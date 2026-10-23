@@ -2,7 +2,7 @@
 
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 
@@ -39,6 +39,9 @@
   - Revert, Save as variant (credited "edited from ... by ..."), Copy to Hydra.
   - **Knobs** for every plain float argument of a hydra function, named from hydra-synth's own definitions. Sliders change uniforms without re-eval. Range fields. Per-knob audio link with depth. Bake writes the values back.
 - **Phone:** the controller fits 390 px again.
+- **Show input (v0.2.1):** a Focusrite Scarlett is picked automatically when listed, ahead of the instance's last choice. The device name shows in the Live tab and the Log.
+  - Unplugged: the Live tab says so in red, the visuals keep running without audio, and it reconnects by itself when the device is back.
+  - Hookup checklist in `SHOWNIGHT.md`: USB, mixer booth/record out to input 1 (or 1+2), INST/Air/direct monitor off, gain ring green (amber on peaks, never red), Focusrite Control on Windows if not listed, plug in before opening the app.
 - **Keys card:** adds S (star) and Ctrl+Enter (run).
 
 ## Stretch done (all off by default or only active when used)
@@ -53,7 +56,7 @@
 
 ## Tests
 
-- **E2E** (`tools/e2e.mjs`, Playwright on the RTX 3080) at v0.2.0: 26/26 local headless, 26/26 local headed, 25/25 against the live URL (the offline check is local only).
+- **E2E** (`tools/e2e.mjs`, Playwright on the RTX 3080) at v0.2.0: 26/26 local headless, 26/26 local headed, 25/25 against the live URL (the offline check is local only). v0.2.1 adds a show-input test (fake Scarlett: auto-pick, unplug, replug): 27/27 local headless and headed.
   - Live edit: knob parsing; run changes the render with no time reset; syntax and runtime errors keep the last frame; revert; a slider changes a uniform with zero re-evals; an audio-linked knob moves with the fake input; bake; variant save, reload, gallery and playlist; instances separate.
   - Covers gallery and quarantine; every playlist operation; export/import round trip; autoplay timing and looping; random coverage; crossfade and cut; idle deck not ticking.
   - Full screen checked on real screen pixels through transitions, quality change, 20 toggles, button/F/double-click and the refused-API fallback.
@@ -89,7 +92,7 @@
 
 ## Known issues
 
-- Not verified on Luna, the M4, Stardust, any projector, or a real audio interface. Audio was tested only with Chromium's fake microphone.
+- Not verified on Luna, the M4, Stardust, any projector, or a real audio interface. Audio was tested only with Chromium's fake microphone; the Scarlett auto-pick and unplug/replug were tested with a fake device renamed to "Focusrite USB (Scarlett 2i2 USB)". Check the real device name at soundcheck.
 - On a GitHub project page, `robots.txt` and `ai.txt` sit under `/posthuman/`, where crawlers don't look. The `noindex/noai` meta tag is what applies.
 - The Share link carries only the playlist, not `?i=`, by design.
 - Sketches that read `a.fft` (audio in the original gallery) run with silent bands; they do not react to the Live tab audio.
@@ -110,6 +113,6 @@
 ## What landed where
 
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\` (git repo; `test-results/` holds e2e and soak JSON, not committed).
-- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0` and `posthuman-v0.2.0`.
+- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0`, `posthuman-v0.2.0` and `posthuman-v0.2.1`.
 - **Pages:** https://laserpirate.github.io/posthuman/ from `main` `/`.
 - The existing `posthuman\` folder (post-human26 gated site) was not touched.
