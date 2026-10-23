@@ -56,7 +56,7 @@
 
 ## Tests
 
-- **E2E** (`tools/e2e.mjs`, Playwright on the RTX 3080) at v0.2.0: 26/26 local headless, 26/26 local headed, 25/25 against the live URL (the offline check is local only). v0.2.1 adds a show-input test (fake Scarlett: auto-pick, unplug, replug): 27/27 local headless and headed.
+- **E2E** (`tools/e2e.mjs`, Playwright on the RTX 3080) at v0.2.0: 26/26 local headless, 26/26 local headed, 25/25 against the live URL (the offline check is local only). v0.2.1 adds a show-input test (fake Scarlett: auto-pick, unplug, replug): 27/27 local headless and headed, 26/26 live.
   - Live edit: knob parsing; run changes the render with no time reset; syntax and runtime errors keep the last frame; revert; a slider changes a uniform with zero re-evals; an audio-linked knob moves with the fake input; bake; variant save, reload, gallery and playlist; instances separate.
   - Covers gallery and quarantine; every playlist operation; export/import round trip; autoplay timing and looping; random coverage; crossfade and cut; idle deck not ticking.
   - Full screen checked on real screen pixels through transitions, quality change, 20 toggles, button/F/double-click and the refused-API fallback.
