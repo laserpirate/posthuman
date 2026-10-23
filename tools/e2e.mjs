@@ -5,10 +5,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 
-const BASE = process.argv[2] || 'http://localhost:8091/';
+const BASE = process.argv.slice(2).find(a => a.startsWith('http')) || 'http://localhost:8091/';
+const HEADED = process.argv.includes('--headed');
 const LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+const browser = await chromium.launch({ headless: !HEADED, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const results = [];
 const consoleProblems = [];
 const offsite = [];
@@ -44,6 +46,20 @@ async function test(name, fn) {
   try { await fn(); results.push({ name, ok: true, ms: Date.now() - t0 }); console.log('PASS', name); }
   catch (e) { results.push({ name, ok: false, ms: Date.now() - t0, err: e.message }); console.log('FAIL', name, '::', e.message); }
 }
+// what is really on screen: screenshot the stage area, count lit pixels
+async function screenLit(p) {
+  const r = await p.evaluate(() => { const b = document.getElementById('stage').getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; });
+  if (r.w < 20 || r.h < 20) return { lit: 0, white: 0, rect: r };
+  const png = PNG.sync.read(await p.screenshot({ clip: { x: r.x, y: r.y, width: Math.min(r.w, 1600), height: Math.min(r.h, 900) } }));
+  let lit = 0, white = 0, n = 0;
+  for (let i = 0; i < png.data.length; i += 16) { // every 4th pixel
+    const mx = Math.max(png.data[i], png.data[i + 1], png.data[i + 2]), mn = Math.min(png.data[i], png.data[i + 1], png.data[i + 2]);
+    n++; if (mx > 24) lit++; if (mn > 245) white++;
+  }
+  return { lit: lit / n, white: white / n, rect: r };
+}
+const notBlank = q => q.lit > 0.02 && q.white < 0.98;
+
 // set the playlist through the test handle: clear, then add ids
 async function setList(p, ids, dur) {
   await p.click('[data-tab=playlist]');
@@ -301,6 +317,84 @@ await test('full screen: code hidden, credits hidden, menu auto-hides and return
   await c.close();
 });
 
+await test('full screen shows the sketch: pixels, transitions, quality, 20 toggles, all entry points', async () => {
+  const c = await ctx(); const p = await open(c);
+  await setList(p, ['example_3', 'example_14', 'nesso_0', 'rangga_4'], 30);
+  await p.selectOption('#s-trans', 'xfade');
+  await p.fill('#n-xfade', '1'); await p.press('#n-xfade', 'Enter');
+  await p.selectOption('#s-q', 'high');
+  await p.click('#pl-list li:nth-child(1) .t');
+  await p.keyboard.press('Space');
+  await wait(500);
+  const win = await screenLit(p);
+  assert(notBlank(win), 'window stage lit ' + JSON.stringify(win));
+  const enter = async how => {
+    if (how === 'button') await p.click('#b-full');
+    else if (how === 'key') await p.keyboard.press('f');
+    else await p.dblclick('#stage', { position: { x: 200, y: 150 } });
+    await p.waitForFunction(() => PHVJ.state.fs, null, { timeout: 2000 });
+  };
+  const leave = async () => {
+    await p.keyboard.press('f');
+    await p.waitForFunction(() => !PHVJ.state.fs, null, { timeout: 2000 });
+  };
+  for (const how of ['button', 'key', 'dblclick']) {
+    await enter(how);
+    await wait(1000);
+    const q = await screenLit(p);
+    const vp = p.viewportSize();
+    assert(q.rect.w >= vp.width - 2 && q.rect.h >= vp.height - 2, how + ': stage fills the screen ' + JSON.stringify(q.rect));
+    assert(notBlank(q), how + ': not blank within 1 s ' + JSON.stringify(q));
+    await leave();
+  }
+  await enter('key');
+  for (let k = 0; k < 3; k++) {
+    await p.keyboard.press('ArrowRight');
+    let t = 0;
+    for (const ms of [300, 700, 1300]) { await wait(ms - t); t = ms; const q = await screenLit(p); assert(notBlank(q), 'transition ' + k + ' at ' + ms + ' ms ' + JSON.stringify(q)); }
+    const s = await st(p);
+    assert(await p.textContent('#now') === (await p.evaluate(id => { const x = PH_DATA.sketches.find(z => z.id === id); return x.title + ' · ' + x.author; }, s.cur)), 'menu title matches the sketch on screen');
+  }
+  await p.keyboard.press('ArrowLeft'); await wait(1300);
+  assert(notBlank(await screenLit(p)), 'after previous');
+  await p.evaluate(() => { const s = document.getElementById('s-q'); s.value = 'low'; s.dispatchEvent(new Event('change')); });
+  await wait(600);
+  assert(notBlank(await screenLit(p)), 'after quality change');
+  await leave();
+  for (let k = 0; k < 20; k++) { await enter('key'); await leave(); }
+  await enter('key'); await wait(800);
+  assert(notBlank(await screenLit(p)), 'after 20 toggles');
+  await leave();
+  const r = await p.evaluate(() => ({ panel: !!document.getElementById('panel').offsetParent, bar: document.getElementById('bar').getBoundingClientRect().height, stage: document.getElementById('stage').getBoundingClientRect().width }));
+  assert(r.panel && r.bar > 20 && r.stage < p.viewportSize().width, 'exit restores the layout ' + JSON.stringify(r));
+  assert(notBlank(await screenLit(p)), 'window stage lit after exit');
+  // fallback: a refused Fullscreen API still gives a full window that renders
+  await p.evaluate(() => { Element.prototype.requestFullscreen = () => Promise.reject(new Error('refused for test')); });
+  await p.keyboard.press('f');
+  await p.waitForFunction(() => PHVJ.state.fs);
+  await wait(600);
+  const fb = await screenLit(p);
+  assert(notBlank(fb) && fb.rect.h >= p.viewportSize().height - 2, 'CSS full-window fallback renders ' + JSON.stringify(fb));
+  await p.keyboard.press('Escape');
+  assert(!(await st(p)).fs, 'Esc leaves the fallback');
+  await c.close();
+});
+
+await test('clean output and the output window render the sketch (pixels)', async () => {
+  const c = await ctx(); const p = await open(c, '?i=px');
+  await wait(400);
+  await p.click('#b-clean'); await wait(500);
+  assert(notBlank(await screenLit(p)), 'clean output lit');
+  await p.keyboard.press('h');
+  await p.keyboard.press('h'); await wait(300);
+  assert(notBlank(await screenLit(p)), 'menu hidden: stage lit');
+  await p.keyboard.press('h');
+  const out = await open(c, '?i=px&out=1');
+  await wait(1200);
+  assert(notBlank(await screenLit(out)), 'output window lit');
+  await c.close();
+});
+
 await test('blackout from any state', async () => {
   const c = await ctx(); const p = await open(c);
   const covered = () => p.evaluate(() => {
@@ -416,8 +510,15 @@ await test('stretch: audio reactive (fake input) drives zoom and flash, off by d
   assert(!s.settings.au.on && !s.audio, 'off by default');
   assert(await p.evaluate(() => getComputedStyle(document.getElementById('decks')).transform) === 'none', 'no effect when off');
   await p.click('[data-tab=live]');
-  await p.selectOption('#au-band', 'mids');
-  await p.evaluate(() => { const el = document.getElementById('au-sens'); el.value = '30'; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
+  // the fake device is a tone; open the full band and the mid band, route both effects
+  await p.evaluate(() => {
+    for (const b of ['full', 'mid', 'low', 'high']) {
+      const el = document.querySelector(`.band[data-band="${b}"] label:first-of-type input`);
+      el.value = '40'; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
+    }
+  });
+  await p.selectOption('#au-zsrc', 'full');
+  await p.selectOption('#au-fsrc', 'mid');
   await p.check('#au-on');
   await p.waitForFunction(() => PHVJ.state.audio, null, { timeout: 5000 });
   let maxFx = 0, sawTransform = false;
@@ -428,7 +529,10 @@ await test('stretch: audio reactive (fake input) drives zoom and flash, off by d
     if (r[1].startsWith('scale(')) sawTransform = true;
   }
   assert(maxFx > 0.02 && sawTransform, 'level drives the effect: max ' + maxFx);
-  assert(await p.evaluate(() => document.getElementById('au-meter').style.width !== '0%'), 'meter moves');
+  assert(await p.evaluate(() => document.getElementById('au-m-full').style.width !== '0%'), 'full band meter moves');
+  const A = (await st(p)).A;
+  assert(['full', 'low', 'mid', 'high', 'custom'].every(k => typeof A[k] === 'number') && await p.evaluate(() => typeof window.A.low === 'number'), 'A.* globals');
+  assert(await p.locator('.band').count() === 5, 'five band rows with sens, smooth, threshold');
   const opts = await p.locator('#au-dev option').count();
   assert(opts >= 1, 'device picker');
   await p.uncheck('#au-on');

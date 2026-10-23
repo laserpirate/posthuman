@@ -39,3 +39,14 @@ One line per judgment call. Newest at the bottom.
 - Stretch, tempo: Tap averages up to the last 8 taps (a gap over 2 s restarts); with "every N bars" each sketch runs N × 4 beats. Four or more taps also restart the current sketch's clock so the switch lands on a bar line.
 - Stretch, hold: Hold freezes the countdown on the current sketch (G); Play/Pause stays separate.
 - Stretch, ban: per instance and saved; banned sketches never autoplay, are skipped at once if on screen, and can still be played by hand.
+- First soak (pre-fix code) found a 404 for favicon.ico (counted as a console error) and slow heap growth; added an empty data: favicon.
+- Heap snapshots traced the growth to hydra-synth's hush(): Source.clear() makes a new 1×1 texture per source without freeing the old one (4 WebGL textures leaked per switch). The app frees them before hush; vendored hydra-synth stays unmodified.
+- Remaining per-switch heap noise is V8 code for each `new Function` eval and Chrome's layout-shift buffer (capped at 150 entries); both bounded.
+- The soak pass rule allows under 2 MB growth between the first and last third of samples, after forced GC.
+- Handoff-3 #1 root cause: in full screen #bar becomes position: fixed (and in clean/out/menu-off it is display: none), so it leaves the grid flow and #main is auto-placed into grid row 1, which those modes size to 0 px. The stage had zero height, so the screen showed only the black body. Fix: pin #bar to row 1 and #main to row 2. The output window had the same flaw.
+- Full screen: if the Fullscreen API is missing or refused, the app enters the same layout as a full-window mode (Esc or F leaves it). Double-click on the stage also toggles full screen.
+- Full screen menu: synthetic mousemove events with no movement (Chrome sends them when the cursor hides or layout shifts) no longer reset the 3 s auto-hide. Found only in the headed run.
+- E2E now checks real screen pixels (Playwright screenshot of the stage, decoded with pngjs) for full screen, transitions, quality change, 20 toggles, clean output and the output window.
+- Interrupted soak #2: the visible soak window at ?i=soak was used by hand (random on, High 60 fps, held). Later soaks run headless (same RTX 3080 via ANGLE D3D11) so they cannot be touched.
+- Stars: one star set per instance, shown on gallery cards, playlist rows and the menu bar (S). "Playlist from starred" makes or replaces a playlist named Starred.
+- Audio v2: five bands analysed at once (Full, Low = lowpass 150 Hz, Mid = 1 to 3 kHz, High = highpass 6 kHz, Custom lo..hi); each has sensitivity, smoothing, threshold and a meter. Zoom and flash each pick their own band, so two bands run at once. The v0.1 Kick/Bass presets became Custom buttons (40-120, 60-250 Hz). Levels exposed as window.A.

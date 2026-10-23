@@ -47,18 +47,27 @@
     try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch (e) { /* storage full or blocked */ }
   }
 
-  const BANDS = {
-    kick: { type: 'lowpass', f: 120, q: 0.7 },
-    bass: { type: 'lowpass', f: 250, q: 0.7 },
-    mids: { type: 'bandpass', f: 1732, q: 0.87 }, // 1 to 3 kHz
-    highs: { type: 'highpass', f: 6000, q: 0.7 },
-  };
+  // audio bands: each is a chain of biquads (none for full) into its own analyser
+  const BANDS = ['full', 'low', 'mid', 'high', 'custom'];
+  const BAND_LABEL = { full: 'Full', low: 'Low (kick/bass)', mid: 'Mid', high: 'High (hats)', custom: 'Custom Hz' };
+  const bandFilters = (b, lo, hi) => ({
+    full: [],
+    low: [['lowpass', 150]],
+    mid: [['highpass', 1000], ['lowpass', 3000]],
+    high: [['highpass', 6000]],
+    custom: [['highpass', lo], ['lowpass', hi]],
+  })[b];
+  const bandDef = () => ({ sens: 8, smooth: 0.85, thr: 0.05 });
   const DEF = {
     defaultDur: 30, transition: 'xfade', xfadeSec: 2, random: false, scope: 'playlist',
     quality: 'med', autoDrop: true, credits: true, clean: false, menuHidden: false, black: false,
     tab: 'playlist', pullN: 5, pullFrom: 'pool',
     bpm: 120, bars: 0, outPreview: false,
-    au: { on: false, dev: '', band: 'kick', sens: 8, smooth: 0.85, zoom: 0.08, flash: 0.5 },
+    au: {
+      on: false, dev: '', lo: 40, hi: 120,
+      bands: { full: bandDef(), low: bandDef(), mid: bandDef(), high: bandDef(), custom: bandDef() },
+      zoomSrc: 'low', zoom: 0.08, flashSrc: 'high', flash: 0.5,
+    },
   };
   const S = (() => {
     const v = Object.assign({}, DEF, load('settings', {}));
@@ -76,11 +85,18 @@
     const au = Object.assign({}, DEF.au, v.au && typeof v.au === 'object' ? v.au : {});
     au.on = !!au.on;
     au.dev = typeof au.dev === 'string' ? au.dev : '';
-    if (!BANDS[au.band]) au.band = DEF.au.band;
-    au.sens = clamp(au.sens, 0.5, 30, DEF.au.sens);
-    au.smooth = clamp(au.smooth, 0, 0.97, DEF.au.smooth);
+    au.lo = clamp(au.lo, 20, 18000, DEF.au.lo);
+    au.hi = clamp(au.hi, au.lo + 10, 20000, Math.max(DEF.au.hi, au.lo + 10));
+    const bands = {};
+    for (const b of BANDS) {
+      const x = Object.assign(bandDef(), au.bands && au.bands[b] ? au.bands[b] : {});
+      bands[b] = { sens: clamp(x.sens, 0.5, 40, 8), smooth: clamp(x.smooth, 0, 0.97, 0.85), thr: clamp(x.thr, 0, 0.9, 0.05) };
+    }
+    au.bands = bands;
+    for (const k of ['zoomSrc', 'flashSrc']) if (au[k] !== 'off' && !BANDS.includes(au[k])) au[k] = DEF.au[k];
     au.zoom = clamp(au.zoom, 0, 0.3, DEF.au.zoom);
     au.flash = clamp(au.flash, 0, 1.5, DEF.au.flash);
+    for (const k of ['band', 'sens', 'smooth']) delete au[k]; // v0.1 single-band settings
     v.au = au;
     return v;
   })();
@@ -518,8 +534,9 @@
     $('#n-bpm').value = String(S.bpm);
     $('#s-bars').value = String(S.bars);
     $('#au-on').checked = S.au.on;
-    $('#au-band').value = S.au.band;
-    for (const k of ['sens', 'smooth', 'zoom', 'flash']) $('#au-' + k).value = String(S.au[k]);
+    $('#au-zsrc').value = S.au.zoomSrc; $('#au-fsrc').value = S.au.flashSrc;
+    $('#au-zoom').value = String(S.au.zoom); $('#au-flash').value = String(S.au.flash);
+    $('#au-lo').value = String(S.au.lo); $('#au-hi').value = String(S.au.hi);
     const cue = SK.get(PLAY.cue);
     $('#cue-st').textContent = cue ? 'Cued next: ' + cue.title : '';
     renderClock();
@@ -532,6 +549,7 @@
     $('#code-ov').textContent = sk ? sk.code : '';
     for (const li of $('#pl-list').children) li.classList.toggle('cur', li.dataset.id === RT.cur);
     for (const c of $('#g-grid').children) c.classList.toggle('cur', c.dataset.id === RT.cur);
+    if (!OUT) renderStar();
     renderClock();
   }
 
@@ -549,7 +567,14 @@
     clearTimeout(idleT);
     if (RT.fs) idleT = setTimeout(() => { if (RT.fs && !$('#bar').matches(':hover')) body.classList.add('idle'); else poke(); }, 3000);
   }
-  document.addEventListener('mousemove', poke);
+  // Chrome sends synthetic mousemoves with no movement (cursor hidden, layout change); only real
+  // movement brings the menu back
+  let mx = -1, my = -1;
+  document.addEventListener('mousemove', e => {
+    if (e.clientX === mx && e.clientY === my) return;
+    mx = e.clientX; my = e.clientY;
+    poke();
+  });
   function setFs(on) {
     RT.fs = !!on;
     body.classList.toggle('fs', RT.fs);
@@ -558,10 +583,14 @@
     poke();
   }
   document.addEventListener('fullscreenchange', () => setFs(!!document.fullscreenElement));
+  if (!OUT) $('#stage').addEventListener('dblclick', toggleFull);
+  // the Fullscreen API when the browser allows it; otherwise the same layout as a full-window mode
   function toggleFull() {
-    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
-    const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
-    if (p && p.catch) p.catch(e => log('Full screen refused: ' + (e.message || e), true));
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => setFs(false)); return; }
+    if (RT.fs) { setFs(false); return; } // leaving the full-window fallback
+    const el = document.documentElement;
+    if (!el.requestFullscreen) { log('Full screen API unavailable; using full window'); setFs(true); return; }
+    el.requestFullscreen().catch(e => { log('Full screen refused (' + (e.message || e) + '); using full window', true); setFs(true); });
   }
 
   // ---- UI: tabs ---------------------------------------------------------------------------------
@@ -592,6 +621,7 @@
       return h('li', { 'data-id': it.id, class: cls.join(' ').trim() },
         h('span', { class: 'h', title: 'Drag to reorder', text: '≡' }),
         h('span', { class: 'i', text: String(i + 1) }),
+        h('button', { class: 'star', 'data-act': 'star', title: 'Star', 'aria-pressed': String(stars.has(it.id)), text: stars.has(it.id) ? '★' : '☆' }),
         h('span', { class: 't', title: 'Play now' + q, 'data-act': 'play' }, sk.title, h('small', { text: sk.author })),
         h('input', { type: 'number', min: 1, max: 3600, step: 1, value: it.dur, title: 'Seconds', 'data-act': 'dur' }),
         h('button', { 'data-act': 'cue', title: 'Play this next', text: 'Cue', 'aria-pressed': String(PLAY.cue === it.id) }),
@@ -648,6 +678,7 @@
     else if (act === 'up') move(i, i - 1);
     else if (act === 'down') move(i, i + 1);
     else if (act === 'rm') { list().splice(i, 1); changed(); }
+    else if (act === 'star') toggleStar(li.dataset.id);
     else if (act === 'cue') setCue(PLAY.cue === li.dataset.id ? null : li.dataset.id);
     else if (act === 'ban') setBan(li.dataset.id, !banned.has(li.dataset.id));
   });
@@ -826,13 +857,31 @@
     const el = e.target.closest('[data-act]'), card = e.target.closest('.cardg');
     if (!el || !card) return;
     const id = card.dataset.id;
-    if (el.dataset.act === 'star') {
-      if (stars.has(id)) stars.delete(id); else stars.add(id);
-      saveStars();
-      if ($('#g-star').checked) renderGallery();
-      else { press(el, stars.has(id)); el.textContent = stars.has(id) ? '★' : '☆'; }
-    } else if (el.dataset.act === 'add') addToList(id);
+    if (el.dataset.act === 'star') toggleStar(id);
+    else if (el.dataset.act === 'add') addToList(id);
     else if (el.dataset.act === 'play') { show(id) || log('Could not play ' + id, true); }
+  });
+  // one star set per instance: gallery cards, playlist rows and the menu bar all show it
+  function toggleStar(id) {
+    if (!SK.has(id)) return;
+    if (stars.has(id)) stars.delete(id); else stars.add(id);
+    saveStars();
+    renderPlaylist();
+    if ($('#g-star').checked) renderGallery();
+    else for (const b of grid.querySelectorAll('.cardg[data-id="' + id + '"] .star')) { press(b, stars.has(id)); b.textContent = stars.has(id) ? '★' : '☆'; }
+    renderStar();
+  }
+  function renderStar() {
+    const b = btn('star'), on = !!RT.cur && stars.has(RT.cur);
+    press(b, on); b.textContent = on ? '★' : '☆'; b.disabled = !RT.cur;
+  }
+  btn('star').addEventListener('click', () => RT.cur && toggleStar(RT.cur));
+  $('#pl-fromstar').addEventListener('click', () => {
+    const ids = D.sketches.filter(s => stars.has(s.id) && !s.quarantine).map(s => s.id);
+    if (!ids.length) { log('No starred sketches yet', true); return; }
+    LISTS.lists.Starred = ids.map(id => ({ id, dur: S.defaultDur }));
+    switchList('Starred');
+    log('Playlist "Starred" made from ' + ids.length + ' starred sketches');
   });
   $('#g-q').addEventListener('input', renderGallery);
   $('#g-star').addEventListener('change', renderGallery);
@@ -868,7 +917,7 @@
         if (LEVEL[m.level] && m.level !== RT.level) { RT.level = m.level; applyQuality(); }
         renderBar();
       }
-      if (m.t === 'fx') applyFx(m.v, m.z, m.f);
+      if (m.t === 'fx') applyFx(m.A, m.fx || S.au);
       return;
     }
     if (m.t === 'hello') {
@@ -939,24 +988,41 @@
   $('#n-bpm').addEventListener('change', e => { S.bpm = clamp(e.target.value, 40, 240, S.bpm); saveSettings(); renderBar(); });
   $('#s-bars').addEventListener('change', e => { S.bars = Number(e.target.value) || 0; saveSettings(); renderBar(); e.target.blur(); });
 
-  // ---- audio: one band through a biquad into an analyser, driving zoom and brightness ---------------
+  // ---- audio: five bands, each through its own filters into an analyser ------------------------------
+  // Levels are 0..1 in window.A (A.full, A.low, A.mid, A.high, A.custom) so edited code can use them.
+  // Effects stay after the sketch: a zoom pump and a brightness flash on the deck wrapper, each driven
+  // by the band you pick. The output window gets the levels from the controller.
 
-  const AU = { ctx: null, stream: null, an: null, filt: null, buf: null, v: 0, lastSent: 0 };
+  const A = window.A = { full: 0, low: 0, mid: 0, high: 0, custom: 0 };
+  const AU = { ctx: null, stream: null, src: null, bands: {}, buf: null };
   const decksEl = $('#decks');
-  function applyFx(v, zoom = S.au.zoom, flash = S.au.flash) {
-    v = clamp(v, 0, 1, 0);
-    zoom = clamp(zoom, 0, 0.3, 0); flash = clamp(flash, 0, 1.5, 0);
-    RT.fx = v;
-    decksEl.style.transform = v > 0.001 ? 'scale(' + (1 + v * zoom).toFixed(4) + ')' : '';
-    decksEl.style.filter = v > 0.001 ? 'brightness(' + (1 + v * flash).toFixed(3) + ')' : '';
-    if (!OUT) $('#au-meter').style.width = (v * 100).toFixed(1) + '%';
+  function applyFx(levels, fx = S.au) {
+    for (const b of BANDS) A[b] = clamp(levels && levels[b], 0, 1, 0);
+    const z = fx.zoomSrc === 'off' ? 0 : A[fx.zoomSrc] || 0, f = fx.flashSrc === 'off' ? 0 : A[fx.flashSrc] || 0;
+    const zoom = clamp(fx.zoom, 0, 0.3, 0), flash = clamp(fx.flash, 0, 1.5, 0);
+    RT.fx = Math.max(z, f);
+    decksEl.style.transform = z * zoom > 0.0005 ? 'scale(' + (1 + z * zoom).toFixed(4) + ')' : '';
+    decksEl.style.filter = f * flash > 0.001 ? 'brightness(' + (1 + f * flash).toFixed(3) + ')' : '';
+    if (!OUT) for (const b of BANDS) { const m = document.getElementById('au-m-' + b); if (m) m.style.width = (A[b] * 100).toFixed(1) + '%'; }
   }
-  function setBand() {
-    if (!AU.filt) return;
-    const b = BANDS[S.au.band];
-    AU.filt.type = b.type;
-    AU.filt.frequency.value = b.f;
-    AU.filt.Q.value = b.q;
+  function buildBand(b) {
+    const ctx = AU.ctx, an = ctx.createAnalyser();
+    an.fftSize = 1024;
+    let node = AU.src;
+    const filters = bandFilters(b, S.au.lo, S.au.hi).map(([type, f]) => {
+      const n = ctx.createBiquadFilter();
+      n.type = type; n.frequency.value = f; n.Q.value = 0.707;
+      node.connect(n); node = n;
+      return n;
+    });
+    node.connect(an);
+    AU.bands[b] = { an, filters, v: 0 };
+  }
+  function setCustom() {
+    const c = AU.bands.custom;
+    if (!c) return;
+    c.filters[0].frequency.value = S.au.lo;
+    c.filters[1].frequency.value = S.au.hi;
   }
   async function listInputs() {
     try {
@@ -967,13 +1033,14 @@
       sel.value = [...sel.options].some(o => o.value === S.au.dev) ? S.au.dev : '';
     } catch (e) { /* no media devices */ }
   }
+  const fxSettings = () => ({ zoomSrc: S.au.zoomSrc, zoom: S.au.zoom, flashSrc: S.au.flashSrc, flash: S.au.flash });
   function audioStop() {
     if (AU.stream) for (const t of AU.stream.getTracks()) t.stop();
     if (AU.ctx) AU.ctx.close().catch(() => {});
-    AU.ctx = AU.stream = AU.an = AU.filt = null;
-    AU.v = 0;
-    applyFx(0);
-    post({ t: 'fx', v: 0 });
+    AU.ctx = AU.stream = AU.src = null;
+    AU.bands = {};
+    applyFx(null);
+    post({ t: 'fx', A: { ...A }, fx: fxSettings() });
   }
   async function audioStart() {
     audioStop();
@@ -983,16 +1050,12 @@
         audio: { deviceId: S.au.dev ? { exact: S.au.dev } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       if (!S.au.on) { for (const t of stream.getTracks()) t.stop(); return; }
-      const ctx = new AudioContext();
-      const src = ctx.createMediaStreamSource(stream);
-      AU.filt = ctx.createBiquadFilter();
-      AU.an = ctx.createAnalyser();
-      AU.an.fftSize = 1024;
-      src.connect(AU.filt).connect(AU.an);
-      AU.buf = new Float32Array(AU.an.fftSize);
-      AU.ctx = ctx; AU.stream = stream;
-      setBand();
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      AU.ctx = new AudioContext();
+      AU.stream = stream;
+      AU.src = AU.ctx.createMediaStreamSource(stream);
+      for (const b of BANDS) buildBand(b);
+      AU.buf = new Float32Array(1024);
+      if (AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
       log('Audio on: ' + (stream.getAudioTracks()[0] || {}).label);
       listInputs();
     } catch (e) {
@@ -1000,25 +1063,56 @@
       S.au.on = false; saveSettings(); renderBar();
     }
   }
-  // attack at once, release by the smoothing amount
+  // per band: RMS x sensitivity, gated by the threshold, attack at once, release by the smoothing
   function audioFrame() {
-    if (!AU.an) return;
-    AU.an.getFloatTimeDomainData(AU.buf);
-    let sum = 0;
-    for (let i = 0; i < AU.buf.length; i++) sum += AU.buf[i] * AU.buf[i];
-    const raw = Math.min(1, Math.sqrt(sum / AU.buf.length) * S.au.sens);
-    AU.v = Math.max(raw, AU.v * S.au.smooth);
-    applyFx(AU.v);
-    if (outLive()) post({ t: 'fx', v: +AU.v.toFixed(3), z: S.au.zoom, f: S.au.flash });
+    if (!AU.ctx) return;
+    const lv = {};
+    for (const b of BANDS) {
+      const x = AU.bands[b], p = S.au.bands[b];
+      x.an.getFloatTimeDomainData(AU.buf);
+      let sum = 0;
+      for (let i = 0; i < AU.buf.length; i++) sum += AU.buf[i] * AU.buf[i];
+      const raw = Math.min(1, Math.sqrt(sum / AU.buf.length) * p.sens);
+      const gated = raw <= p.thr ? 0 : (raw - p.thr) / (1 - p.thr);
+      x.v = Math.max(gated, x.v * p.smooth);
+      lv[b] = x.v;
+    }
+    applyFx(lv);
+    if (outLive()) post({ t: 'fx', A: lv, fx: fxSettings() });
   }
+
+  // band rows: name, live meter, sensitivity, smoothing, threshold
+  function slider(min, max, step, value, on) {
+    const el = h('input', { type: 'range', min, max, step, value: String(value) });
+    el.addEventListener('input', () => on(Number(el.value)));
+    el.addEventListener('change', () => { saveSettings(); el.blur(); });
+    return el;
+  }
+  $('#au-bands').replaceChildren(...BANDS.map(b => h('div', { class: 'band', 'data-band': b },
+    h('b', { text: BAND_LABEL[b] }),
+    h('div', { class: 'meter', title: 'Filtered level' }, h('div', { id: 'au-m-' + b })),
+    h('label', {}, 'Sens', slider(0.5, 40, 0.5, S.au.bands[b].sens, v => { S.au.bands[b].sens = v; })),
+    h('label', {}, 'Smooth', slider(0, 0.97, 0.01, S.au.bands[b].smooth, v => { S.au.bands[b].smooth = v; })),
+    h('label', {}, 'Threshold', slider(0, 0.9, 0.01, S.au.bands[b].thr, v => { S.au.bands[b].thr = v; })))));
+  for (const sel of [$('#au-zsrc'), $('#au-fsrc')]) sel.replaceChildren(h('option', { value: 'off', text: 'Off' }), ...BANDS.map(b => h('option', { value: b, text: BAND_LABEL[b] })));
+
   $('#au-on').addEventListener('change', e => { S.au.on = e.target.checked; saveSettings(); if (S.au.on) audioStart(); else { audioStop(); log('Audio off'); } });
   $('#au-dev').addEventListener('change', e => { S.au.dev = e.target.value; saveSettings(); if (S.au.on) audioStart(); e.target.blur(); });
-  $('#au-band').addEventListener('change', e => { S.au.band = e.target.value; saveSettings(); setBand(); e.target.blur(); });
-  for (const k of ['sens', 'smooth', 'zoom', 'flash']) {
+  $('#au-zsrc').addEventListener('change', e => { S.au.zoomSrc = e.target.value; saveSettings(); e.target.blur(); });
+  $('#au-fsrc').addEventListener('change', e => { S.au.flashSrc = e.target.value; saveSettings(); e.target.blur(); });
+  for (const k of ['zoom', 'flash']) {
     const el = $('#au-' + k);
     el.addEventListener('input', () => { S.au[k] = Number(el.value); });
     el.addEventListener('change', () => { saveSettings(); el.blur(); });
   }
+  function setRange(lo, hi) {
+    S.au.lo = clamp(lo, 20, 18000, S.au.lo);
+    S.au.hi = clamp(hi, S.au.lo + 10, 20000, S.au.lo + 10);
+    saveSettings(); setCustom(); renderBar();
+  }
+  $('#au-lo').addEventListener('change', () => setRange($('#au-lo').value, $('#au-hi').value));
+  $('#au-hi').addEventListener('change', () => setRange($('#au-lo').value, $('#au-hi').value));
+  for (const b of document.querySelectorAll('[data-hz]')) b.addEventListener('click', () => { const [lo, hi] = b.dataset.hz.split('-').map(Number); setRange(lo, hi); });
 
   // ---- bar controls and keys ----------------------------------------------------------------------
 
@@ -1061,6 +1155,7 @@
     if (OUT) { if (k === 'f') { e.preventDefault(); toggleFull(); } return; } // the controller drives the rest
     const acts = {
       t: tap,
+      s: () => RT.cur && toggleStar(RT.cur),
       g: () => setHold(!PLAY.hold),
       x: () => RT.cur && setBan(RT.cur, true),
       ' ': () => setPlaying(!PLAY.playing),
@@ -1074,6 +1169,7 @@
       '?': () => { $('#help').hidden = !$('#help').hidden; },
       Escape: () => {
         if (!$('#help').hidden) $('#help').hidden = true;
+        else if (RT.fs && !document.fullscreenElement) setFs(false);
         else if (S.clean) setClean(false);
         if (typing(e.target)) e.target.blur();
       },
@@ -1118,7 +1214,7 @@
         fs: RT.fs, code: RT.code, settings: { ...S }, active: LISTS.active,
         list: list().map(it => ({ ...it })), lists: Object.keys(LISTS.lists), stars: [...stars],
         out: OUT, outLive: outLive(), resting: previewResting(), hold: PLAY.hold, cue: PLAY.cue, banned: [...banned],
-        fx: RT.fx, audio: !!AU.an, dur: RT.cur ? durOf(RT.cur) : 0,
+        fx: RT.fx, audio: !!AU.ctx, A: { ...A }, dur: RT.cur ? durOf(RT.cur) : 0,
       };
     },
     next, prev, show, setPlaying, toggleRandom, shareLink, exportData, importData, setFs,
