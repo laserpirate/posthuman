@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai">
+<title>POST/HUMAN · VJ</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <header id="bar">
+    <div class="grp brand"><b>POST/HUMAN · VJ</b><span id="inst" class="tag" title="Instance name (?i=)"></span></div>
+    <div class="grp transport">
+      <button id="b-prev" title="Previous (Left)">Prev</button>
+      <button id="b-play" class="wide" title="Play / pause (Space)">Play</button>
+      <button id="b-next" title="Next (Right)">Next</button>
+      <span id="count" class="readout" title="Time to next switch">0:00</span>
+      <span id="now" class="now"></span>
+    </div>
+    <div class="grp tools">
+      <button id="b-rand" title="Random mode (R)">Random</button>
+      <select id="s-scope" title="Random picks from">
+        <option value="playlist">from playlist</option>
+        <option value="pool">from pool</option>
+      </select>
+      <select id="s-trans" title="Transition">
+        <option value="xfade">Crossfade</option>
+        <option value="cut">Cut</option>
+      </select>
+      <label class="num" title="Crossfade seconds"><input id="n-xfade" type="number" min="0.2" max="10" step="0.1"><span>s</span></label>
+      <select id="s-q" title="Quality">
+        <option value="low">Low 960×540</option>
+        <option value="med">Med 1280×720</option>
+        <option value="high">High 1920×1080</option>
+      </select>
+      <span id="fps" class="readout" title="Frames per second">-- fps</span>
+      <button id="b-code" title="Code overlay (C)">Code</button>
+      <button id="b-cred" title="Credits line">Credits</button>
+      <button id="b-clean" title="Clean output: hide all UI (H or Esc to leave)">Clean</button>
+      <button id="b-black" class="warn" title="Blackout (B)">Blackout</button>
+      <button id="b-full" title="Full screen (F)">Full screen</button>
+      <button id="b-hide" title="Hide menu (H)">Hide</button>
+      <button id="b-help" title="Keys (?)">?</button>
+    </div>
+  </header>
+  <button id="peek" title="Show menu (H)" hidden>Menu</button>
+
+  <main id="main">
+    <section id="stage" aria-label="Output">
+      <canvas id="deck-a"></canvas>
+      <canvas id="deck-b"></canvas>
+      <pre id="code-ov" hidden></pre>
+      <div id="credit"></div>
+      <div id="stage-msg" hidden></div>
+      <div id="black" hidden></div>
+    </section>
+
+    <aside id="panel">
+      <nav id="tabs" role="tablist">
+        <button data-tab="playlist" role="tab">Playlist</button>
+        <button data-tab="gallery" role="tab">Gallery</button>
+        <button data-tab="credits" role="tab">Credits</button>
+        <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
+      </nav>
+
+      <div id="v-playlist" class="view">
+        <div class="row">
+          <select id="pl-sel" title="Playlists"></select>
+          <button id="pl-new">New</button>
+          <button id="pl-ren">Rename</button>
+          <button id="pl-del">Delete</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Pull</span>
+          <input id="pull-n" type="number" min="1" max="58" value="5" title="How many">
+          <select id="pull-from" title="Pull from">
+            <option value="pool">from pool</option>
+            <option value="starred">from starred</option>
+          </select>
+          <button id="pull">Pull random</button>
+          <button id="pl-shuf">Shuffle</button>
+          <button id="pl-clear">Clear</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Default</span>
+          <label class="num"><input id="def-dur" type="number" min="1" max="3600" step="1"><span>s</span></label>
+          <button id="pl-apply">Apply to all</button>
+          <button id="pl-exp">Export</button>
+          <button id="pl-imp">Import</button>
+          <input id="pl-file" type="file" accept="application/json,.json" hidden>
+          <button id="pl-share">Share link</button>
+        </div>
+        <input id="share-out" class="share" readonly hidden>
+        <ol id="pl-list"></ol>
+        <p id="pl-empty" class="dim" hidden>Empty. Add sketches from the Gallery or pull random ones.</p>
+      </div>
+
+      <div id="v-gallery" class="view" hidden>
+        <div class="row">
+          <input id="g-q" type="search" placeholder="Search title or author">
+          <label class="chk"><input id="g-star" type="checkbox"> Starred</label>
+          <span id="g-n" class="dim"></span>
+        </div>
+        <div id="g-grid"></div>
+      </div>
+
+      <div id="v-credits" class="view" hidden>
+        <p class="dim">Sketches from the Hydra gallery, each by the artist named, licensed CC BY-NC-SA 4.0. Code runs unmodified.
+          Engine: hydra-synth by Olivia Jack and contributors, AGPL-3.0. Fonts: Chakra Petch and Martian Mono, SIL OFL 1.1.
+          App code © 2026 Marko Manriquez, all rights reserved.</p>
+        <table id="cr-table"><thead><tr><th>Title</th><th>Author</th><th>License</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="v-log" class="view" hidden>
+        <div class="row"><span id="gpu" class="dim"></span><button id="log-clear">Clear</button></div>
+        <ol id="log"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <div id="help" class="card" hidden>
+    <h2>Keys</h2>
+    <dl>
+      <dt>Space</dt><dd>Play / pause</dd>
+      <dt>→ / ←</dt><dd>Next / previous</dd>
+      <dt>F</dt><dd>Full screen</dd>
+      <dt>H</dt><dd>Hide / show menu</dd>
+      <dt>C</dt><dd>Code overlay</dd>
+      <dt>B</dt><dd>Blackout</dd>
+      <dt>R</dt><dd>Random mode</dd>
+      <dt>Esc</dt><dd>Leave full screen</dd>
+      <dt>?</dt><dd>This card</dd>
+    </dl>
+    <button id="help-x">Close</button>
+  </div>
+</div>
+<script src="vendor/hydra-synth/hydra-synth.js"></script>
+<script src="data/sketches.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

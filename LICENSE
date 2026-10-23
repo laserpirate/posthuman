@@ -1,0 +1,15 @@
+POST/HUMAN · VJ
+
+App code (index.html, app.js, app.css, serve.mjs, tools/): © 2026 Marko Manriquez. All rights reserved.
+No permission is granted to copy, modify, distribute or use the app code without written permission.
+
+Sketches (data/sketches.js, thumbs/, tools/source/examples.json): from the Hydra gallery
+(https://github.com/hydra-synth/hydra, src/stores/examples.json), each by the artist named in its
+header comment, licensed Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0, https://creativecommons.org/licenses/by-nc-sa/4.0/). Code is run unmodified.
+Thumbnails are stills rendered from those sketches and carry the same license.
+
+hydra-synth (vendor/hydra-synth/): by Olivia Jack and contributors, GNU Affero General Public License
+v3.0 (AGPL-3.0). Full text in vendor/hydra-synth/LICENSE. Source: https://github.com/hydra-synth/hydra-synth
+
+Fonts (fonts/): Chakra Petch and Martian Mono, SIL Open Font License 1.1. Full text in fonts/OFL.txt.

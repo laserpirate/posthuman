@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const url = process.argv[2] || 'http://localhost:8091/';
+const headless = process.argv[3] !== 'headed';
+const b = await chromium.launch({ headless, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const p = await b.newPage({ viewport: { width: 1366, height: 768 } });
+const errs = [];
+p.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); });
+p.on('pageerror', e => errs.push('pageerror: ' + e.message));
+await p.goto(url);
+await p.waitForTimeout(4000);
+console.log(JSON.stringify(await p.evaluate(() => { const s = PHVJ.state; return { gpu: document.querySelector('#gpu').textContent, cur: s.cur, fps: s.fps, hydras: s.hydras, ticks: s.ticks, op: s.opacity, errors: s.errors, log: [...document.querySelectorAll('#log li')].map(l => l.textContent) }; }), null, 1));
+await p.screenshot({ path: process.env.SHOT || 'C:/Users/Marko/AppData/Local/Temp/claude/Z---F26-Fall-2026-9-post-human/06e7b7c4-f002-4bad-a04a-33d2552ed8f2/scratchpad/smoke.png' });
+console.log(errs.join('\n'));
+await b.close();
