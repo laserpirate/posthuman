@@ -80,7 +80,7 @@
 - **Soak 2** was stopped: the visible soak window was being driven by hand.
 - Soak 3 shares the GPU with some short e2e runs (the one 27.5 fps sample).
 - Leftover heap growth is about 0.3 MB in 30 min (V8 code for each eval, Chrome's capped layout-shift buffer); it flattens.
-- Soak 4, on the v0.2.0 code: running when this was written; result below if done.
+- **Soak 4 (pass), v0.2.0 code, headless on the real GPU, nothing else running:** 32 min, 192 switches, all 57 played; fps min 29, avg 29.9; heap 3.45 to 4.02 MB (thirds 3.69 to 3.99); 0 context lost, 0 reloads, 0 skips, 0 console errors; 2 hydra instances.
 
 ## Quarantine
 
