@@ -35,18 +35,30 @@
 
   const params = new URLSearchParams(location.search);
   const INST = (params.get('i') || 'main').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || 'main';
+  // ?out=1: an output-only window driven by the controller window of the same instance. It reads the
+  // instance's saved state but never writes it.
+  const OUT = params.get('out') === '1';
   const KEY = k => 'phvj:' + INST + ':' + k;
   function load(k, fb) {
     try { const v = localStorage.getItem(KEY(k)); return v ? JSON.parse(v) : fb; } catch (e) { return fb; }
   }
   function save(k, v) {
+    if (OUT) return;
     try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch (e) { /* storage full or blocked */ }
   }
 
+  const BANDS = {
+    kick: { type: 'lowpass', f: 120, q: 0.7 },
+    bass: { type: 'lowpass', f: 250, q: 0.7 },
+    mids: { type: 'bandpass', f: 1732, q: 0.87 }, // 1 to 3 kHz
+    highs: { type: 'highpass', f: 6000, q: 0.7 },
+  };
   const DEF = {
     defaultDur: 30, transition: 'xfade', xfadeSec: 2, random: false, scope: 'playlist',
     quality: 'med', autoDrop: true, credits: true, clean: false, menuHidden: false, black: false,
     tab: 'playlist', pullN: 5, pullFrom: 'pool',
+    bpm: 120, bars: 0, outPreview: false,
+    au: { on: false, dev: '', band: 'kick', sens: 8, smooth: 0.85, zoom: 0.08, flash: 0.5 },
   };
   const S = (() => {
     const v = Object.assign({}, DEF, load('settings', {}));
@@ -57,8 +69,19 @@
     if (!['playlist', 'pool'].includes(v.scope)) v.scope = DEF.scope;
     if (!['low', 'med', 'high'].includes(v.quality)) v.quality = DEF.quality;
     if (!['pool', 'starred'].includes(v.pullFrom)) v.pullFrom = DEF.pullFrom;
-    if (!['playlist', 'gallery', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
-    for (const k of ['random', 'autoDrop', 'credits', 'clean', 'menuHidden', 'black']) v[k] = !!v[k];
+    if (!['playlist', 'gallery', 'live', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
+    for (const k of ['random', 'autoDrop', 'credits', 'clean', 'menuHidden', 'black', 'outPreview']) v[k] = !!v[k];
+    v.bpm = clamp(v.bpm, 40, 240, DEF.bpm);
+    v.bars = [0, 4, 8, 16, 32].includes(Number(v.bars)) ? Number(v.bars) : 0;
+    const au = Object.assign({}, DEF.au, v.au && typeof v.au === 'object' ? v.au : {});
+    au.on = !!au.on;
+    au.dev = typeof au.dev === 'string' ? au.dev : '';
+    if (!BANDS[au.band]) au.band = DEF.au.band;
+    au.sens = clamp(au.sens, 0.5, 30, DEF.au.sens);
+    au.smooth = clamp(au.smooth, 0, 0.97, DEF.au.smooth);
+    au.zoom = clamp(au.zoom, 0, 0.3, DEF.au.zoom);
+    au.flash = clamp(au.flash, 0, 1.5, DEF.au.flash);
+    v.au = au;
     return v;
   })();
   const saveSettings = () => save('settings', S);
@@ -90,13 +113,17 @@
   const saveLists = () => save('lists', LISTS);
   const stars = new Set((load('stars', null) || D.favorites).filter(id => SK.has(id)));
   const saveStars = () => save('stars', [...stars]);
+  const banned = new Set((load('banned', null) || []).filter(id => SK.has(id)));
+  const saveBanned = () => save('banned', [...banned]);
 
   const PLAY = (() => {
-    const v = Object.assign({ id: null, pos: 0, elapsed: 0, playing: false, bag: [], hist: [] }, load('play', {}));
+    const v = Object.assign({ id: null, pos: 0, elapsed: 0, playing: false, hold: false, cue: null, bag: [], hist: [] }, load('play', {}));
     if (!SK.has(v.id)) v.id = null;
+    if (!SK.has(v.cue)) v.cue = null;
     v.pos = clamp(v.pos, 0, 999, 0);
     v.elapsed = clamp(v.elapsed, 0, 3600e3, 0);
-    v.playing = !!v.playing;
+    v.playing = !!v.playing && !OUT; // the output window never runs its own clock
+    v.hold = !!v.hold;
     v.bag = Array.isArray(v.bag) ? v.bag.filter(id => SK.has(id)) : [];
     v.hist = Array.isArray(v.hist) ? v.hist.filter(id => SK.has(id)).slice(-100) : [];
     return v;
@@ -114,6 +141,7 @@
   const RT = {
     cur: null, elapsed: 0, fade: null, live: -1, decks: [], failed: new Set(),
     errors: 0, ctxLost: 0, hydras: 0, skips: 0, fps: 0, level: S.quality, code: false, fs: false,
+    outSeen: -1e9, fx: 0, // outSeen: last hello from an output window (performance.now starts near 0)
   };
 
   // ---- controller log (never shown on the output) ---------------------------------------------
@@ -215,6 +243,9 @@
     const hy = d.hy, s = hy.synth, c = LEVEL[RT.level];
     try {
       if (d.canvas.width !== c.w || d.canvas.height !== c.h) hy.setResolution(c.w, c.h);
+      // hush() gives each source a fresh 1x1 texture without freeing the old one (4 leaked
+      // textures per switch); free them first. Only the idle deck is ever reloaded.
+      for (const src of hy.s || []) { try { if (src.tex) src.tex.destroy(); } catch (e) { /* already gone */ } }
       hy.hush();
       s.speed = 1; s.bpm = 30; s.fps = undefined;
       if (!s.a || !s.a.fft) s.a = audioStub();
@@ -276,10 +307,13 @@
     }
     d.id = id; d.badSince = 0;
     RT.cur = id; RT.elapsed = opts.elapsed || 0;
+    if (PLAY.cue === id) PLAY.cue = null;
     const old = RT.live >= 0 ? RT.decks[RT.live] : null;
+    const cut = !!(opts.cut || S.transition === 'cut' || !old);
+    post({ t: 'show', id, cut, xfadeSec: S.xfadeSec });
     d.canvas.style.zIndex = '2';
     if (old) old.canvas.style.zIndex = '1';
-    if (opts.cut || S.transition === 'cut' || !old) {
+    if (cut) {
       d.canvas.style.opacity = '1';
       if (old) old.canvas.style.opacity = '0';
       RT.live = idle;
@@ -306,16 +340,28 @@
     if (f && RT.decks[f.to] === d) { d.canvas.style.opacity = '0'; RT.fade = null; }
     else if (RT.decks[RT.live] === d) d.canvas.style.opacity = '0';
     if (RT.cur === id) RT.cur = null;
+    // the output window does not pick what plays: it reports and waits for the controller
+    if (OUT) { if (chan) chan.postMessage({ t: 'failed', id, reason }); return; }
     advance(1, { cut: true, from: id });
   }
 
   // ---- what plays next ------------------------------------------------------------------------
 
-  const playable = id => { const s = SK.get(id); return !!s && !s.quarantine && !RT.failed.has(id); };
-  const durOf = id => { const it = list().find(x => x.id === id); return it ? it.dur : S.defaultDur; };
+  const playable = id => { const s = SK.get(id); return !!s && !s.quarantine && !RT.failed.has(id) && !banned.has(id); };
+  // with tempo sync on, every sketch runs N bars of 4 beats; otherwise its own duration
+  const durOf = id => {
+    if (S.bars) return S.bars * 4 * 60 / S.bpm;
+    const it = list().find(x => x.id === id);
+    return it ? it.dur : S.defaultDur;
+  };
   const universe = () => (S.scope === 'pool' ? D.sketches.map(s => s.id) : list().map(it => it.id)).filter(playable);
 
   function pickNext(dir, from) {
+    if (dir > 0 && PLAY.cue) {
+      const id = PLAY.cue;
+      PLAY.cue = null;
+      if (playable(id) && id !== from) return id;
+    }
     if (S.random && dir > 0) {
       const all = universe();
       PLAY.bag = PLAY.bag.filter(id => all.includes(id) && id !== from);
@@ -386,7 +432,7 @@
   function frame(now) {
     requestAnimationFrame(frame);
     const cap = LEVEL[RT.level].fps;
-    if (last && now - last < 1000 / cap - 4) return;
+    if (last && now - last < 1000 / cap - 8) return; // 8 ms slack: 30 fps holds on 60 Hz with frame jitter
     const dt = last ? Math.min(now - last, 250) : 16;
     last = now;
     guard.frame(now);
@@ -397,14 +443,17 @@
       if (k >= 1) finishFade();
       else RT.decks[f.to].canvas.style.opacity = k.toFixed(3);
     }
+    // with an output window open, this preview can rest (the output checks its own frames)
+    const rest = previewResting();
     // tick only what is on screen: the live deck, plus the incoming one during a fade
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 2 && !rest; i++) {
       const d = RT.decks[i];
       if (!d.id || (i !== RT.live && !(RT.fade && RT.fade.to === i))) continue;
       try { tickSafe(d, dt); ticks[i]++; } catch (e) { failDeck(d, 'runtime error: ' + (e.message || e)); return; }
     }
+    if (!OUT) audioFrame();
     const d = curDeck();
-    if (d && d.id && now - lastProbe > 1000) {
+    if (!rest && d && d.id && now - lastProbe > 1000) {
       lastProbe = now;
       let bad = '';
       try { bad = blankness(d.canvas); } catch (e) { /* readback unavailable */ }
@@ -412,7 +461,7 @@
       else if (!d.badSince) d.badSince = now;
       else if (now - d.badSince > 3000) { failDeck(d, 'rendered ' + bad + ' for 3 s'); return; }
     }
-    if (PLAY.playing && RT.cur) {
+    if (PLAY.playing && !PLAY.hold && RT.cur) {
       RT.elapsed += dt;
       if (RT.elapsed >= durOf(RT.cur) * 1000) advance(1);
     }
@@ -431,9 +480,14 @@
     if (!RT.cur) c.textContent = '-:--';
     else {
       const rem = durOf(RT.cur) - RT.elapsed / 1000;
-      c.textContent = (PLAY.playing ? '' : 'paused ') + fmt(rem);
+      c.textContent = (!PLAY.playing ? 'paused ' : PLAY.hold ? 'hold ' : '') + fmt(rem);
     }
-    $('#fps').textContent = (guard.fps ? guard.fps.toFixed(0) : '--') + ' fps';
+    $('#fps').textContent = (rest => (rest ? 'rest' : (guard.fps ? guard.fps.toFixed(0) : '--') + ' fps'))(previewResting());
+    if (!OUT) {
+      const live = outLive();
+      $('#out-st').textContent = live ? 'Output window connected' + (previewResting() ? '. Preview resting.' : '') : 'Not open';
+      stageMsg(previewResting() ? 'Preview resting while the output window is open' : RT.cur ? '' : $('#stage-msg').textContent);
+    }
   }
 
   function renderBar() {
@@ -458,6 +512,16 @@
     $('#black').hidden = !S.black;
     $('#code-ov').hidden = !RT.code;
     $('#credit').hidden = !S.credits;
+    // live tab
+    press(btn('hold'), PLAY.hold);
+    $('#out-prev').checked = S.outPreview;
+    $('#n-bpm').value = String(S.bpm);
+    $('#s-bars').value = String(S.bars);
+    $('#au-on').checked = S.au.on;
+    $('#au-band').value = S.au.band;
+    for (const k of ['sens', 'smooth', 'zoom', 'flash']) $('#au-' + k).value = String(S.au[k]);
+    const cue = SK.get(PLAY.cue);
+    $('#cue-st').textContent = cue ? 'Cued next: ' + cue.title : '';
     renderClock();
   }
 
@@ -473,8 +537,8 @@
 
   function stageMsg(t) { const m = $('#stage-msg'); m.textContent = t; m.hidden = !t; }
 
-  function setCode(on) { RT.code = !!on; renderBar(); }
-  function setBlack(on) { S.black = !!on; saveSettings(); renderBar(); }
+  function setCode(on) { RT.code = !!on; renderBar(); postState(); }
+  function setBlack(on) { S.black = !!on; saveSettings(); renderBar(); postState(); }
   function setClean(on) { S.clean = !!on; saveSettings(); renderBar(); }
   function setMenuHidden(on) { S.menuHidden = !!on; saveSettings(); renderBar(); poke(); }
 
@@ -505,7 +569,7 @@
   function setTab(t) {
     S.tab = t; saveSettings();
     for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
-    for (const v of ['playlist', 'gallery', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
+    for (const v of ['playlist', 'gallery', 'live', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
     if (t === 'log') { unseen = 0; logN.hidden = true; }
     if (t === 'gallery' && !$('#g-grid').children.length) renderGallery();
   }
@@ -524,11 +588,14 @@
     plList.replaceChildren(...L.map((it, i) => {
       const sk = SK.get(it.id);
       const q = sk.quarantine ? ' (quarantined: ' + sk.quarantine + ')' : '';
-      return h('li', { 'data-id': it.id, class: [it.id === RT.cur ? 'cur' : '', sk.quarantine ? 'q' : ''].join(' ').trim() },
+      const cls = [it.id === RT.cur ? 'cur' : '', sk.quarantine ? 'q' : '', PLAY.cue === it.id ? 'cued' : '', banned.has(it.id) ? 'ban' : ''];
+      return h('li', { 'data-id': it.id, class: cls.join(' ').trim() },
         h('span', { class: 'h', title: 'Drag to reorder', text: '≡' }),
         h('span', { class: 'i', text: String(i + 1) }),
         h('span', { class: 't', title: 'Play now' + q, 'data-act': 'play' }, sk.title, h('small', { text: sk.author })),
         h('input', { type: 'number', min: 1, max: 3600, step: 1, value: it.dur, title: 'Seconds', 'data-act': 'dur' }),
+        h('button', { 'data-act': 'cue', title: 'Play this next', text: 'Cue', 'aria-pressed': String(PLAY.cue === it.id) }),
+        h('button', { 'data-act': 'ban', class: 'warn', title: 'Ban: never autoplay on this instance', text: 'Ban', 'aria-pressed': String(banned.has(it.id)) }),
         h('button', { 'data-act': 'up', title: 'Move up', text: '↑', disabled: i === 0 }),
         h('button', { 'data-act': 'down', title: 'Move down', text: '↓', disabled: i === L.length - 1 }),
         h('button', { 'data-act': 'rm', title: 'Remove', text: '✕' }));
@@ -581,6 +648,8 @@
     else if (act === 'up') move(i, i - 1);
     else if (act === 'down') move(i, i + 1);
     else if (act === 'rm') { list().splice(i, 1); changed(); }
+    else if (act === 'cue') setCue(PLAY.cue === li.dataset.id ? null : li.dataset.id);
+    else if (act === 'ban') setBan(li.dataset.id, !banned.has(li.dataset.id));
   });
   plList.addEventListener('change', e => {
     if (e.target.dataset.act !== 'dur') return;
@@ -742,6 +811,7 @@
         img,
         h('div', { class: 'meta' }, h('b', { text: s.title }), h('span', { text: s.author })),
         s.quarantine ? h('div', { class: 'qb', text: 'Quarantined: ' + s.quarantine }) : null,
+        banned.has(s.id) ? h('div', { class: 'qb ban', text: 'Banned on this instance' }) : null,
         h('div', { class: 'acts' },
           h('button', { class: 'star', 'data-act': 'star', title: 'Star', 'aria-pressed': String(stars.has(s.id)), text: stars.has(s.id) ? '★' : '☆' }),
           h('button', { 'data-act': 'add', text: 'Add' }),
@@ -773,6 +843,181 @@
       h('td', {}, s.href ? h('a', { href: s.href, target: '_blank', rel: 'noopener', text: s.author }) : s.author,
         s.link && !s.href ? h('span', { class: 'dim', text: ' ' + s.link }) : null),
       h('td', { text: LICENSE }))));
+  }
+
+  // ---- output window: ?i=<name>&out=1, synced over BroadcastChannel -------------------------------
+  // The controller owns the clock and the playlist; it sends what to show. The output window renders
+  // the same sketch on its own two decks, says hello once a second and reports failures back.
+
+  const chan = 'BroadcastChannel' in window ? new BroadcastChannel('phvj:' + INST) : null;
+  function post(m) { if (chan && !OUT) try { chan.postMessage(m); } catch (e) { /* closed */ } }
+  function postState() { post({ t: 'state', black: S.black, code: RT.code, level: RT.level }); }
+  const outLive = () => !OUT && performance.now() - RT.outSeen < 3000;
+  const previewResting = () => outLive() && !S.outPreview;
+  if (chan) chan.onmessage = ({ data: m }) => {
+    if (!m || typeof m !== 'object') return;
+    if (OUT) {
+      if (m.t === 'show' || m.t === 'sync') {
+        if (m.t === 'show' || m.id !== RT.cur) {
+          if (m.t === 'show') { S.transition = m.cut ? 'cut' : 'xfade'; S.xfadeSec = clamp(m.xfadeSec, 0.2, 10, 2); }
+          if (m.id && SK.has(m.id)) show(m.id, { cut: m.t === 'sync' || m.cut });
+        }
+      }
+      if (m.t === 'state' || m.t === 'sync') {
+        S.black = !!m.black; RT.code = !!m.code;
+        if (LEVEL[m.level] && m.level !== RT.level) { RT.level = m.level; applyQuality(); }
+        renderBar();
+      }
+      if (m.t === 'fx') applyFx(m.v, m.z, m.f);
+      return;
+    }
+    if (m.t === 'hello') {
+      const fresh = !outLive() || m.first; // m.first: a new or reloaded output window
+      RT.outSeen = performance.now();
+      if (fresh) { log('Output window connected'); post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level }); }
+    } else if (m.t === 'failed' && SK.has(m.id) && !RT.failed.has(m.id)) {
+      RT.failed.add(m.id);
+      RT.skips++;
+      log('Output window skipped "' + SK.get(m.id).title + '" (' + m.id + '): ' + m.reason, true);
+      if (RT.cur === m.id) advance(1, { cut: true });
+    }
+  };
+  if (OUT) {
+    body.classList.add('out');
+    document.title = 'POST/HUMAN · VJ output · ' + INST;
+    const hello = first => chan && chan.postMessage({ t: 'hello', first: !!first });
+    hello(true);
+    setInterval(() => hello(false), 1000);
+    document.addEventListener('dblclick', toggleFull);
+  }
+  $('#out-open').addEventListener('click', () => {
+    const w = window.open(location.pathname + '?i=' + encodeURIComponent(INST) + '&out=1', 'phvj-out-' + INST, 'popup,width=960,height=560');
+    if (!w) log('The browser blocked the output window. Allow pop-ups for this page.', true);
+  });
+  $('#out-prev').addEventListener('change', e => { S.outPreview = e.target.checked; saveSettings(); });
+
+  // ---- hold, cue, ban ------------------------------------------------------------------------------
+
+  function setHold(on) { PLAY.hold = !!on; savePlay(); renderBar(); }
+  function setCue(id) {
+    PLAY.cue = id && SK.has(id) ? id : null;
+    if (PLAY.cue) log('Cued next: ' + SK.get(PLAY.cue).title);
+    savePlay(); renderPlaylist(); renderBar();
+  }
+  function setBan(id, on) {
+    if (!SK.has(id)) return;
+    if (on) banned.add(id); else banned.delete(id);
+    saveBanned();
+    log((on ? 'Banned ' : 'Unbanned ') + SK.get(id).title);
+    if (PLAY.cue === id && on) PLAY.cue = null;
+    renderPlaylist();
+    if ($('#g-grid').children.length) renderGallery();
+    if (on && RT.cur === id) advance(1);
+  }
+  btn('hold').addEventListener('click', () => setHold(!PLAY.hold));
+  btn('ban').addEventListener('click', () => RT.cur && setBan(RT.cur, true));
+  btn('unban').addEventListener('click', () => { banned.clear(); saveBanned(); log('Unbanned all'); renderPlaylist(); if ($('#g-grid').children.length) renderGallery(); });
+
+  // ---- tempo: tap, or type a BPM; switch every N bars ------------------------------------------------
+
+  const taps = [];
+  function tap() {
+    const now = performance.now();
+    if (taps.length && now - taps[taps.length - 1] > 2000) taps.length = 0;
+    taps.push(now);
+    if (taps.length > 8) taps.shift();
+    if (taps.length >= 2) {
+      const span = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+      S.bpm = clamp(Math.round(600000 / span) / 10, 40, 240, S.bpm);
+      saveSettings();
+    }
+    // four taps on the one: the next switch lands on a bar line
+    if (taps.length >= 4 && S.bars) RT.elapsed = 0;
+    renderBar();
+  }
+  btn('tap').addEventListener('click', tap);
+  $('#n-bpm').addEventListener('change', e => { S.bpm = clamp(e.target.value, 40, 240, S.bpm); saveSettings(); renderBar(); });
+  $('#s-bars').addEventListener('change', e => { S.bars = Number(e.target.value) || 0; saveSettings(); renderBar(); e.target.blur(); });
+
+  // ---- audio: one band through a biquad into an analyser, driving zoom and brightness ---------------
+
+  const AU = { ctx: null, stream: null, an: null, filt: null, buf: null, v: 0, lastSent: 0 };
+  const decksEl = $('#decks');
+  function applyFx(v, zoom = S.au.zoom, flash = S.au.flash) {
+    v = clamp(v, 0, 1, 0);
+    zoom = clamp(zoom, 0, 0.3, 0); flash = clamp(flash, 0, 1.5, 0);
+    RT.fx = v;
+    decksEl.style.transform = v > 0.001 ? 'scale(' + (1 + v * zoom).toFixed(4) + ')' : '';
+    decksEl.style.filter = v > 0.001 ? 'brightness(' + (1 + v * flash).toFixed(3) + ')' : '';
+    if (!OUT) $('#au-meter').style.width = (v * 100).toFixed(1) + '%';
+  }
+  function setBand() {
+    if (!AU.filt) return;
+    const b = BANDS[S.au.band];
+    AU.filt.type = b.type;
+    AU.filt.frequency.value = b.f;
+    AU.filt.Q.value = b.q;
+  }
+  async function listInputs() {
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+      const sel = $('#au-dev');
+      sel.replaceChildren(h('option', { value: '', text: 'Default input' }),
+        ...devs.filter(d => d.deviceId && d.deviceId !== 'default').map((d, i) => h('option', { value: d.deviceId, text: d.label || 'Input ' + (i + 1) })));
+      sel.value = [...sel.options].some(o => o.value === S.au.dev) ? S.au.dev : '';
+    } catch (e) { /* no media devices */ }
+  }
+  function audioStop() {
+    if (AU.stream) for (const t of AU.stream.getTracks()) t.stop();
+    if (AU.ctx) AU.ctx.close().catch(() => {});
+    AU.ctx = AU.stream = AU.an = AU.filt = null;
+    AU.v = 0;
+    applyFx(0);
+    post({ t: 'fx', v: 0 });
+  }
+  async function audioStart() {
+    audioStop();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { log('Audio input is not available here (needs https or localhost)', true); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: S.au.dev ? { exact: S.au.dev } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+      if (!S.au.on) { for (const t of stream.getTracks()) t.stop(); return; }
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      AU.filt = ctx.createBiquadFilter();
+      AU.an = ctx.createAnalyser();
+      AU.an.fftSize = 1024;
+      src.connect(AU.filt).connect(AU.an);
+      AU.buf = new Float32Array(AU.an.fftSize);
+      AU.ctx = ctx; AU.stream = stream;
+      setBand();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      log('Audio on: ' + (stream.getAudioTracks()[0] || {}).label);
+      listInputs();
+    } catch (e) {
+      log('Audio input failed: ' + (e.message || e.name), true);
+      S.au.on = false; saveSettings(); renderBar();
+    }
+  }
+  // attack at once, release by the smoothing amount
+  function audioFrame() {
+    if (!AU.an) return;
+    AU.an.getFloatTimeDomainData(AU.buf);
+    let sum = 0;
+    for (let i = 0; i < AU.buf.length; i++) sum += AU.buf[i] * AU.buf[i];
+    const raw = Math.min(1, Math.sqrt(sum / AU.buf.length) * S.au.sens);
+    AU.v = Math.max(raw, AU.v * S.au.smooth);
+    applyFx(AU.v);
+    if (outLive()) post({ t: 'fx', v: +AU.v.toFixed(3), z: S.au.zoom, f: S.au.flash });
+  }
+  $('#au-on').addEventListener('change', e => { S.au.on = e.target.checked; saveSettings(); if (S.au.on) audioStart(); else { audioStop(); log('Audio off'); } });
+  $('#au-dev').addEventListener('change', e => { S.au.dev = e.target.value; saveSettings(); if (S.au.on) audioStart(); e.target.blur(); });
+  $('#au-band').addEventListener('change', e => { S.au.band = e.target.value; saveSettings(); setBand(); e.target.blur(); });
+  for (const k of ['sens', 'smooth', 'zoom', 'flash']) {
+    const el = $('#au-' + k);
+    el.addEventListener('input', () => { S.au[k] = Number(el.value); });
+    el.addEventListener('change', () => { saveSettings(); el.blur(); });
   }
 
   // ---- bar controls and keys ----------------------------------------------------------------------
@@ -813,7 +1058,11 @@
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (typing(e.target) && e.key !== 'Escape') return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (OUT) { if (k === 'f') { e.preventDefault(); toggleFull(); } return; } // the controller drives the rest
     const acts = {
+      t: tap,
+      g: () => setHold(!PLAY.hold),
+      x: () => RT.cur && setBan(RT.cur, true),
       ' ': () => setPlaying(!PLAY.playing),
       ArrowRight: next,
       ArrowLeft: prev,
@@ -831,7 +1080,7 @@
     };
     if (!acts[k]) return;
     e.preventDefault();
-    if (e.repeat && k !== 'ArrowRight' && k !== 'ArrowLeft') return;
+    if (e.repeat && k !== 'ArrowRight' && k !== 'ArrowLeft' && k !== 't') return;
     acts[k]();
   });
   // a focused button must not also fire on Space
@@ -852,10 +1101,11 @@
 
   // restore the sketch that was on, where it was; else the first playable item
   const restoreId = PLAY.id;
-  if (restoreId && SK.has(restoreId) && !SK.get(restoreId).quarantine && show(restoreId, { cut: true, elapsed: PLAY.elapsed })) { /* restored */ }
+  if (restoreId && SK.has(restoreId) && !SK.get(restoreId).quarantine && !banned.has(restoreId) && show(restoreId, { cut: true, elapsed: PLAY.elapsed })) { /* restored */ }
   else advance(1, { cut: true, from: null });
   renderBar();
   requestAnimationFrame(frame);
+  if (!OUT) { listInputs(); if (S.au.on) audioStart(); }
 
   // test and debug handle
   window.PHVJ = {
@@ -867,6 +1117,8 @@
         deckIds: RT.decks.map(d => d.id), opacity: RT.decks.map(d => d.canvas.style.opacity),
         fs: RT.fs, code: RT.code, settings: { ...S }, active: LISTS.active,
         list: list().map(it => ({ ...it })), lists: Object.keys(LISTS.lists), stars: [...stars],
+        out: OUT, outLive: outLive(), resting: previewResting(), hold: PLAY.hold, cue: PLAY.cue, banned: [...banned],
+        fx: RT.fx, audio: !!AU.an, dur: RT.cur ? durOf(RT.cur) : 0,
       };
     },
     next, prev, show, setPlaying, toggleRandom, shareLink, exportData, importData, setFs,

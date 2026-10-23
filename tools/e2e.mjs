@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 
 const BASE = process.argv[2] || 'http://localhost:8091/';
 const LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const results = [];
 const consoleProblems = [];
 const offsite = [];
@@ -405,6 +405,105 @@ await test('1366x768: bar fits and stage is large', async () => {
   const c = await ctx(); const p = await open(c);
   const r = await p.evaluate(() => { const s = document.getElementById('stage').getBoundingClientRect(), b = document.getElementById('bar').getBoundingClientRect(); return { sw: s.width, sh: s.height, bh: b.height, over: document.documentElement.scrollWidth > innerWidth }; });
   assert(!r.over && r.sw >= 900 && r.bh <= 80, JSON.stringify(r));
+  await c.close();
+});
+
+// ---- stretch -----------------------------------------------------------------------------------
+
+await test('stretch: audio reactive (fake input) drives zoom and flash, off by default', async () => {
+  const c = await ctx({ permissions: ['microphone'] }); const p = await open(c);
+  let s = await st(p);
+  assert(!s.settings.au.on && !s.audio, 'off by default');
+  assert(await p.evaluate(() => getComputedStyle(document.getElementById('decks')).transform) === 'none', 'no effect when off');
+  await p.click('[data-tab=live]');
+  await p.selectOption('#au-band', 'mids');
+  await p.evaluate(() => { const el = document.getElementById('au-sens'); el.value = '30'; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
+  await p.check('#au-on');
+  await p.waitForFunction(() => PHVJ.state.audio, null, { timeout: 5000 });
+  let maxFx = 0, sawTransform = false;
+  for (let k = 0; k < 40; k++) {
+    await wait(100);
+    const r = await p.evaluate(() => [PHVJ.state.fx, document.getElementById('decks').style.transform]);
+    maxFx = Math.max(maxFx, r[0]);
+    if (r[1].startsWith('scale(')) sawTransform = true;
+  }
+  assert(maxFx > 0.02 && sawTransform, 'level drives the effect: max ' + maxFx);
+  assert(await p.evaluate(() => document.getElementById('au-meter').style.width !== '0%'), 'meter moves');
+  const opts = await p.locator('#au-dev option').count();
+  assert(opts >= 1, 'device picker');
+  await p.uncheck('#au-on');
+  s = await st(p);
+  assert(!s.audio && s.fx === 0 && await p.evaluate(() => document.getElementById('decks').style.transform === ''), 'off clears the effect');
+  await c.close();
+});
+
+await test('stretch: output window follows the controller, reports failures back', async () => {
+  const c = await ctx(); const ctl = await open(c, '?i=o');
+  await setList(ctl, ['example_3', 'example_14', 'example_15'], 30);
+  await ctl.selectOption('#s-trans', 'cut');
+  const out = await open(c, '?i=o&out=1');
+  await ctl.waitForFunction(() => PHVJ.state.outLive, null, { timeout: 4000 });
+  assert((await st(ctl)).resting, 'controller preview rests while the output is open');
+  assert(!(await out.isVisible('#bar')) && !(await out.isVisible('#panel')) && !(await out.isVisible('#credit')), 'output shows the stage only');
+  await out.evaluate(() => { window.__writes = 0; const set = Storage.prototype.setItem; Storage.prototype.setItem = function (...a) { window.__writes++; return set.apply(this, a); }; });
+  for (let k = 0; k < 3; k++) {
+    await ctl.keyboard.press('ArrowRight');
+    await out.waitForFunction(id => PHVJ.state.cur === id, (await st(ctl)).cur, { timeout: 2000 });
+  }
+  await ctl.keyboard.press('b');
+  await out.waitForFunction(() => !document.getElementById('black').hidden, null, { timeout: 2000 });
+  await ctl.keyboard.press('b');
+  await out.waitForFunction(() => document.getElementById('black').hidden, null, { timeout: 2000 });
+  const before = await st(ctl);
+  // a sketch that renders white only matters on the output; the controller hears about it and moves on
+  for (const pg of [ctl, out]) await pg.evaluate(() => PHVJ.addTestSketch('t_white2', 'solid(1,1,1).out()'));
+  await ctl.evaluate(() => PHVJ.show('t_white2', { cut: true }));
+  await ctl.waitForFunction(() => PHVJ.state.failed.includes('t_white2') && PHVJ.state.cur !== 't_white2', null, { timeout: 8000 });
+  await out.waitForFunction(() => PHVJ.state.cur && PHVJ.state.cur !== 't_white2', null, { timeout: 3000 });
+  assert((await st(out)).cur === (await st(ctl)).cur, 'back in step after the skip');
+  assert(await out.evaluate(() => window.__writes) === 0, 'output never writes the instance state');
+  await out.close();
+  await ctl.waitForFunction(() => !PHVJ.state.outLive, null, { timeout: 5000 });
+  assert(!(await st(ctl)).resting && before.hydras === 2, 'preview resumes when the output closes');
+  await c.close();
+});
+
+await test('stretch: tap tempo and switch every N bars', async () => {
+  const c = await ctx(); const p = await open(c);
+  await p.click('[data-tab=live]');
+  for (let k = 0; k < 5; k++) { await p.keyboard.press('t'); await wait(500); }
+  let s = await st(p);
+  assert(Math.abs(s.settings.bpm - 120) < 6, 'tapped bpm ' + s.settings.bpm);
+  await p.fill('#n-bpm', '120'); await p.press('#n-bpm', 'Enter');
+  await p.selectOption('#s-bars', '4');
+  s = await st(p);
+  assert(s.dur === 8, '4 bars at 120 = 8 s, got ' + s.dur);
+  await p.selectOption('#s-bars', '0');
+  assert((await st(p)).dur === 30, 'back to item durations');
+  await c.close();
+});
+
+await test('stretch: hold, cue next, ban', async () => {
+  const c = await ctx(); const p = await open(c);
+  await setList(p, ['example_3', 'example_14', 'example_15', 'rangga_0', 'rangga_1'], 2);
+  await p.selectOption('#s-trans', 'cut');
+  await p.click('#pl-list li:nth-child(1) .t');
+  await p.keyboard.press('Space');
+  await p.keyboard.press('g');
+  const a = await st(p); await wait(2600); const b = await st(p);
+  assert(b.hold && a.cur === b.cur, 'hold keeps the sketch');
+  await p.keyboard.press('g');
+  await p.click('#pl-list li[data-id="rangga_0"] [data-act=cue]');
+  assert((await st(p)).cue === 'rangga_0', 'cued');
+  await p.keyboard.press('ArrowRight');
+  assert((await st(p)).cur === 'rangga_0' && !(await st(p)).cue, 'cue plays next');
+  await p.keyboard.press('x');
+  let s = await st(p);
+  assert(s.banned.includes('rangga_0') && s.cur !== 'rangga_0', 'X bans and skips');
+  for (let k = 0; k < 8; k++) { await p.keyboard.press('ArrowRight'); assert((await st(p)).cur !== 'rangga_0', 'banned never plays'); }
+  await p.click('[data-tab=live]');
+  await p.click('#b-unban');
+  assert((await st(p)).banned.length === 0, 'unban all');
   await c.close();
 });
 

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai">
 <title>POST/HUMAN · VJ</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -48,8 +49,10 @@
 
   <main id="main">
     <section id="stage" aria-label="Output">
-      <canvas id="deck-a"></canvas>
-      <canvas id="deck-b"></canvas>
+      <div id="decks">
+        <canvas id="deck-a"></canvas>
+        <canvas id="deck-b"></canvas>
+      </div>
       <pre id="code-ov" hidden></pre>
       <div id="credit"></div>
       <div id="stage-msg" hidden></div>
@@ -60,6 +63,7 @@
       <nav id="tabs" role="tablist">
         <button data-tab="playlist" role="tab">Playlist</button>
         <button data-tab="gallery" role="tab">Gallery</button>
+        <button data-tab="live" role="tab">Live</button>
         <button data-tab="credits" role="tab">Credits</button>
         <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
       </nav>
@@ -105,6 +109,49 @@
         <div id="g-grid"></div>
       </div>
 
+      <div id="v-live" class="view" hidden>
+        <h3>Output window</h3>
+        <div class="row"><button id="out-open">Open output window</button><span id="out-st" class="dim">Not open</span></div>
+        <div class="row"><label class="chk"><input id="out-prev" type="checkbox"> Keep this preview running while the output window is open</label></div>
+        <p class="dim">Move the output window to the projector and press F there (or double-click it). This window stays the controller.</p>
+
+        <h3>Hold, cue, ban</h3>
+        <div class="row">
+          <button id="b-hold" title="Hold the current sketch (G)">Hold</button>
+          <button id="b-ban" class="warn" title="Ban the current sketch and skip it (X)">Ban current</button>
+          <button id="b-unban">Unban all</button>
+          <span id="cue-st" class="dim"></span>
+        </div>
+        <p class="dim">Cue and Ban are also on each playlist row. Banned sketches are never autoplayed on this instance.</p>
+
+        <h3>Tempo</h3>
+        <div class="row">
+          <button id="b-tap" class="wide" title="Tap tempo (T)">Tap</button>
+          <label class="num"><input id="n-bpm" type="number" min="40" max="240" step="0.1"><span>BPM</span></label>
+          <select id="s-bars" title="Switch sketches on the beat">
+            <option value="0">Use item durations</option>
+            <option value="4">Every 4 bars</option>
+            <option value="8">Every 8 bars</option>
+            <option value="16">Every 16 bars</option>
+            <option value="32">Every 32 bars</option>
+          </select>
+        </div>
+
+        <h3>Audio</h3>
+        <div class="row"><label class="chk"><input id="au-on" type="checkbox"> Audio reactive</label><select id="au-dev" title="Input device"><option value="">Default input</option></select></div>
+        <div class="row"><span class="lbl">Band</span>
+          <select id="au-band">
+            <option value="kick">Kick (lowpass 120 Hz)</option>
+            <option value="bass">Bass (lowpass 250 Hz)</option>
+            <option value="mids">Mids (bandpass 1 to 3 kHz)</option>
+            <option value="highs">Highs (highpass 6 kHz)</option>
+          </select></div>
+        <div class="row sl"><span class="lbl">Sens</span><input id="au-sens" type="range" min="0.5" max="30" step="0.5"><span class="lbl">Smooth</span><input id="au-smooth" type="range" min="0" max="0.97" step="0.01"></div>
+        <div class="row sl"><span class="lbl">Zoom</span><input id="au-zoom" type="range" min="0" max="0.3" step="0.01"><span class="lbl">Flash</span><input id="au-flash" type="range" min="0" max="1.5" step="0.05"></div>
+        <div class="meter" title="Level"><div id="au-meter"></div></div>
+        <p class="dim">Drives a zoom pump and brightness flash on top of the sketch. Sketch code is untouched. Browser voice processing is off.</p>
+      </div>
+
       <div id="v-credits" class="view" hidden>
         <p class="dim">Sketches from the Hydra gallery, each by the artist named, licensed CC BY-NC-SA 4.0. Code runs unmodified.
           Engine: hydra-synth by Olivia Jack and contributors, AGPL-3.0. Fonts: Chakra Petch and Martian Mono, SIL OFL 1.1.
@@ -129,6 +176,9 @@
       <dt>C</dt><dd>Code overlay</dd>
       <dt>B</dt><dd>Blackout</dd>
       <dt>R</dt><dd>Random mode</dd>
+      <dt>T</dt><dd>Tap tempo</dd>
+      <dt>G</dt><dd>Hold current sketch</dd>
+      <dt>X</dt><dd>Ban current sketch</dd>
       <dt>Esc</dt><dd>Leave full screen</dd>
       <dt>?</dt><dd>This card</dd>
     </dl>

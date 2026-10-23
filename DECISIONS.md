@@ -23,3 +23,19 @@ One line per judgment call. Newest at the bottom.
 - Auto quality drop is per session (not saved); the chosen level is saved.
 - Share links carry only the playlist (name, ids, durations), not `?i=`, so the receiving laptop keeps its own instance.
 - robots.txt and ai.txt are copied for parity, but GitHub project Pages serve them under /posthuman/, where crawlers do not look; the noindex/noai meta tag is what counts.
+- Sketch functions that throw are caught inside hydra-synth, which only prints console.warn('ERROR', e) each frame; the app intercepts that warning while a deck ticks and treats it as a failure (skip + log). Same rule in the preflight harness.
+- Preflight frame cost is measured with a 1 px readPixels after each tick (forces the GPU to finish); "slow" means p95 over 41.7 ms (under 24 fps) at 1280×720.
+- Preflight quarantines code that needs a camera, screen, video, image or network input (offline shows); only flor_1 (initCam) hits this.
+- Stills are 320×180 JPEG, grabbed 4.5 s into each sketch on the RTX 3080; preflight rewrites them only with --thumbs.
+- Frame cap allows 8 ms of slack so 30 fps holds on 60 Hz displays with jitter (was 4 ms, which gave about 28 fps headed).
+- Enter commits a number field and blurs it so shortcut keys work again; selects blur after a change.
+- Random mode: a bag of every playable item except the one on screen; it refills when empty. Each cycle plays every item once.
+- Random "from pool" uses every non-quarantined, non-banned sketch, not only the playlist.
+- Stretch, output window: the controller owns the clock and the playlist and sends what to show over BroadcastChannel `phvj:<instance>`; the output renders on its own two decks, never writes storage, and reports failures back so the controller skips.
+- Stretch, output window: while an output window is connected the controller preview rests (no ticking) to save GPU on older laptops; a Live tab checkbox keeps it running.
+- Stretch, output window: in the output window only F and double-click work (full screen); everything else is driven from the controller.
+- Stretch, audio: RMS of the filtered band, attack at once, release by the Smooth slider; zoom and brightness on a wrapper around both decks so crossfades are unaffected. Off by default, saved per instance.
+- Stretch, audio: Mids is a bandpass centered at 1.73 kHz with Q 0.87 (covers 1 to 3 kHz).
+- Stretch, tempo: Tap averages up to the last 8 taps (a gap over 2 s restarts); with "every N bars" each sketch runs N × 4 beats. Four or more taps also restart the current sketch's clock so the switch lands on a bar line.
+- Stretch, hold: Hold freezes the countdown on the current sketch (G); Play/Pause stays separate.
+- Stretch, ban: per instance and saved; banned sketches never autoplay, are skipped at once if on screen, and can still be played by hand.
