@@ -1,0 +1,76 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow, noai, noimageai">
+<title>preflight harness</title>
+<body style="margin:0;background:#000">
+<canvas id="c" style="width:640px;height:360px"></canvas>
+<script src="../vendor/hydra-synth/hydra-synth.js"></script>
+<script src="../data/sketches.js"></script>
+<script>
+// Preflight harness for tools/preflight.mjs. Same load steps as app.js loadInto(): one reused hydra
+// instance, hush, flush feedback buffers, time = 0, with(h) eval. Renders each sketch for a few
+// seconds on the real GPU, measures frame cost, watches for black/white, grabs a still.
+const W = 1280, H = 720;
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+const hy = new Hydra({ canvas, width: W, height: H, autoLoop: false, makeGlobal: false, detectAudio: false, enableStreamCapture: false });
+const stub = () => ({ fft: [0, 0, 0, 0], vol: 0, bins: [], beat: {}, settings: [], setBins() {}, setSmooth() {}, setCutoff() {}, setScale() {}, show() {}, hide() {}, onBeat() {} });
+const gl = hy.regl._gl;
+const probe = document.createElement('canvas'); probe.width = 160; probe.height = 90;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+const thumb = document.createElement('canvas'); thumb.width = 320; thumb.height = 180;
+const tctx = thumb.getContext('2d');
+let lost = 0;
+const px1 = new Uint8Array(4); // a 1 px readback forces the GPU to finish the frame, so the timing is real
+canvas.addEventListener('webglcontextlost', () => lost++);
+
+function blankness() {
+  pctx.drawImage(canvas, 0, 0, 160, 90);
+  const px = pctx.getImageData(0, 0, 160, 90).data;
+  let hi = 0, lo = 255;
+  for (let i = 0; i < px.length; i += 4) {
+    const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]);
+    if (mx > hi) hi = mx; if (mn < lo) lo = mn;
+  }
+  return hi < 10 ? 'black' : lo > 245 ? 'white' : '';
+}
+
+window.run = (id, secs, thumbAt) => new Promise(resolve => {
+  const sk = PH_DATA.sketches.find(s => s.id === id), s = hy.synth;
+  const res = { id, err: '', frames: 0, avgMs: 0, p95Ms: 0, blankMax: 0, blankKind: '', thumb: '', lost: 0 };
+  try { hy.hush(); s.speed = 1; s.bpm = 30; s.fps = undefined; if (!s.a || !s.a.fft) s.a = stub(); hy.tick(16); hy.tick(16); } catch (e) {}
+  s.time = 0;
+  try { new Function('h', 'with(h){' + sk.code + '\n}')(s); hy.tick(16); }
+  catch (e) { res.err = 'eval: ' + (e.message || e); return resolve(res); }
+  const costs = [];
+  let t0 = 0, last = 0, lastProbe = 0, badSince = 0;
+  const step = now => {
+    if (!t0) { t0 = last = lastProbe = now; }
+    const dt = Math.min(now - last, 100); last = now;
+    const a = performance.now();
+    try { hy.tick(dt || 16); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); } catch (e) { res.err = 'tick: ' + (e.message || e); return resolve(res); }
+    costs.push(performance.now() - a);
+    res.frames++;
+    if (now - lastProbe >= 250) {
+      lastProbe = now;
+      const b = blankness();
+      if (b) { if (!badSince) badSince = now; res.blankMax = Math.max(res.blankMax, (now - badSince) / 1000); res.blankKind = b; }
+      else badSince = 0;
+    }
+    if (!res.thumb && now - t0 >= thumbAt * 1000) {
+      tctx.drawImage(canvas, 0, 0, 320, 180);
+      res.thumb = thumb.toDataURL('image/jpeg', 0.82);
+    }
+    if (now - t0 >= secs * 1000) {
+      costs.sort((x, y) => x - y);
+      res.avgMs = costs.reduce((x, y) => x + y, 0) / costs.length;
+      res.p95Ms = costs[Math.floor(costs.length * 0.95)];
+      res.lost = lost;
+      return resolve(res);
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+});
+window.ready = true;
+</script>

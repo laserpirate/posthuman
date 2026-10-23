@@ -429,7 +429,7 @@ window.PH_DATA = {
    "code": "//Hydra Glitchy Slit Scan\n//Flor de Fuego\n//https://flordefuego.github.io/ \ns0.initCam()\nsrc(s0).saturate(2).contrast(1.3).layer(src(o0).mask(shape(4,2).scale(0.5,0.7).scrollX(0.25)).scrollX(0.001)).modulate(o0,0.001).out(o0)\n\n",
    "hydraCode": "JTJGJTJGSHlkcmElMjBHbGl0Y2h5JTIwU2xpdCUyMFNjYW4lMEElMkYlMkZGbG9yJTIwZGUlMjBGdWVnbyUwQSUyRiUyRmh0dHBzJTNBJTJGJTJGZmxvcmRlZnVlZ28uZ2l0aHViLmlvJTJGJTIwJTBBczAuaW5pdENhbSgpJTBBc3JjKHMwKS5zYXR1cmF0ZSgyKS5jb250cmFzdCgxLjMpLmxheWVyKHNyYyhvMCkubWFzayhzaGFwZSg0JTJDMikuc2NhbGUoMC41JTJDMC43KS5zY3JvbGxYKDAuMjUpKS5zY3JvbGxYKDAuMDAxKSkubW9kdWxhdGUobzAlMkMwLjAwMSkub3V0KG8wKSUwQSUwQQ==",
    "thumb": "thumbs/flor_1.jpg",
-   "quarantine": ""
+   "quarantine": "needs cam input"
   },
   {
    "id": "flor_2",
