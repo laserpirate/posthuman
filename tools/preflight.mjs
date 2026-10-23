@@ -1,5 +1,6 @@
 // Preflight every sketch on this machine's real GPU, write data/quarantine.json and thumbs/<id>.jpg.
-//   node serve.mjs --port 8091 &   then   node tools/preflight.mjs [http://localhost:8091/]
+//   node serve.mjs --port 8091 &   then   node tools/preflight.mjs [http://localhost:8091/] [--thumbs]
+// Stills are written only when missing, or for all sketches with --thumbs.
 // Quarantine: throws, renders black or white for more than 3 s, tanks frame cost (p95 > 41.7 ms at
 // 1280x720, i.e. under 24 fps), or needs a camera, screen or network media (offline shows).
 // Re-run node tools/build-data.mjs afterwards to fold the flags into data/sketches.js.
@@ -9,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = process.argv[2] || 'http://localhost:8091/';
+const BASE = process.argv.slice(2).find(a => a.startsWith('http')) || 'http://localhost:8091/';
+const ALL_THUMBS = process.argv.includes('--thumbs');
 const SECS = 7, THUMB_AT = 4.5;
 
 global.window = {};
@@ -34,7 +36,8 @@ for (const sk of D.sketches) {
   const m = STATIC.exec(body(sk.code));
   const errBefore = errors.length;
   const r = await page.evaluate(([id, s, t]) => window.run(id, s, t), [sk.id, SECS, THUMB_AT]);
-  if (r.thumb) fs.writeFileSync(path.join(ROOT, 'thumbs', sk.id + '.jpg'), Buffer.from(r.thumb.split(',')[1], 'base64'));
+  const tf = path.join(ROOT, 'thumbs', sk.id + '.jpg');
+  if (r.thumb && (ALL_THUMBS || !fs.existsSync(tf))) fs.writeFileSync(path.join(ROOT, 'thumbs', sk.id + '.jpg'), Buffer.from(r.thumb.split(',')[1], 'base64'));
   let q = '';
   if (m) q = 'needs ' + (m[1] ? m[1].toLowerCase() : m[0]) + ' input';
   else if (r.err) q = 'throws (' + r.err.slice(0, 80) + ')';
