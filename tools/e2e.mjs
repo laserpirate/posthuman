@@ -488,8 +488,15 @@ await test('instances ?i=a and ?i=b are separate; share link opens the same play
 await test('phone width: usable, no horizontal scroll', async () => {
   const c = await ctx({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const p = await open(c);
-  const w = await p.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+  const w = await p.evaluate(() => [document.documentElement.scrollWidth, 390]);
   assert(w[0] <= w[1], 'no horizontal overflow ' + w);
+  for (const tab of ['playlist', 'gallery', 'live', 'code', 'credits', 'log']) {
+    await p.evaluate(t => document.querySelector(`[data-tab=${t}]`).click(), tab);
+    const off = await p.evaluate(() => [...document.querySelectorAll('#app *')]
+      .filter(e => e.offsetParent && !e.closest('#tabs') && !e.closest('#stage')).filter(e => e.getBoundingClientRect().right > 391).map(e => e.id || e.textContent || e.type).slice(0, 5));
+    assert(!off.length, tab + ' tab: controls cut off at the right edge: ' + off);
+  }
+  await p.evaluate(() => document.querySelector('[data-tab=playlist]').click());
   assert(await p.isVisible('#stage') && await p.isVisible('#pl-list'), 'stage and playlist visible');
   await p.screenshot({ path: path.join(os.tmpdir(), 'phvj-phone.png') });
   await c.close();
@@ -608,6 +615,133 @@ await test('stretch: hold, cue next, ban', async () => {
   await p.click('[data-tab=live]');
   await p.click('#b-unban');
   assert((await st(p)).banned.length === 0, 'unban all');
+  await c.close();
+});
+
+// ---- live edit -------------------------------------------------------------------------------------
+
+// average colour of the stage as seen on screen
+async function screenAvg(p) {
+  const r = await p.evaluate(() => { const b = document.getElementById('stage').getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; });
+  const png = PNG.sync.read(await p.screenshot({ clip: r }));
+  let R = 0, G = 0, B = 0, n = 0;
+  for (let i = 0; i < png.data.length; i += 40) { R += png.data[i]; G += png.data[i + 1]; B += png.data[i + 2]; n++; }
+  return [R / n, G / n, B / n];
+}
+
+await test('live edit: knob parsing finds float arguments only', async () => {
+  const c = await ctx(); const p = await open(c);
+  const k = await p.evaluate(() => PHVJ.parseKnobs([
+    'osc(40, 0.2, 1)',
+    '  .modulateScale(osc(40,0,1).kaleid(8))',
+    '  .color([0.5,2].smooth(1), -0.3, 0)',
+    '  .rotate(() => Math.sin(time) * 0.5, 0.1)',
+    '  .modulate(o0, 0.05) // 7, 8',
+    '  .scale("2", Math.max(1, 2))',
+    '  .out(o0)'].join('\n')).map(x => x.fn + '.' + x.name + '=' + x.value));
+  const expect = ['osc.frequency=40', 'osc.sync=0.2', 'osc.offset=1', 'osc.frequency=40', 'osc.sync=0', 'osc.offset=1', 'kaleid.nSides=8', 'color.g=-0.3', 'color.b=0', 'rotate.speed=0.1', 'modulate.amount=0.05'];
+  assert(JSON.stringify(k) === JSON.stringify(expect), 'knobs ' + JSON.stringify(k));
+  // every gallery sketch parses and its getter version still evals
+  const bad = await p.evaluate(() => {
+    const out = [];
+    for (const s of PH_DATA.sketches) { try { PHVJ.parseKnobs(s.code); } catch (e) { out.push(s.id + ': ' + e.message); } }
+    return out;
+  });
+  assert(!bad.length, 'parse errors ' + bad);
+  await c.close();
+});
+
+await test('live edit: run changes the render, errors keep the last frame, revert restores', async () => {
+  const c = await ctx(); const p = await open(c, '?i=ed');
+  await p.click('[data-tab=code]');
+  await wait(400);
+  const orig = await p.inputValue('#ed-text');
+  assert(orig.includes('Puertas III'), 'panel shows the current sketch code');
+  const t0 = (await st(p)).time;
+  await p.fill('#ed-text', 'solid(1, 0, 0).out()');
+  await p.press('#ed-text', 'Control+Enter');
+  await wait(400);
+  let col = await screenAvg(p), s = await st(p);
+  assert(col[0] > 200 && col[1] < 40 && col[2] < 40, 'red after run ' + col);
+  assert(s.time >= t0, 'no time reset ' + t0 + ' -> ' + s.time);
+  assert(!s.fading, 'no crossfade');
+  await p.fill('#ed-text', 'solid(0, 0, 1).out(');
+  await p.press('#ed-text', 'Control+Enter');
+  await wait(300);
+  assert(await p.isVisible('#ed-err') && /Syntax/.test(await p.textContent('#ed-err')), 'syntax error shown');
+  col = await screenAvg(p);
+  assert(col[0] > 200, 'last frame keeps playing after a syntax error ' + col);
+  await p.fill('#ed-text', 'solid(() => { throw new Error("kaput") }, 0, 0).out()');
+  await p.press('#ed-text', 'Control+Enter');
+  await wait(600);
+  assert(/kaput/.test(await p.textContent('#ed-err')), 'runtime error shown: ' + await p.textContent('#ed-err'));
+  col = await screenAvg(p); s = await st(p);
+  assert(col[0] > 200 && s.cur === 'celeste_1' && !s.failed.includes('celeste_1'), 'runtime error: last good code restored, not skipped ' + col);
+  await p.click('#ed-revert');
+  await wait(500);
+  assert(await p.inputValue('#ed-text') === orig, 'revert restores the text');
+  col = await screenAvg(p);
+  assert(!(col[0] > 200 && col[1] < 40 && col[2] < 40), 'revert restores the render ' + col);
+  await c.close();
+});
+
+await test('live edit: knob slider changes a uniform without re-eval; audio link moves it', async () => {
+  const c = await ctx({ permissions: ['microphone'] }); const p = await open(c, '?i=kn');
+  await p.click('[data-tab=code]');
+  await p.fill('#ed-text', 'solid(0.2, 0, 0).out()');
+  await p.press('#ed-text', 'Control+Enter');
+  await wait(300);
+  let s = await st(p);
+  assert(s.knobs.join() === 'solid.r=0.2,solid.g=0,solid.b=0', 'knobs ' + s.knobs);
+  const before = await screenAvg(p), evals = s.evals, t0 = s.time;
+  const slider = p.locator('.knob[data-k="0"] > input[type=range]');
+  await slider.evaluate(el => { el.value = '0.8'; el.dispatchEvent(new Event('input')); });
+  const evalsAfterAttach = (await st(p)).evals;
+  for (const v of ['0.85', '0.9', '0.95']) await slider.evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input')); }, v);
+  await wait(400);
+  s = await st(p);
+  const after = await screenAvg(p);
+  assert(after[0] > before[0] + 100, 'slider moved the render ' + before + ' -> ' + after);
+  assert(evalsAfterAttach === evals + 1 && s.evals === evalsAfterAttach, 'one eval to attach, none per slider move: ' + evals + ' / ' + evalsAfterAttach + ' / ' + s.evals);
+  assert(s.time > t0, 'time keeps running');
+  assert((await p.inputValue('#ed-text')).includes('solid(0.95, 0, 0)'), 'code text shows the value');
+  // audio link
+  await p.click('[data-tab=live]');
+  await p.evaluate(() => { const el = document.querySelector('.band[data-band="full"] label:first-of-type input'); el.value = '40'; el.dispatchEvent(new Event('input')); });
+  await p.check('#au-on');
+  await p.waitForFunction(() => PHVJ.state.audio);
+  await p.click('[data-tab=code]');
+  await p.selectOption('.knob[data-k="1"] select', 'full');
+  await p.locator('.knob[data-k="1"] .kx input[type=range]').evaluate(el => { el.value = '1'; el.dispatchEvent(new Event('input')); });
+  const seen = new Set();
+  for (let k = 0; k < 30; k++) { await wait(80); seen.add((await st(p)).knobVals[1].toFixed(3)); }
+  assert(seen.size > 3, 'audio-linked knob moves: ' + [...seen].slice(0, 6));
+  await p.click('#ed-bake');
+  assert(!(await st(p)).edActive && (await p.inputValue('#ed-text')).startsWith('solid(0.95,'), 'bake writes values back');
+  await c.close();
+});
+
+await test('live edit: save as variant, reload, add to a playlist; instances stay separate', async () => {
+  const c = await ctx(); const p = await open(c, '?i=var');
+  await p.click('[data-tab=code]');
+  await p.fill('#ed-text', 'osc(12, 0.1, 1.2).kaleid(5).out()');
+  await p.click('#ed-save');
+  let s = await st(p);
+  assert(s.variants.length === 1, 'saved');
+  const vid = s.variants[0];
+  await p.reload(); await p.waitForFunction(() => window.PHVJ);
+  s = await st(p);
+  assert(s.variants.includes(vid), 'variant survives reload');
+  await p.click('[data-tab=gallery]');
+  const card = p.locator(`.cardg[data-id="${vid}"]`);
+  assert(await card.count() === 1, 'variant in gallery');
+  assert(/Puertas III \(edit\)/.test(await card.textContent()) && /edited from Puertas III by Celeste Betancur/.test(await card.textContent()), 'credited');
+  await card.locator('[data-act=add]').click();
+  assert((await st(p)).list.some(i => i.id === vid), 'addable to playlist');
+  await card.locator('[data-act=play]').click();
+  assert((await st(p)).cur === vid, 'plays');
+  const other = await open(c, '?i=var2');
+  assert((await st(other)).variants.length === 0, 'other instance has no variants');
   await c.close();
 });
 

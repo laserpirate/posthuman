@@ -65,6 +65,7 @@
         <button data-tab="playlist" role="tab">Playlist</button>
         <button data-tab="gallery" role="tab">Gallery</button>
         <button data-tab="live" role="tab">Live</button>
+        <button data-tab="code" role="tab">Code</button>
         <button data-tab="credits" role="tab">Credits</button>
         <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
       </nav>
@@ -152,6 +153,21 @@
         <p class="dim">Zoom and flash sit on top of the sketch; sketch code is untouched. Browser voice processing is off. In edited code, A.full, A.low, A.mid, A.high and A.custom give the levels (0 to 1).</p>
       </div>
 
+      <div id="v-code" class="view" hidden>
+        <div class="row"><b id="ed-title"></b></div>
+        <div class="ed"><pre id="ed-gutter" aria-hidden="true"></pre><textarea id="ed-text" spellcheck="false" autocomplete="off" wrap="off" aria-label="Sketch code"></textarea></div>
+        <div class="row">
+          <button id="ed-run" title="Run on the live deck, no crossfade, no time reset (Ctrl+Enter)">Run</button>
+          <button id="ed-revert" title="Back to the gallery code">Revert</button>
+          <button id="ed-bake" title="Write the knob values into the code">Bake</button>
+          <button id="ed-save" title="Keep this edit in this instance as a new sketch">Save as variant</button>
+          <button id="ed-hydra" title="Open this code in the Hydra editor">Copy to Hydra</button>
+        </div>
+        <pre id="ed-err" hidden></pre>
+        <h3>Knobs</h3>
+        <div id="knobs"></div>
+      </div>
+
       <div id="v-credits" class="view" hidden>
         <p class="dim">Sketches from the Hydra gallery, each by the artist named, licensed CC BY-NC-SA 4.0. Code runs unmodified.
           Engine: hydra-synth by Olivia Jack and contributors, AGPL-3.0. Fonts: Chakra Petch and Martian Mono, SIL OFL 1.1.
@@ -177,6 +193,7 @@
       <dt>B</dt><dd>Blackout</dd>
       <dt>R</dt><dd>Random mode</dd>
       <dt>S</dt><dd>Star current sketch</dd>
+      <dt>Ctrl+Enter</dt><dd>Run edited code (Code tab)</dd>
       <dt>T</dt><dd>Tap tempo</dd>
       <dt>G</dt><dd>Hold current sketch</dd>
       <dt>X</dt><dd>Ban current sketch</dd>

@@ -48,6 +48,10 @@
   }
 
   // audio bands: each is a chain of biquads (none for full) into its own analyser
+  // saved edits (variants) join the pool before the playlists are checked against it
+  const VARIANTS = load('variants', []).filter(v => v && typeof v.code === 'string' && typeof v.id === 'string' && SK.has(v.base));
+  for (const v of VARIANTS) addVariantToPool(v);
+
   const BANDS = ['full', 'low', 'mid', 'high', 'custom'];
   const BAND_LABEL = { full: 'Full', low: 'Low (kick/bass)', mid: 'Mid', high: 'High (hats)', custom: 'Custom Hz' };
   const bandFilters = (b, lo, hi) => ({
@@ -78,7 +82,7 @@
     if (!['playlist', 'pool'].includes(v.scope)) v.scope = DEF.scope;
     if (!['low', 'med', 'high'].includes(v.quality)) v.quality = DEF.quality;
     if (!['pool', 'starred'].includes(v.pullFrom)) v.pullFrom = DEF.pullFrom;
-    if (!['playlist', 'gallery', 'live', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
+    if (!['playlist', 'gallery', 'live', 'code', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
     for (const k of ['random', 'autoDrop', 'credits', 'clean', 'menuHidden', 'black', 'outPreview']) v[k] = !!v[k];
     v.bpm = clamp(v.bpm, 40, 240, DEF.bpm);
     v.bars = [0, 4, 8, 16, 32].includes(Number(v.bars)) ? Number(v.bars) : 0;
@@ -157,7 +161,7 @@
   const RT = {
     cur: null, elapsed: 0, fade: null, live: -1, decks: [], failed: new Set(),
     errors: 0, ctxLost: 0, hydras: 0, skips: 0, fps: 0, level: S.quality, code: false, fs: false,
-    outSeen: -1e9, fx: 0, // outSeen: last hello from an output window (performance.now starts near 0)
+    outSeen: -1e9, fx: 0, evals: 0, // outSeen: last hello from an output window (performance.now starts near 0)
   };
 
   // ---- controller log (never shown on the output) ---------------------------------------------
@@ -269,6 +273,8 @@
     } catch (e) { /* a broken previous sketch; the eval below decides */ }
     s.time = 0;
     d.tickErr = '';
+    d.edited = false;
+    RT.evals++;
     try {
       new Function('h', 'with(h){' + sk.code + '\n}')(s);
       tickSafe(d, 16);
@@ -465,11 +471,15 @@
     for (let i = 0; i < 2 && !rest; i++) {
       const d = RT.decks[i];
       if (!d.id || (i !== RT.live && !(RT.fade && RT.fade.to === i))) continue;
-      try { tickSafe(d, dt); ticks[i]++; } catch (e) { failDeck(d, 'runtime error: ' + (e.message || e)); return; }
+      try { tickSafe(d, dt); ticks[i]++; } catch (e) {
+        if (d.edited) edRecover(d, e.message || String(e)); // a live edit: never skip, put the last good code back
+        else failDeck(d, 'runtime error: ' + (e.message || e));
+        return;
+      }
     }
-    if (!OUT) audioFrame();
+    if (!OUT) { audioFrame(); knobFrame(now); }
     const d = curDeck();
-    if (!rest && d && d.id && now - lastProbe > 1000) {
+    if (!rest && d && d.id && !d.edited && now - lastProbe > 1000) {
       lastProbe = now;
       let bad = '';
       try { bad = blankness(d.canvas); } catch (e) { /* readback unavailable */ }
@@ -549,7 +559,7 @@
     $('#code-ov').textContent = sk ? sk.code : '';
     for (const li of $('#pl-list').children) li.classList.toggle('cur', li.dataset.id === RT.cur);
     for (const c of $('#g-grid').children) c.classList.toggle('cur', c.dataset.id === RT.cur);
-    if (!OUT) renderStar();
+    if (!OUT) { renderStar(); if (ED.id !== RT.cur) edLoad(RT.cur); }
     renderClock();
   }
 
@@ -598,7 +608,7 @@
   function setTab(t) {
     S.tab = t; saveSettings();
     for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
-    for (const v of ['playlist', 'gallery', 'live', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
+    for (const v of ['playlist', 'gallery', 'live', 'code', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
     if (t === 'log') { unseen = 0; logN.hidden = true; }
     if (t === 'gallery' && !$('#g-grid').children.length) renderGallery();
   }
@@ -918,12 +928,22 @@
         renderBar();
       }
       if (m.t === 'fx') applyFx(m.A, m.fx || S.au);
+      if (m.t === 'knobs' && m.slot) PHK[m.slot] = m.vals;
+      if (m.t === 'run' && m.id === RT.cur && typeof m.code === 'string') {
+        if (m.slot) PHK[m.slot] = m.vals;
+        const err = evalLive(m.code);
+        if (err) restoreGood(); else ED.goodEval = m.code;
+      }
       return;
     }
     if (m.t === 'hello') {
       const fresh = !outLive() || m.first; // m.first: a new or reloaded output window
       RT.outSeen = performance.now();
-      if (fresh) { log('Output window connected'); post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level }); }
+      if (fresh) {
+        log('Output window connected');
+        post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level });
+        if (ED.liveCode) post({ t: 'run', id: RT.cur, code: ED.liveCode, slot: ED.active ? ED.slot : 0, vals: PHK[ED.slot] });
+      }
     } else if (m.t === 'failed' && SK.has(m.id) && !RT.failed.has(m.id)) {
       RT.failed.add(m.id);
       RT.skips++;
@@ -1114,6 +1134,257 @@
   $('#au-hi').addEventListener('change', () => setRange($('#au-lo').value, $('#au-hi').value));
   for (const b of document.querySelectorAll('[data-hz]')) b.addEventListener('click', () => { const [lo, hi] = b.dataset.hz.split('-').map(Number); setRange(lo, hi); });
 
+  // ---- live edit: code panel, run without a time reset, revert, variants, knobs ----------------------
+  // Controller only. Run evals on the deck that is on screen with no hush and no time reset, so the
+  // visual keeps flowing; a failed edit leaves the last good code running. Knobs turn the numeric
+  // literals that are direct float arguments of hydra functions into getters, ()=>PHK[slot][i], so a
+  // slider changes a uniform without another eval.
+
+  const PHK = window.PHK = {};
+  const ED = { id: null, orig: '', text: '', good: '', goodEval: '', shown: '', knobs: [], links: [], slot: 0, active: false, liveCode: '' };
+  const edText = $('#ed-text'), edGut = $('#ed-gutter'), edErr = $('#ed-err');
+  let slotSeq = 0;
+
+  // numeric literals that are whole float arguments of a hydra function call
+  function parseKnobs(code) {
+    const T = RT.decks[0].hy.generator.glslTransforms;
+    const out = [], stack = [];
+    const n = code.length;
+    let i = 0, prev = '', prevIdent = '', prevIdentDotted = false, prevIdentEnd = -1;
+    const isId = c => /[A-Za-z0-9_$]/.test(c);
+    const back = j => { while (j >= 0 && /\s/.test(code[j])) j--; return j; };
+    const fwd = j => { while (j < n && /\s/.test(code[j])) j++; return j; };
+    while (i < n) {
+      const c = code[i];
+      if (c === '/' && code[i + 1] === '/') { while (i < n && code[i] !== '\n') i++; continue; }
+      if (c === '/' && code[i + 1] === '*') { const e = code.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+      if (c === '"' || c === "'" || c === '`') {
+        i++;
+        while (i < n && code[i] !== c) i += code[i] === '\\' ? 2 : 1;
+        i++; prev = 'str'; continue;
+      }
+      if (/\s/.test(c)) { i++; continue; }
+      if (/[A-Za-z_$]/.test(c)) {
+        const s = i;
+        while (i < n && isId(code[i])) i++;
+        prevIdent = code.slice(s, i); prevIdentEnd = i;
+        const d = back(s - 1);
+        // callee rule: not a property of something else (Math.sin), unless chained on a call result
+        prevIdentDotted = d >= 0 && code[d] === '.' && code[back(d - 1)] !== ')';
+        prev = 'id'; continue;
+      }
+      const num = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(code.slice(i, i + 32));
+      if (num && !(prev === 'id' && prevIdentEnd === i)) {
+        const s = i, e = i + num[0].length;
+        let start = s;
+        let b = back(s - 1);
+        if (b >= 0 && code[b] === '-') { const bb = back(b - 1); if (bb >= 0 && (code[bb] === '(' || code[bb] === ',')) { start = b; b = bb; } }
+        const top = stack[stack.length - 1], after = code[fwd(e)];
+        if (top && top.ch === '(' && top.fn && b >= 0 && (code[b] === '(' || code[b] === ',') && (after === ',' || after === ')')) {
+          const inp = T[top.fn] && T[top.fn].inputs[top.arg];
+          if (inp && inp.type === 'float') {
+            out.push({ start, end: e, value: Number(code.slice(start, e).replace(/\s+/g, '')), fn: top.fn, name: inp.name, arg: top.arg });
+          }
+        }
+        i = e; prev = 'num'; continue;
+      }
+      if (c === '(') {
+        const callee = prev === 'id' && back(i - 1) === prevIdentEnd - 1 && !prevIdentDotted && T[prevIdent] ? prevIdent : null;
+        stack.push({ ch: '(', fn: callee, arg: 0 });
+      } else if (c === '[' || c === '{') stack.push({ ch: c });
+      else if (c === ')' || c === ']' || c === '}') stack.pop();
+      else if (c === ',' && stack.length) stack[stack.length - 1].arg = (stack[stack.length - 1].arg || 0) + 1;
+      prev = c;
+      i++;
+    }
+    return out;
+  }
+  const fmtNum = v => String(Math.round(v * 1000) / 1000);
+  function spliceKnobs(code, knobs, rep) {
+    let s = code;
+    for (let k = knobs.length - 1; k >= 0; k--) s = s.slice(0, knobs[k].start) + rep(knobs[k], k) + s.slice(knobs[k].end);
+    return s;
+  }
+
+  function knobRange(v) {
+    let min = v < 0 ? 4 * v : 0, max = v > 0 ? 4 * v : 0;
+    if (max - min < 1) max = min + 1;
+    return { min, max };
+  }
+  function setKnobs(code, keepLinks) {
+    const old = ED.links;
+    ED.knobs = parseKnobs(code);
+    ED.links = ED.knobs.map((kn, k) => {
+      const r = knobRange(kn.value), o = keepLinks && old[k] && old[k].fn === kn.fn ? old[k] : null;
+      return { fn: kn.fn, v: kn.value, min: o ? Math.min(o.min, kn.value) : r.min, max: o ? Math.max(o.max, kn.value) : r.max, band: o ? o.band : 'none', depth: o ? o.depth : 0.5 };
+    });
+    ED.active = false;
+    renderKnobs();
+  }
+  const knobVal = l => l.v + (l.band !== 'none' ? l.depth * (A[l.band] || 0) * (l.max - l.min) : 0);
+
+  function edLoad(id) {
+    const sk = SK.get(id);
+    ED.id = id;
+    ED.orig = ED.text = ED.good = ED.goodEval = sk ? sk.code : '';
+    ED.liveCode = '';
+    edText.value = ED.shown = ED.text;
+    $('#ed-title').textContent = sk ? sk.title + ' · ' + sk.author : 'Nothing on screen';
+    edError('');
+    setKnobs(ED.text, false);
+    gutter();
+  }
+  function gutter() {
+    const lines = edText.value.split('\n').length;
+    let s = '';
+    for (let k = 1; k <= lines; k++) s += k + '\n';
+    edGut.textContent = s;
+    edGut.scrollTop = edText.scrollTop;
+  }
+  function edError(msg) { edErr.textContent = msg; edErr.hidden = !msg; }
+
+  // eval on the deck that is on screen: no hush, no time reset
+  function evalLive(code) {
+    finishFade();
+    const d = curDeck();
+    if (!d || !d.id) return new Error('nothing on screen');
+    d.tickErr = '';
+    RT.evals++;
+    try {
+      new Function('h', 'with(h){' + code + '\n}')(d.hy.synth);
+      tickSafe(d, 0);
+      d.edited = true;
+      return null;
+    } catch (e) { return e; }
+  }
+  function restoreGood() {
+    const d = curDeck();
+    if (d) d.tickErr = '';
+    const e = evalLive(ED.goodEval);
+    if (e && d) { d.edited = false; failDeck(d, 'edited code failed and the last good version did not recover: ' + (e.message || e)); }
+  }
+  // a runtime error from an edited deck (seen while ticking): show it, put the last good code back
+  function edRecover(d, msg) {
+    edError('Runtime error: ' + msg + '. Last good version restored.');
+    restoreGood();
+  }
+  function edRun(text, opts = {}) {
+    if (!RT.cur) return false;
+    const err = evalLive(text);
+    if (err) {
+      edError((err.name === 'SyntaxError' ? 'Syntax error: ' : 'Error: ') + (err.message || err) + '. Last good version still playing.');
+      restoreGood();
+      return false;
+    }
+    edError('');
+    ED.text = ED.good = ED.shown = text;
+    ED.goodEval = text;
+    ED.liveCode = text;
+    setKnobs(text, opts.keepLinks);
+    if (PLAY.playing && !PLAY.hold) { setHold(true); log('Hold on while editing (G to release)'); }
+    post({ t: 'run', id: RT.cur, code: text });
+    return true;
+  }
+  // first slider move: swap in the getter version, same look, no time reset
+  function activateKnobs() {
+    if (ED.active || !ED.knobs.length) return ED.active;
+    const slot = ++slotSeq;
+    PHK[slot] = ED.links.map(knobVal);
+    const code = spliceKnobs(ED.good, ED.knobs, (kn, k) => '()=>PHK[' + slot + '][' + k + ']');
+    const err = evalLive(code);
+    if (err) { edError('Knobs could not attach: ' + (err.message || err)); restoreGood(); return false; }
+    delete PHK[slot - 4]; // a fading deck may still read the previous slots
+    ED.slot = slot; ED.active = true; ED.goodEval = code; ED.liveCode = code;
+    post({ t: 'run', id: RT.cur, code, slot, vals: PHK[slot] });
+    return true;
+  }
+  // the text shows the slider values as plain literals
+  function knobsToText() {
+    const text = spliceKnobs(ED.good, ED.knobs, (kn, k) => fmtNum(ED.links[k].v));
+    ED.good = text;
+    ED.knobs = parseKnobs(text);
+    // only when the box holds what was last run (no unsaved typing to lose)
+    if (edText.value === ED.shown) { const st = edText.scrollTop; edText.value = ED.shown = text; edText.scrollTop = st; gutter(); }
+  }
+  let knobSent = 0;
+  function knobFrame(now) {
+    if (!ED.active || !PHK[ED.slot]) return;
+    const vals = PHK[ED.slot];
+    let changed = false;
+    ED.links.forEach((l, k) => { const v = knobVal(l); if (v !== vals[k]) { vals[k] = v; changed = true; } });
+    if (changed && outLive() && now - knobSent > 30) { knobSent = now; post({ t: 'knobs', slot: ED.slot, vals }); }
+  }
+
+  function renderKnobs() {
+    const box = $('#knobs');
+    if (!ED.knobs.length) { box.replaceChildren(h('p', { class: 'dim', text: 'No knobs: no plain numbers as hydra function arguments.' })); return; }
+    const bandOpts = ['none', ...BANDS];
+    box.replaceChildren(...ED.knobs.map((kn, k) => {
+      const l = ED.links[k];
+      const range = h('input', { type: 'range', min: l.min, max: l.max, step: 'any', value: l.v });
+      const num = h('input', { type: 'number', step: 'any', value: fmtNum(l.v), title: 'Value' });
+      const lo = h('input', { type: 'number', step: 'any', value: fmtNum(l.min), title: 'Range min' });
+      const hi = h('input', { type: 'number', step: 'any', value: fmtNum(l.max), title: 'Range max' });
+      const band = h('select', { title: 'Audio link' }, ...bandOpts.map(b => h('option', { value: b, text: b === 'none' ? 'No audio' : BAND_LABEL[b] })));
+      band.value = l.band;
+      const depth = h('input', { type: 'range', min: 0, max: 1, step: 0.01, value: l.depth, title: 'Audio depth' });
+      const set = v => {
+        if (!activateKnobs()) return;
+        l.v = v; num.value = fmtNum(v); range.value = String(v);
+        knobsToText();
+      };
+      range.addEventListener('input', () => set(Number(range.value)));
+      num.addEventListener('change', () => { const v = Number(num.value); if (Number.isFinite(v)) { if (v < l.min) { l.min = v; range.min = v; lo.value = fmtNum(v); } if (v > l.max) { l.max = v; range.max = v; hi.value = fmtNum(v); } set(v); } });
+      const setRange = () => {
+        const a = Number(lo.value), b = Number(hi.value);
+        if (Number.isFinite(a) && Number.isFinite(b) && b > a) { l.min = a; l.max = b; range.min = a; range.max = b; }
+      };
+      lo.addEventListener('change', setRange); hi.addEventListener('change', setRange);
+      band.addEventListener('change', () => { if (activateKnobs()) l.band = band.value; else band.value = 'none'; band.blur(); });
+      depth.addEventListener('input', () => { l.depth = Number(depth.value); });
+      return h('div', { class: 'knob', 'data-k': k },
+        h('span', { class: 'kl', text: kn.fn + ' · ' + kn.name }), range, num,
+        h('div', { class: 'kx' }, h('span', { text: 'range' }), lo, hi, band, depth));
+    }));
+  }
+
+  // variants: edited code saved in this instance, credited to the original
+  function addVariantToPool(v) {
+    const base = SK.get(v.base);
+    const sk = {
+      id: v.id, title: v.title, author: 'edited from ' + base.title + ' by ' + base.author, link: base.link, href: base.href,
+      code: v.code, hydraCode: btoa(encodeURIComponent(v.code)), thumb: base.thumb, quarantine: '', variant: v.base,
+    };
+    SK.set(v.id, sk);
+    D.sketches.push(sk);
+  }
+  function saveVariant() {
+    if (!ED.id) return null;
+    const cur = SK.get(ED.id), base = cur.variant ? SK.get(cur.variant) : cur;
+    const v = { id: 'v_' + base.id + '_' + Date.now().toString(36), base: base.id, title: base.title + ' (edit)', code: ED.good };
+    VARIANTS.push(v);
+    save('variants', VARIANTS);
+    addVariantToPool(v);
+    if ($('#g-grid').children.length) renderGallery();
+    renderCredits();
+    log('Saved variant "' + v.title + '" (' + v.id + ')');
+    return v.id;
+  }
+
+  edText.addEventListener('input', gutter);
+  edText.addEventListener('scroll', () => { edGut.scrollTop = edText.scrollTop; });
+  edText.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); edRun(edText.value, { keepLinks: true }); }
+    else if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); edText.setRangeText('  ', edText.selectionStart, edText.selectionEnd, 'end'); gutter(); }
+  });
+  $('#ed-run').addEventListener('click', () => edRun(edText.value, { keepLinks: true }));
+  $('#ed-revert').addEventListener('click', () => { edText.value = ED.orig; gutter(); edRun(ED.orig); });
+  $('#ed-bake').addEventListener('click', () => { if (ED.active) { edText.value = ED.good; edRun(ED.good); log('Knob values baked into the code'); } });
+  $('#ed-save').addEventListener('click', () => { if (!edRun(edText.value, { keepLinks: true })) return; saveVariant(); });
+  $('#ed-hydra').addEventListener('click', () => {
+    window.open('https://hydra.ojack.xyz/?code=' + encodeURIComponent(btoa(encodeURIComponent(edText.value))), '_blank', 'noopener');
+  });
+
   // ---- bar controls and keys ----------------------------------------------------------------------
 
   btn('play').addEventListener('click', () => setPlaying(!PLAY.playing));
@@ -1214,6 +1485,9 @@
         fs: RT.fs, code: RT.code, settings: { ...S }, active: LISTS.active,
         list: list().map(it => ({ ...it })), lists: Object.keys(LISTS.lists), stars: [...stars],
         out: OUT, outLive: outLive(), resting: previewResting(), hold: PLAY.hold, cue: PLAY.cue, banned: [...banned],
+        time: curDeck() ? curDeck().hy.synth.time : 0, evals: RT.evals, edited: !!(curDeck() && curDeck().edited),
+        knobs: ED.knobs.map((kn, k) => kn.fn + '.' + kn.name + '=' + ED.links[k].v), knobVals: (PHK[ED.slot] || []).slice(), edActive: ED.active,
+        edErr: edErr.textContent, variants: VARIANTS.map(v => v.id),
         fx: RT.fx, audio: !!AU.ctx, A: { ...A }, dur: RT.cur ? durOf(RT.cur) : 0,
       };
     },
@@ -1221,6 +1495,6 @@
     addTestSketch(id, code) {
       SK.set(id, { id, title: 'Test ' + id, author: 'test', link: '', href: '', code, hydraCode: '', thumb: '', quarantine: '' });
     },
-    addToList, pull,
+    addToList, pull, edRun, saveVariant, parseKnobs,
   };
 })();
