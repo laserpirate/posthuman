@@ -20,7 +20,10 @@ const probe = document.createElement('canvas'); probe.width = 160; probe.height 
 const pctx = probe.getContext('2d', { willReadFrequently: true });
 const thumb = document.createElement('canvas'); thumb.width = 320; thumb.height = 180;
 const tctx = thumb.getContext('2d');
-let lost = 0;
+let lost = 0, tickErr = '';
+// hydra-synth catches errors inside sketch functions and warns 'ERROR' instead; count those as failures
+const warn = console.warn.bind(console);
+console.warn = (...a) => { if (a[0] === 'ERROR') { tickErr = tickErr || ((a[1] && a[1].message) || String(a[1])); return; } warn(...a); };
 const px1 = new Uint8Array(4); // a 1 px readback forces the GPU to finish the frame, so the timing is real
 canvas.addEventListener('webglcontextlost', () => lost++);
 
@@ -40,6 +43,7 @@ window.run = (id, secs, thumbAt) => new Promise(resolve => {
   const res = { id, err: '', frames: 0, avgMs: 0, p95Ms: 0, blankMax: 0, blankKind: '', thumb: '', lost: 0 };
   try { hy.hush(); s.speed = 1; s.bpm = 30; s.fps = undefined; if (!s.a || !s.a.fft) s.a = stub(); hy.tick(16); hy.tick(16); } catch (e) {}
   s.time = 0;
+  tickErr = '';
   try { new Function('h', 'with(h){' + sk.code + '\n}')(s); hy.tick(16); }
   catch (e) { res.err = 'eval: ' + (e.message || e); return resolve(res); }
   const costs = [];
@@ -49,6 +53,7 @@ window.run = (id, secs, thumbAt) => new Promise(resolve => {
     const dt = Math.min(now - last, 100); last = now;
     const a = performance.now();
     try { hy.tick(dt || 16); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); } catch (e) { res.err = 'tick: ' + (e.message || e); return resolve(res); }
+    if (tickErr) { res.err = 'runtime: ' + tickErr; return resolve(res); }
     costs.push(performance.now() - a);
     res.frames++;
     if (now - lastProbe >= 250) {

@@ -207,7 +207,7 @@
       savePlay();
       setTimeout(() => location.reload(), 2000);
     });
-    return { hy, canvas, id: null, badSince: 0 };
+    return { hy, canvas, id: null, badSince: 0, tickErr: '' };
   }
 
   // hush, clear the feedback buffers, reset time, then eval. Returns the error, or null.
@@ -221,14 +221,32 @@
       hy.tick(16); hy.tick(16);
     } catch (e) { /* a broken previous sketch; the eval below decides */ }
     s.time = 0;
+    d.tickErr = '';
     try {
       new Function('h', 'with(h){' + sk.code + '\n}')(s);
-      hy.tick(16);
+      tickSafe(d, 16);
       return null;
     } catch (e) {
       try { hy.hush(); } catch (e2) { /* ignore */ }
       return e;
     }
+  }
+
+  // hydra-synth catches errors thrown inside sketch functions (uniform callbacks) and prints
+  // console.warn('ERROR', err) every frame. While a deck ticks, that warning marks the deck as failed.
+  let tickDeck = null;
+  const warn = console.warn.bind(console);
+  console.warn = (...args) => {
+    if (tickDeck && args[0] === 'ERROR') {
+      if (!tickDeck.tickErr) tickDeck.tickErr = (args[1] && args[1].message) || String(args[1]);
+      return;
+    }
+    warn(...args);
+  };
+  function tickSafe(d, dt) {
+    tickDeck = d;
+    try { d.hy.tick(dt); } finally { tickDeck = null; }
+    if (d.tickErr) throw new Error(d.tickErr);
   }
 
   const curDeck = () => (RT.fade ? RT.decks[RT.fade.to] : RT.live >= 0 ? RT.decks[RT.live] : null);
@@ -383,7 +401,7 @@
     for (let i = 0; i < 2; i++) {
       const d = RT.decks[i];
       if (!d.id || (i !== RT.live && !(RT.fade && RT.fade.to === i))) continue;
-      try { d.hy.tick(dt); ticks[i]++; } catch (e) { failDeck(d, 'runtime error: ' + (e.message || e)); return; }
+      try { tickSafe(d, dt); ticks[i]++; } catch (e) { failDeck(d, 'runtime error: ' + (e.message || e)); return; }
     }
     const d = curDeck();
     if (d && d.id && now - lastProbe > 1000) {
@@ -567,7 +585,8 @@
   plList.addEventListener('change', e => {
     if (e.target.dataset.act !== 'dur') return;
     const it = list().find(x => x.id === e.target.closest('li').dataset.id);
-    if (it) { it.dur = clamp(e.target.value, 1, 3600, it.dur); changed(); }
+    // save without re-rendering: the input may be mid-blur
+    if (it) { it.dur = clamp(e.target.value, 1, 3600, it.dur); e.target.value = String(it.dur); saveLists(); renderClock(); }
   });
 
   // drag to reorder, from the handle
@@ -640,7 +659,7 @@
     list().length = 0;
     changed();
   });
-  $('#def-dur').addEventListener('change', e => { S.defaultDur = clamp(e.target.value, 1, 3600, S.defaultDur); saveSettings(); renderPlaylist(); });
+  $('#def-dur').addEventListener('change', e => { S.defaultDur = clamp(e.target.value, 1, 3600, S.defaultDur); e.target.value = String(S.defaultDur); saveSettings(); });
   $('#pl-apply').addEventListener('click', () => {
     S.defaultDur = clamp($('#def-dur').value, 1, 3600, S.defaultDur); saveSettings();
     for (const it of list()) it.dur = S.defaultDur;
@@ -774,6 +793,8 @@
   $('#s-scope').addEventListener('change', e => { S.scope = e.target.value; PLAY.bag = []; saveSettings(); e.target.blur(); });
   $('#s-trans').addEventListener('change', e => { S.transition = e.target.value; saveSettings(); renderBar(); e.target.blur(); });
   $('#n-xfade').addEventListener('change', e => { S.xfadeSec = clamp(e.target.value, 0.2, 10, S.xfadeSec); saveSettings(); renderBar(); });
+  // Enter in a number field commits it and hands the keys back to the shortcuts
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('input[type=number]')) e.target.blur(); });
   $('#s-q').addEventListener('change', e => {
     S.quality = RT.level = e.target.value; saveSettings();
     log('Quality set to ' + RT.level);
