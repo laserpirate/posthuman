@@ -548,6 +548,54 @@ await test('stretch: audio reactive (fake input) drives zoom and flash, off by d
   await c.close();
 });
 
+await test('audio input: a Scarlett is picked automatically, unplug keeps visuals, replug reconnects', async () => {
+  const c = await ctx({ permissions: ['microphone'] });
+  // relabel the last fake input as the show interface; window.__unplug hides it, as if the USB cable came out
+  await c.addInitScript(() => {
+    const md = navigator.mediaDevices, orig = md.enumerateDevices.bind(md);
+    md.enumerateDevices = async () => {
+      const all = (await orig()).map(d => ({ kind: d.kind, deviceId: d.deviceId, groupId: d.groupId, label: d.label }));
+      const ins = all.filter(d => d.kind === 'audioinput' && d.deviceId !== 'default');
+      const sc = ins[ins.length - 1];
+      if (sc && sc.label) { sc.label = 'Focusrite USB (Scarlett 2i2 USB)'; window.__scId = sc.deviceId; }
+      return window.__unplug ? all.filter(d => d !== sc) : all;
+    };
+  });
+  const p = await open(c, '?i=scar');
+  await p.click('[data-tab=live]');
+  await p.check('#au-on');
+  await p.waitForFunction(() => PHVJ.state.audio, null, { timeout: 5000 });
+  let s = await st(p);
+  const scId = await p.evaluate(() => window.__scId);
+  assert(scId && /Scarlett/.test(s.auStatus), 'Scarlett shown as the input: ' + s.auStatus);
+  assert(await p.inputValue('#au-dev') === scId, 'picker shows the Scarlett');
+  assert(await p.locator('#log li', { hasText: 'show interface, picked automatically' }).count() === 1, 'logged');
+  const before = (await st(p)).time;
+  // unplug: the track ends and the device leaves the list
+  await p.evaluate(() => { window.__unplug = true; PHVJ.testEndInput(); });
+  await wait(300);
+  s = await st(p);
+  assert(!s.audio && s.auLost && /Input lost/.test(s.auStatus) && s.settings.au.on, 'lost, said so, audio still armed: ' + s.auStatus);
+  assert(s.A.full === 0 && s.fx === 0, 'no stale levels');
+  await wait(800);
+  assert((await st(p)).time > before && !(await st(p)).failed.length, 'visuals keep running');
+  // replug
+  await p.evaluate(() => { window.__unplug = false; navigator.mediaDevices.dispatchEvent(new Event('devicechange')); });
+  await p.waitForFunction(() => PHVJ.state.audio, null, { timeout: 5000 });
+  s = await st(p);
+  assert(!s.auLost && /Scarlett/.test(s.auStatus), 'reconnected: ' + s.auStatus);
+  // the Scarlett wins over a remembered choice on the next start too
+  await p.uncheck('#au-on');
+  const other = await p.evaluate(sc => [...document.querySelectorAll('#au-dev option')].map(o => o.value).find(v => v && v !== sc), scId);
+  if (other) {
+    await p.selectOption('#au-dev', other);
+    await p.check('#au-on');
+    await p.waitForFunction(() => PHVJ.state.audio, null, { timeout: 5000 });
+    assert(/Scarlett/.test((await st(p)).auStatus), 'Scarlett preferred over the remembered device');
+  }
+  await c.close();
+});
+
 await test('stretch: output window follows the controller, reports failures back', async () => {
   const c = await ctx(); const ctl = await open(c, '?i=o');
   await setList(ctl, ['example_3', 'example_14', 'example_15'], 30);

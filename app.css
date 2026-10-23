@@ -112,6 +112,8 @@ body.menu-off #app { grid-template-rows: 0 minmax(0, 1fr); }
 .band label { display: flex; flex-direction: column; font-size: 11px; color: var(--dim); }
 .band input[type=range] { width: 100%; accent-color: var(--on); }
 .meter { height: 8px; background: var(--bg3); border: 1px solid var(--line); margin: 4px 0 8px; }
+#au-status { font-size: 12px; color: var(--dim); }
+#au-status.warn { color: var(--warn); }
 #au-meter { height: 100%; width: 0; background: var(--on); }
 #pl-list li.cued { border-color: var(--dim); border-style: dashed; }
 #pl-list li.ban .t { text-decoration: line-through; color: var(--dim); }

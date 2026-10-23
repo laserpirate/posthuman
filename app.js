@@ -1014,7 +1014,8 @@
   // by the band you pick. The output window gets the levels from the controller.
 
   const A = window.A = { full: 0, low: 0, mid: 0, high: 0, custom: 0 };
-  const AU = { ctx: null, stream: null, src: null, bands: {}, buf: null };
+  const AU = { ctx: null, stream: null, src: null, bands: {}, buf: null, devId: '', label: '', lost: null };
+  const SHOW_INPUT = /scarlett|focusrite/i; // the show interface wins over any remembered choice
   const decksEl = $('#decks');
   function applyFx(levels, fx = S.au) {
     for (const b of BANDS) A[b] = clamp(levels && levels[b], 0, 1, 0);
@@ -1044,44 +1045,99 @@
     c.filters[0].frequency.value = S.au.lo;
     c.filters[1].frequency.value = S.au.hi;
   }
+  async function inputs() {
+    try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default'); }
+    catch (e) { return []; }
+  }
   async function listInputs() {
-    try {
-      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
-      const sel = $('#au-dev');
-      sel.replaceChildren(h('option', { value: '', text: 'Default input' }),
-        ...devs.filter(d => d.deviceId && d.deviceId !== 'default').map((d, i) => h('option', { value: d.deviceId, text: d.label || 'Input ' + (i + 1) })));
-      sel.value = [...sel.options].some(o => o.value === S.au.dev) ? S.au.dev : '';
-    } catch (e) { /* no media devices */ }
+    const devs = await inputs();
+    const sel = $('#au-dev');
+    sel.replaceChildren(h('option', { value: '', text: 'Default input' }),
+      ...devs.map((d, i) => h('option', { value: d.deviceId, text: d.label || 'Input ' + (i + 1) })));
+    const want = AU.devId || S.au.dev;
+    sel.value = [...sel.options].some(o => o.value === want) ? want : '';
+    return devs;
+  }
+  function auStatus() {
+    const el = $('#au-status');
+    el.classList.toggle('warn', !!AU.lost);
+    el.textContent = AU.lost ? 'Input lost: ' + AU.lost.label + '. Visuals keep running; reconnects when it is back.'
+      : AU.ctx ? 'Input: ' + AU.label : S.au.on ? 'Input: connecting' : 'Input: off';
+  }
+  // device order: a Scarlett/Focusrite if one is listed, else the last choice for this instance, else the default
+  function chooseInput(devs) {
+    const show = devs.find(d => SHOW_INPUT.test(d.label));
+    if (show) return show.deviceId;
+    return devs.some(d => d.deviceId === S.au.dev) ? S.au.dev : '';
   }
   const fxSettings = () => ({ zoomSrc: S.au.zoomSrc, zoom: S.au.zoom, flashSrc: S.au.flashSrc, flash: S.au.flash });
   function audioStop() {
-    if (AU.stream) for (const t of AU.stream.getTracks()) t.stop();
+    if (AU.stream) for (const t of AU.stream.getTracks()) { t.onended = null; t.stop(); }
     if (AU.ctx) AU.ctx.close().catch(() => {});
     AU.ctx = AU.stream = AU.src = null;
     AU.bands = {};
+    for (const k in A) A[k] = 0;
     applyFx(null);
     post({ t: 'fx', A: { ...A }, fx: fxSettings() });
+    auStatus();
   }
+  const getMic = id => navigator.mediaDevices.getUserMedia({
+    audio: { deviceId: id ? { exact: id } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  });
   async function audioStart() {
     audioStop();
+    AU.lost = null;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { log('Audio input is not available here (needs https or localhost)', true); return; }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: S.au.dev ? { exact: S.au.dev } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
+      // labels stay hidden until the first permission grant, so choose, open, then choose again with labels
+      let id = chooseInput(await inputs());
+      let stream = await getMic(id);
+      const better = chooseInput(await inputs());
+      if (better && better !== (stream.getAudioTracks()[0].getSettings().deviceId || id)) {
+        for (const t of stream.getTracks()) t.stop();
+        id = better;
+        stream = await getMic(id);
+      }
       if (!S.au.on) { for (const t of stream.getTracks()) t.stop(); return; }
+      const track = stream.getAudioTracks()[0];
+      AU.devId = track.getSettings().deviceId || id;
+      AU.label = ((await inputs()).find(d => d.deviceId === AU.devId) || track).label || 'Default input';
+      track.onended = () => inputLost();
       AU.ctx = new AudioContext();
       AU.stream = stream;
       AU.src = AU.ctx.createMediaStreamSource(stream);
       for (const b of BANDS) buildBand(b);
       AU.buf = new Float32Array(1024);
       if (AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
-      log('Audio on: ' + (stream.getAudioTracks()[0] || {}).label);
+      log('Audio on: ' + AU.label + (SHOW_INPUT.test(AU.label) ? ' (show interface, picked automatically)' : ''));
       listInputs();
+      auStatus();
     } catch (e) {
       log('Audio input failed: ' + (e.message || e.name), true);
-      S.au.on = false; saveSettings(); renderBar();
+      S.au.on = false; saveSettings(); renderBar(); auStatus();
     }
+  }
+  // unplugged: drop the audio, keep the visuals, wait for the same device (or any show interface) to come back
+  function inputLost() {
+    if (!AU.ctx) return;
+    const lost = { id: AU.devId, label: AU.label };
+    audioStop();
+    AU.lost = lost;
+    log('Audio input lost: ' + lost.label + '. Visuals keep running without audio.', true);
+    auStatus();
+  }
+  async function inputCheck() {
+    const devs = await listInputs();
+    if (!S.au.on) return;
+    if (AU.ctx && AU.devId && AU.devId !== 'default' && !devs.some(d => d.deviceId === AU.devId)) { inputLost(); return; }
+    if (AU.lost && devs.some(d => d.deviceId === AU.lost.id || SHOW_INPUT.test(d.label))) {
+      log('Audio input back: reconnecting');
+      await audioStart();
+    }
+  }
+  if (!OUT && navigator.mediaDevices) {
+    navigator.mediaDevices.addEventListener('devicechange', inputCheck);
+    setInterval(() => { if (AU.lost) inputCheck(); }, 3000); // devicechange does not fire on every driver
   }
   // per band: RMS x sensitivity, gated by the threshold, attack at once, release by the smoothing
   function audioFrame() {
@@ -1116,7 +1172,7 @@
     h('label', {}, 'Threshold', slider(0, 0.9, 0.01, S.au.bands[b].thr, v => { S.au.bands[b].thr = v; })))));
   for (const sel of [$('#au-zsrc'), $('#au-fsrc')]) sel.replaceChildren(h('option', { value: 'off', text: 'Off' }), ...BANDS.map(b => h('option', { value: b, text: BAND_LABEL[b] })));
 
-  $('#au-on').addEventListener('change', e => { S.au.on = e.target.checked; saveSettings(); if (S.au.on) audioStart(); else { audioStop(); log('Audio off'); } });
+  $('#au-on').addEventListener('change', e => { S.au.on = e.target.checked; saveSettings(); if (S.au.on) audioStart(); else { audioStop(); AU.lost = null; auStatus(); log('Audio off'); } });
   $('#au-dev').addEventListener('change', e => { S.au.dev = e.target.value; saveSettings(); if (S.au.on) audioStart(); e.target.blur(); });
   $('#au-zsrc').addEventListener('change', e => { S.au.zoomSrc = e.target.value; saveSettings(); e.target.blur(); });
   $('#au-fsrc').addEventListener('change', e => { S.au.flashSrc = e.target.value; saveSettings(); e.target.blur(); });
@@ -1488,7 +1544,7 @@
         time: curDeck() ? curDeck().hy.synth.time : 0, evals: RT.evals, edited: !!(curDeck() && curDeck().edited),
         knobs: ED.knobs.map((kn, k) => kn.fn + '.' + kn.name + '=' + ED.links[k].v), knobVals: (PHK[ED.slot] || []).slice(), edActive: ED.active,
         edErr: edErr.textContent, variants: VARIANTS.map(v => v.id),
-        fx: RT.fx, audio: !!AU.ctx, A: { ...A }, dur: RT.cur ? durOf(RT.cur) : 0,
+        fx: RT.fx, audio: !!AU.ctx, auLabel: AU.label, auLost: !!AU.lost, auStatus: $('#au-status').textContent, A: { ...A }, dur: RT.cur ? durOf(RT.cur) : 0,
       };
     },
     next, prev, show, setPlaying, toggleRandom, shareLink, exportData, importData, setFs,
@@ -1496,5 +1552,6 @@
       SK.set(id, { id, title: 'Test ' + id, author: 'test', link: '', href: '', code, hydraCode: '', thumb: '', quarantine: '' });
     },
     addToList, pull, edRun, saveVariant, parseKnobs,
+    testEndInput: () => { if (AU.stream) AU.stream.getAudioTracks()[0].dispatchEvent(new Event('ended')); },
   };
 })();
