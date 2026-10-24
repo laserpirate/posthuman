@@ -36,8 +36,9 @@ Scene tab (Kodama mode):
 
 - **The scene's own buttons**, mirrored: TIME (dawn/day/dusk/night/cycle), FLOOD (low/high/cycle), CLIMATE/RIVER/LIGHT cycles, as each scene has them. The scene's text and buttons never show on the output.
 - **Speed** 0.1× to 3× (1× button resets). **Turntable** 0 to 3×, plus Reverse; 0 stops the orbit.
-- **Palette** (both modes, each its own): Original, Grayscale, Black/white (threshold), Mono (hue), Duotone (presets red/green, cyan/magenta, amber/indigo, or two colors), Red/green gradient map; Intensity and Contrast. A playlist row's **Pal** button saves the current palette for that item. "Kodama start" picks the palette used on entering Kodama mode.
-- Default kodama duration is 90 s. The new drafts (airfield, under-city, drowned towers, cloud city) are marked Draft and are not in the default Kodamas playlist.
+- **Palette** (both modes, each its own): first row of the **Scene** tab; in Kodama mode also the dropdown in the menu bar; **P** cycles. Original, Grayscale, Black/white (threshold), Mono (hue), Duotone (presets red/green, cyan/magenta, amber/indigo, or two colors), Red/green gradient map; Intensity and Contrast (Intensity below 1 mixes the original back in). A playlist row's **Pal** button gives that item its own palette; while it is on screen the Scene tab says so and its controls edit that item. "On start" is the Kodama palette when the app opens.
+- **View** (Kodamas): drag on the stage to orbit, **shift-drag or right-drag** to pan, **wheel** to zoom. Same on the Scene tab's pad, or directly in the output window; the projector follows the controller and the other way round. The turntable rests while you steer and resumes 2 s later. **Reset view** goes back to the scene's start. A playlist row's **View** button saves the current view for that item.
+- Default kodama duration is 90 s. airfield, under-city, drowned towers and cloud city are approved and in the default Kodamas playlist. The mashups (cloud airfield, flooded under-city, storm runway, hanging city) are marked Draft and are not in it.
 
 ## Keys
 
