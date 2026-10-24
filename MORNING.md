@@ -2,6 +2,7 @@
 
 ## MIDI preview (handoff-10, 24 Oct): read this first
 
+- **pk30 to pk36 approved (v0.4.4, 16:40):** out of draft and into the default Kodamas playlist in order, before pk37 (still last), on `/` and `/next/`. Same password. **Recopy `local\kodamas\` to the show laptops.**
 - **pk37 remy astral (handoff-11) is live** in `/` and `/next/` (tag `posthuman-v0.4.3`, root baseline moved to it), last in the default Kodamas playlist. 3080 High 60 fps, SwiftShader Low 29.9. Preview: `local\kodamas\pk37-preview.jpg`. **Recopy `local\kodamas\` to the show laptops.**
 - **Preview:** https://laserpirate.github.io/posthuman/next/?i=<name> (tag `posthuman-v0.5.0-next`). **The root `/` is unchanged** (byte-identical to its baseline, now `posthuman-v0.4.3` with pk37; checked by `node tools/root-hash.mjs` before the push).
 - **Enable:** plug the nanoKONTROL in before Chrome, MIDI tab, **Enable MIDI** (Chrome only). Map **Auto** = original nanoKONTROL (scene 1, your map) or nanoKONTROL2 by port name. Keep SCENE on 1.

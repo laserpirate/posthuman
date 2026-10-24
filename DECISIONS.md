@@ -169,3 +169,12 @@ One line per judgment call. Newest at the bottom.
 - e2e-kodama: KSCENES 44; pk37 is in the visuals-only check and must be last in the default playlist. The local encrypted-pack check expects 44 scenes too, so it passes only once Phase B re-encrypts the pack with pk37.
 - Root baseline moved to `posthuman-v0.4.3` (pk37: app.js APPROVED list, registry, encrypted pack) with `node tools/root-hash.mjs --set posthuman-v0.4.3`; `/next/` rebuilt from feat/midi with pk37 and the same pack.
 - pk37 Phase B gates (15:50 to 16:04): kodama e2e 14/14 on `/` and `/next/` (the first `/next/` run hit 404s because rebuilding next/ removed the local-only `next/local` test junction; rerun after relinking), Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, kodama soak 3 min pass, pk36+pk37 looped soak 2 min pass (28.5 fps, 0 errors, 0 context lost), leak check 0, root byte-identical to `posthuman-v0.4.3`.
+
+## v0.4.4 · pk30 to pk36 approved (handoff-12)
+
+- Marko approved drafts pk30 to pk36 on show day (24 Oct, 16:30). The "Also: approve drafts pk30 to pk36" section named in his request is not in handoff-11 or any other handoff; his message gave the full instruction, so it was done from that.
+- `tools/kodama-import.mjs` drops their draft flags; the plain pack and the encrypted pack were rebuilt (44 scenes, same salt and password). A fresh instance's default Kodamas playlist ends pk30, pk31 ... pk36, pk37.
+- `APPROVED` in app.js now lists pk26 to pk37 in order. An instance that already has a Kodamas playlist gets pk30 to pk36 once, inserted ahead of any scene listed after it in APPROVED, so they land before pk37, which stays last. Same change on `feat/midi`; `/next/` rebuilt from it (904b267).
+- e2e-kodama: the "drafts not in the default playlist" assertion is now "the last eight are pk30 to pk37 in order" plus "no scene in the default playlist is a draft" (checked against the pack's scene list). The append path for existing instances was checked in node, not in the browser.
+- Root baseline moved to `posthuman-v0.4.4` (172 files).
+- Gates (16:33 to 16:40, RTX 3080, headless): kodama e2e 14/14 on `/` and `/next/`, Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, kodama soak 2 min pass (44 scenes, 29.5 to 30 fps, 0 errors, 0 context lost), leak check 0, root byte-identical to `posthuman-v0.4.4`.
