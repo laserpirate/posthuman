@@ -84,8 +84,10 @@
 
   // open whatever pack this server has: plain first, then encrypted with a remembered key (or `key`)
   async function open(rawKey) {
-    // ?kpack=enc tests the encrypted copy on a server that also has the plain folder
-    if (!/[?&]kpack=enc(&|$)/.test(location.search) && await openLocal()) return P;
+    // ?kpack=enc tests the encrypted copy on a server that also has the plain folder; Pages never has
+    // local/ (gitignored), so it is not probed there (a 404 would land in the console)
+    const hosted = /\.github\.io$/.test(location.hostname);
+    if (!hosted && !/[?&]kpack=enc(&|$)/.test(location.search) && await openLocal()) return P;
     const info = await packMeta();
     if (!info) { P.mode = 'none'; P.why = 'Kodama pack not loaded'; return P; }
     let raw = rawKey;

@@ -2,7 +2,7 @@
 
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`; safety tag `posthuman-v0.2.2-pre-kodama`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`; safety tag `posthuman-v0.2.2-pre-kodama`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 
@@ -134,7 +134,7 @@
 ## What landed where
 
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\` (git repo; `test-results/` holds e2e and soak JSON, not committed).
-- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.2.2-pre-kodama` and `posthuman-v0.3.0`.
+- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.2.2-pre-kodama`, `posthuman-v0.3.0` and `posthuman-v0.3.1` (no 404 probe of `local/` on Pages).
 - **Kodama pack:** `local\kodamas\` and `local\kodama-pass.txt`, gitignored, Polaris only. The encrypted copy is `kodamas/` in the repo and on Pages.
 - **Pages:** https://laserpirate.github.io/posthuman/ from `main` `/`.
 - The existing `posthuman\` folder (post-human26 gated site) was not touched.
