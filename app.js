@@ -1546,7 +1546,7 @@
     kind: 'k', canvas: el, frame: null, id: null, badSince: 0, tickErr: '', ready: false, rendered: false, t0: 0,
   }));
   const CTX = { hydra: null, kodama: null };
-  const APPROVED = ['pk26', 'pk27', 'pk28', 'pk29', 'pk37']; // handoff-6, handoff-11: out of draft, into the default playlist
+  const APPROVED = ['pk26', 'pk27', 'pk28', 'pk29', 'pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35', 'pk36', 'pk37']; // handoff-6, -11, -12: out of draft, into the default playlist, in this order
 
   // each iframe covers the letterboxed stage; inside it the scene draws at the quality level's size
   // and its canvas is stretched to fit (kodama-rig.js)
@@ -1647,7 +1647,10 @@
       if (had.has(id) || !ksk.has(id)) continue;
       had.add(id);
       const k = L.lists.Kodamas;
-      if (k && !k.some(it => it.id === id)) { k.push({ id, dur: S.kDur }); add.push(id); }
+      if (!k || k.some(it => it.id === id)) continue;
+      // ahead of any scene listed after it in APPROVED, so pk30-pk36 land before pk37, which stays last
+      const later = new Set(APPROVED.slice(APPROVED.indexOf(id) + 1)), at = k.findIndex(it => later.has(it.id));
+      k.splice(at < 0 ? k.length : at, 0, { id, dur: S.kDur }); add.push(id);
     }
     save('k:approved', [...had]);
     if (add.length) { save('k:lists', L); log('Added to the Kodamas playlist (approved): ' + add.join(', ')); }
