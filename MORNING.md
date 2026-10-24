@@ -2,7 +2,7 @@
 
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`; safety tag `posthuman-v0.2.2-pre-kodama`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 
@@ -43,6 +43,27 @@
   - Unplugged: the Live tab says so in red, the visuals keep running without audio, and it reconnects by itself when the device is back.
   - Hookup checklist in `SHOWNIGHT.md`: USB, mixer booth/record out to input 1 (or 1+2), INST/Air/direct monitor off, gain ring green (amber on peaks, never red), Focusrite Control on Windows if not listed, plug in before opening the app.
 - **Keys card:** adds S (star) and Ctrl+Enter (run).
+
+## v0.3.0 (handoff-5): Kodama mode
+
+- **Mode switch** "Hydras | Kodamas" in the menu bar; it fades through black (about 0.5 s). Each mode has its own library, playlists, stars, bans, position and palette, scoped per `?i=`. The output window follows. Hydra mode is unchanged (e2e 27/27, 10 min soak).
+- **Library:** 36 scenes. pk17 to pk24, kv01 to kv25 (there is no kv22), and four new drafts pk26 to pk29. three.js r128 is vendored (`vendor/three.r128.min.js`), nothing from a CDN.
+- **Loading the pack** (the scenes are not in the repo as plain files):
+  - Local: `local\kodamas\` (gitignored; 36 scenes, thumbnails, `index.json`). Copy that folder to the same place on each laptop and run `node serve.mjs`.
+  - Pages: `kodamas/` carries the same pack encrypted (AES-256-GCM, PBKDF2 250k). Gallery tab, enter the password, "Remember on this laptop". The password is only in `local\kodama-pass.txt` on Polaris.
+  - Neither: the Kodamas mode says "Kodama pack not loaded" and Hydra keeps running.
+- **New controls (Scene tab):**
+  - The scene's own controls, mirrored from `data/kodama-controls.json` (90 controls over 36 scenes: TIME, FLOOD, CLIMATE, RIVER, LIGHT and so on). The scenes' own text, buttons and HUD never reach the output.
+  - Speed 0.1x to 3x; turntable 0 to 3x plus Reverse; drag-to-orbit is off.
+  - Palette per mode: Original, Grayscale, Black/white (threshold), Mono (hue), Duotone (red/green, cyan/magenta, amber/indigo presets, or two colors), Red/green gradient map; plus Intensity and Contrast. **Pal** on a playlist row saves a palette for that item. "Kodama start" (your three options and more) picks the palette on entering Kodama mode; default Original.
+  - Default kodama duration 90 s. Crossfade, cut, random, hold, cue, ban, star all work as in Hydra mode.
+- **Reliability:** at most 2 scene iframes at any time; the outgoing one is disposed (renderer dispose plus context loss) after the fade. A scene that throws, loses its context or shows no frame in 15 s is skipped and logged.
+- **Palette cost** (SwiftShader software floor, High 1920x1080, pk18; baseline 60 fps): Grayscale 3.5%, B/W 9.7%, Mono 8.7%, Duotone 10.1%, Red/green 9.9%, Grayscale with intensity 0.5 and contrast 1.4 15.5%. **None over 20%.** At Low every palette holds the 30 fps cap.
+- **New kodamas (drafts, pending your approval, not in the default playlist):** pk26 airfield, pk27 under-city, pk28 drowned towers, pk29 cloud city. Contact sheet: `local\kodamas\contact-sheet.jpg` (4-up). Copies also in `..\All_Kodamas\phylla-kodama-topo-26..29-*.html`. GPU 45 to 60 fps; SwiftShader at Low 22 to 30 fps.
+- **Quarantine (kodamas):** none. All 36 passed preflight on the RTX 3080 (p95 frame cost at most 9.3 ms, no visible text).
+- **Tests:** `tools/e2e-kodama.mjs` 9/9 (pack local and encrypted, wrong password, remembered key; visuals only; mirrored controls; speed and turntable; palettes; autoplay, crossfade, cut, mode switch, teardown, bad scene skipped; output window; offline; zero console errors). Hydra `tools/e2e.mjs` 27/27. Soaks (headless, RTX 3080, Med), both pass: Hydra 10 min, 61 switches, all 57 played, 30 fps, heap 3.6 to 3.9 MB; Kodama 15 min, 46 switches, all 36 played, fps min 29.5 avg 30, heap 6.7 to 7.1 MB, at most 2 iframes; both 0 context lost, 0 skips, 0 console errors.
+- **Not built:** a camera height/zoom slider (scenes don't share one camera model).
+- **Not verified:** Luna, the M4, Stardust, an Intel iGPU, any projector. Kodama mode ran only on Polaris (RTX 3080) and SwiftShader.
 
 ## Stretch done (all off by default or only active when used)
 
@@ -113,6 +134,7 @@
 ## What landed where
 
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\` (git repo; `test-results/` holds e2e and soak JSON, not committed).
-- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0`, `posthuman-v0.2.0` and `posthuman-v0.2.1`.
+- **GitHub:** `laserpirate/posthuman`, `main`, tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.2.2-pre-kodama` and `posthuman-v0.3.0`.
+- **Kodama pack:** `local\kodamas\` and `local\kodama-pass.txt`, gitignored, Polaris only. The encrypted copy is `kodamas/` in the repo and on Pages.
 - **Pages:** https://laserpirate.github.io/posthuman/ from `main` `/`.
 - The existing `posthuman\` folder (post-human26 gated site) was not touched.
