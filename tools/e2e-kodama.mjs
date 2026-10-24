@@ -274,8 +274,8 @@ if (PLAYABLE) {
     let s = await st(p);
     assert(s.dur === 90 || s.list.find(i => i.id === s.cur).dur === 90, 'kodama default duration 90 s');
     assert(['pk26', 'pk27', 'pk28', 'pk29', 'pk37'].every(id => s.list.some(i => i.id === id)), 'approved pk26 to pk29 and pk37 in the default playlist');
-    assert(s.list[s.list.length - 1].id === 'pk37', 'pk37 at the end of the default playlist');
-    assert(!s.list.some(i => ['pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35', 'pk36'].includes(i.id)), 'drafts pk30 to pk36 not in the default playlist');
+    assert(s.list.slice(-8).map(i => i.id).join() === 'pk30,pk31,pk32,pk33,pk34,pk35,pk36,pk37', 'approved pk30 to pk36 in order before pk37, last: ' + s.list.slice(-8).map(i => i.id).join());
+    assert(await p.evaluate(ids => !PHKODA.P.scenes.some(sc => sc.draft && ids.includes(sc.id)), s.list.map(i => i.id)), 'no drafts in the default playlist');
     // short durations, crossfade 1 s, play
     await p.evaluate(() => {
       for (const li of document.querySelectorAll('#pl-list li input[data-act=dur]')) { li.value = '3'; li.dispatchEvent(new Event('change', { bubbles: true })); }
