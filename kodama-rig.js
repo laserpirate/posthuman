@@ -12,7 +12,7 @@
 //  - pins devicePixelRatio to 1 and, in the app, reports the quality level's size as innerWidth /
 //    innerHeight: the scene draws at that size and its canvas is stretched over the iframe, which the
 //    app sizes to the stage. Scaling happens here, before the palette filter, so B/W stays two values;
-//  - applies the palette inside the scene's own document, as a CSS filter on its WebGL canvas;
+//  - applies the palette inside the scene's own document, as a CSS filter on its root element;
 //  - gives the controller the scene's camera: its own orbit globals (camA, camY, camR) plus a pan
 //    offset added to both the camera and its look point at render time. Pointer input is read by the
 //    app on the stage (controller and output window alike) and set here, so the scene's handlers stay off.
@@ -165,7 +165,7 @@
     return true;
   };
 
-  // palette: an SVG filter defined in this document, on every canvas here
+  // palette: an SVG filter defined in this document
   rig.setPal = markup => {
     let f = document.getElementById('__phpal');
     if (!f) {
@@ -183,12 +183,14 @@
     rig.palCanvas();
   };
   rig.palOn = false;
+  // on the document's root, not the canvas: a filter on the canvas itself runs on its drawing buffer
+  // before the canvas is stretched, which leaves mid greys at B/W edges; on the root it runs on the
+  // stretched picture
   rig.palCanvas = () => {
-    for (const c of document.querySelectorAll('canvas')) {
-      c.style.setProperty('filter', 'none', 'important');
-      void c.offsetWidth; // Chrome picks up new filter content only on a filter change
-      c.style.setProperty('filter', rig.palOn ? 'url(#__phpal)' : 'none', 'important');
-    }
+    const el = document.documentElement;
+    el.style.setProperty('filter', 'none', 'important');
+    void el.offsetWidth; // Chrome picks up new filter content only on a filter change
+    el.style.setProperty('filter', rig.palOn ? 'url(#__phpal)' : 'none', 'important');
   };
 
   // the scene's own buttons, mirrored by the controller

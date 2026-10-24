@@ -1560,7 +1560,7 @@
       if (!f) continue;
       const w = Math.round(c.w * s) + 'px', hh = Math.round(c.h * s) + 'px';
       if (f.style.width !== w || f.style.height !== hh) { f.style.width = w; f.style.height = hh; }
-      f.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+      f.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)'; // whole pixels: no resampling after the palette
       const r = kRig(d);
       if (r && r.setSize) r.setSize(c.w, c.h);
     }

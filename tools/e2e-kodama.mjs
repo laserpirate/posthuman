@@ -245,8 +245,13 @@ if (PLAYABLE) {
     await p.evaluate(() => PHVJ.setPal({ style: 'grayscale', int: 1, con: 1 }));
     await p.click('[data-tab=playlist]');
     await p.click('#pl-list li[data-id="pk17"] [data-act=pal]');
+    // the mode palette back to original on another scene (on pk17 the controls edit its own palette)
+    await p.evaluate(() => PHVJ.show('pk18', { cut: true }));
+    await p.waitForFunction(() => PHVJ.state.cur === 'pk18' && PHVJ.state.kready);
     await p.evaluate(() => PHVJ.setPal({ style: 'original' }));
-    await wait(300);
+    await p.evaluate(() => PHVJ.show('pk17', { cut: true }));
+    await p.waitForFunction(() => PHVJ.state.cur === 'pk17' && PHVJ.state.kready && PHVJ.state.kframes === 1);
+    await wait(500);
     assert((await st(p)).pal.style === 'grayscale' && stats(await shot(p)).chroma <= 3, 'item palette wins over the mode palette');
     await p.reload(); await p.waitForFunction(() => window.PHVJ && PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 15000 });
     assert((await st(p)).list.find(i => i.id === 'pk17').pal.style === 'grayscale', 'item palette survives reload');

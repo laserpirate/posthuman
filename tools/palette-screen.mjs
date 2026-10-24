@@ -62,6 +62,16 @@ const browser = await chromium.launch({
   args: ['--window-position=0,0', '--window-size=1400,860', '--autoplay-policy=no-user-gesture-required', '--disable-features=Translate'],
 });
 const ctx = await browser.newContext({ viewport: null });
+// the test window on top of anything else on the desktop, by a unique title
+let tagN = 0;
+async function front(p) {
+  await p.bringToFront();
+  if (!p.__tag) p.__tag = 'phpal-test-' + process.pid + '-' + (++tagN);
+  await p.evaluate(t => { document.title = t; }, p.__tag);
+  await wait(200);
+  try { execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join('tools', 'front.ps1'), p.__tag]); } catch (e) { console.log('   could not raise ' + p.__tag); }
+  await wait(400);
+}
 async function page(q) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type() === 'error') problems.push(q + ' console: ' + m.text()); });
@@ -69,7 +79,7 @@ async function page(q) {
   await p.goto(BASE + q);
   await p.waitForFunction(() => window.PHVJ && PHVJ.state.cur !== undefined);
   await p.evaluate(() => { if (PHVJ.state.settings.credits) document.getElementById('b-cred').click(); });
-  await p.bringToFront();
+  await front(p);
   return p;
 }
 async function toKodama(p) {
@@ -77,13 +87,14 @@ async function toKodama(p) {
   if ((await p.evaluate(() => PHVJ.state.mode)) !== 'kodama') await p.click('#b-mk');
   await p.waitForFunction(() => PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 20000 });
   await p.evaluate(() => PHVJ.setPlaying(false));
+  await p.mouse.move(1, 1); // no tooltip from the button just clicked over the stage
   await wait(800);
 }
 const setPal = (p, ch) => p.evaluate(ch => PHVJ.setPal(ch), ch);
 async function enterFs(p) {
   await p.keyboard.press('f');
   await p.waitForFunction(() => !!document.fullscreenElement, null, { timeout: 5000 });
-  await p.mouse.move(5, 400); await wait(1500);
+  await p.mouse.move(5, 400); await wait(3600); // the menu auto-hides after 3 s
 }
 async function leaveFs(p) { await p.evaluate(() => document.exitFullscreen()); await wait(800); }
 
@@ -129,7 +140,7 @@ await test('kodama palette in the output window, windowed and full screen', asyn
   await o.waitForFunction(() => PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 20000 });
   await wait(1000);
   // the controller drives; the output window is the one on screen
-  const drive = async ch => { await p.evaluate(ch => PHVJ.setPal(ch), ch); await o.bringToFront(); await wait(700); return stats(await grab(o)); };
+  const drive = async ch => { await p.evaluate(ch => PHVJ.setPal(ch), ch); await wait(700); return stats(await grab(o)); };
   const run = async label => {
     const g = await drive({ style: 'grayscale' });
     assert(g.chroma <= 6, label + ': grayscale has no chroma ' + JSON.stringify(g));
@@ -139,7 +150,7 @@ await test('kodama palette in the output window, windowed and full screen', asyn
     assert(x.chroma > 30, label + ': original back ' + JSON.stringify(x));
     console.log('   ' + label, JSON.stringify({ g, b, x }));
   };
-  await o.bringToFront();
+  await front(o);
   await run('output windowed');
   await enterFs(o);
   await run('output full screen');
@@ -148,7 +159,6 @@ await test('kodama palette in the output window, windowed and full screen', asyn
   await p.evaluate(() => PHVJ.next());
   await o.waitForFunction(() => PHVJ.state.kready && !PHVJ.state.fading, null, { timeout: 20000 });
   await wait(2500);
-  await o.bringToFront();
   const after = stats(await grab(o));
   assert(after.chroma <= 6 && after.lit > 0.01, 'grayscale kept across a scene switch ' + JSON.stringify(after));
   await leaveFs(o);
@@ -157,6 +167,7 @@ await test('kodama palette in the output window, windowed and full screen', asyn
 await test('hydra palette on the controller stage, windowed and full screen', async () => {
   const p = await page('?i=palhy');
   if ((await p.evaluate(() => PHVJ.state.mode)) !== 'hydra') { await p.click('#b-mh'); await wait(1500); }
+  await p.mouse.move(1, 1);
   await p.waitForFunction(() => PHVJ.state.cur && !PHVJ.state.fading, null, { timeout: 20000 });
   await p.evaluate(() => PHVJ.setPlaying(false));
   // a sketch that is colourful and stays lit
