@@ -1,0 +1,765 @@
+{
+ "pk17": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0008
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk18": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "river",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk19": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk20": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk21": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "banjir",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk22": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "typhoon",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk23": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "banjir",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk24": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": [
+   {
+    "name": "light",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "noon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "kv01": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0016
+  },
+  "groups": []
+ },
+ "kv02": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0015
+  },
+  "groups": []
+ },
+ "kv03": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0014
+  },
+  "groups": []
+ },
+ "kv04": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0013
+  },
+  "groups": []
+ },
+ "kv05": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0012
+  },
+  "groups": []
+ },
+ "kv06": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0011
+  },
+  "groups": []
+ },
+ "kv07": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.001
+  },
+  "groups": []
+ },
+ "kv08": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "autoSpin",
+   "rate": 0.0007
+  },
+  "groups": []
+ },
+ "kv09": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.001
+  },
+  "groups": []
+ },
+ "kv10": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": []
+ },
+ "kv11": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.001
+  },
+  "groups": []
+ },
+ "kv12": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.001
+  },
+  "groups": []
+ },
+ "kv13": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0009
+  },
+  "groups": []
+ },
+ "kv14": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0009
+  },
+  "groups": []
+ },
+ "kv15": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": []
+ },
+ "kv16": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0009
+  },
+  "groups": []
+ },
+ "kv17": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": []
+ },
+ "kv18": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0009
+  },
+  "groups": []
+ },
+ "kv19": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0008
+  },
+  "groups": []
+ },
+ "kv20": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": []
+ },
+ "kv21": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": []
+ },
+ "kv23": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "river",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "kv24": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "kv25": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "climate",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-m=\"auto\"]"
+     },
+     {
+      "label": "dry",
+      "sel": "[data-m=\"0\"]"
+     },
+     {
+      "label": "monsoon",
+      "sel": "[data-m=\"0.25\"]"
+     },
+     {
+      "label": "flood",
+      "sel": "[data-m=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-m=\"0.75\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk26": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk27": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk28": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ]
+ },
+ "pk29": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0006
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ]
+ }
+}
