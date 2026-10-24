@@ -1,8 +1,23 @@
 # MORNING
 
+## Overnight 24 Oct (handoff-6 + handoff-7): read this first
+
+- **Live tag: `posthuman-v0.4.1`** at https://laserpirate.github.io/posthuman/ (v0.4.0 = handoff-6). Nothing skipped.
+- **Shipped:** palette fix, orbit/pan/zoom, pk26 to pk29 approved into the default Kodamas playlist, mashups pk30 to pk33, Gund Hall pk34 and pk35.
+- **Palette:** the "Kodama start" dropdown looked like the picker but did nothing live. The palette is now first in the Scene tab and in the menu bar (Kodamas); **P** cycles. "On start" applies at once. An item's own Pal shows in the Scene tab and the controls edit it.
+- **Orbit/pan/zoom (Kodamas):** drag = orbit, **shift-drag or right-drag** = pan, **wheel** = zoom, on the stage, the Scene tab pad, or in the output window. Reset view. **View** on a playlist row saves a view. The turntable resumes 2 s after you let go.
+- **Drafts awaiting your approval** (not in any default playlist): pk30 cloud airfield, pk31 flooded under-city, pk32 storm runway, pk33 hanging city, pk34 gund trays, pk35 gund ruin.
+- **Contact sheet:** `local\kodamas\contact-sheet.jpg` (10-up, pk26 to pk35).
+- **Tests (v0.4.1):** Hydra e2e 27/27 local, 26/26 live. Kodama e2e 14/14 local, live 2/2 locked and 13/13 unlocked. On-screen palette 4/4 (headed Chrome, real screen pixels).
+- **Soaks:** Hydra 10 min pass (30 fps, heap 3.7 to 3.9 MB). Kodama 15 min over all 42 scenes, steering and palettes cycling: pass (30 fps, 0 context lost, 0 errors, at most 2 iframes). Leak check: 0.
+- **New scenes:** 59 to 60 fps at High on the 3080; 27.5 to 30 fps at Low on SwiftShader. Preflight 42/42 ok.
+- **Gund:** stylized, not survey-accurate. Massing comes from public descriptions; the ruin damage is invented. Five trays as asked, though the GSD's own page describes four.
+- **Not verified:** Luna, the M4, Stardust, a projector, touch or trackpad dragging.
+- **Where:** app code on GitHub `laserpirate/posthuman` and Pages; the plain kodama pack (42 scenes, gitignored) in `local\kodamas\` here (copy it to each laptop); the encrypted pack in `kodamas/` on Pages; scene copies in `..\All_Kodamas\` with rows in `kodamas_manifest.csv`.
+
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`, `posthuman-v0.4.0`; safety tag `posthuman-v0.2.2-pre-kodama`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`, `posthuman-v0.4.0`, `posthuman-v0.4.1`; safety tag `posthuman-v0.2.2-pre-kodama`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 
@@ -43,6 +58,13 @@
   - Unplugged: the Live tab says so in red, the visuals keep running without audio, and it reconnects by itself when the device is back.
   - Hookup checklist in `SHOWNIGHT.md`: USB, mixer booth/record out to input 1 (or 1+2), INST/Air/direct monitor off, gain ring green (amber on peaks, never red), Focusrite Control on Windows if not listed, plug in before opening the app.
 - **Keys card:** adds S (star) and Ctrl+Enter (run).
+
+## v0.4.1 (handoff-7): Gund Hall kodamas
+
+- **pk34 gund trays** (interior): looking down the trays under the stepped truss roof. Half the glazing is gone, and rain falls only through the gaps. Sagged truss bays, abandoned desks, stools, chipboard and foam models and rolled drawings. Vines, saplings and moss. Flickering monitors, a laser-cutter glow and a desk lamp. A moon and stars show through the roof. FLOOD pools water on the lower trays; TIME defaults to night; RAIN follows TIME, or pick light or heavy. The orbit stays inside the hall.
+- **pk35 gund ruin** (exterior): the long side elevation with the stepped roof profile, overgrown and partly caved in, with trees through the trays. Quincy St is flooded and reflects the building (FLOOD). Lanterns rise from the trays; there is a full moon, stars and shooting stars. The turntable orbits the whole building.
+- **Stylized vs drawn from references:** from public descriptions (proportions only, nothing downloaded or saved): the stepped, trussed glass roof, the trays stepping down beneath it, the full-width trusses, exposed concrete, the arcade on Quincy St. Stylized: all dimensions, the tray count (five as asked; the GSD describes four), truss count and spacing, the roof's compass orientation, the extra interior headroom for the camera, the neighbouring buildings and all the ruin damage. No shield, wordmark, signage or text.
+- Both are drafts, out of the default playlist; they are on the contact sheet. Preflight ok, 60 fps at High on the 3080, 30 fps at Low on SwiftShader.
 
 ## v0.4.0 (handoff-6): approvals, palette fix, orbit/pan/zoom, four mashups
 
