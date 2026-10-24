@@ -15,6 +15,7 @@ const PASSFILE = path.join('local', 'kodama-pass.txt');
 const PASS = process.env.KODAMA_PASS || (fs.existsSync(PASSFILE) ? fs.readFileSync(PASSFILE, 'utf8').trim() : '');
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const offsite = [], consoleProblems = [], results = [];
+const KSCENES = 40; // pk17-pk24, kv01-kv25 (no kv22), pk26-pk33
 
 async function ctx(opts = {}) {
   const c = await browser.newContext({ viewport: { width: 1366, height: 768 }, ...opts });
@@ -40,7 +41,9 @@ async function open(c, query = '') {
 const st = p => p.evaluate(() => PHVJ.state);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
+const ONLY = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7); // run the tests whose name has this text
 async function test(name, fn) {
+  if (ONLY && !name.includes(ONLY) && !name.startsWith('zero console')) return;
   const t0 = Date.now();
   try { await fn(); results.push({ name, ok: true, ms: Date.now() - t0 }); console.log('PASS ' + name); }
   catch (e) { results.push({ name, ok: false, err: e.message }); console.log('FAIL ' + name + ' :: ' + e.message); }
@@ -82,7 +85,7 @@ if (LOCAL) {
     const c = await ctx(); let p = await open(c, '?i=kp');
     await p.waitForFunction(() => PHVJ.state.kpack !== 'none' && PHVJ.state.kscenes > 0, null, { timeout: 15000 });
     let s = await st(p);
-    assert(s.kpack === 'local' && s.kscenes === 36, 'local pack ' + s.kpack + ' ' + s.kscenes);
+    assert(s.kpack === 'local' && s.kscenes === KSCENES, 'local pack ' + s.kpack + ' ' + s.kscenes);
     const p2 = await open(c, '?i=kenc&kpack=enc');
     await p2.evaluate(() => localStorage.removeItem('phvj:kodama-key'));
     await p2.reload(); await p2.waitForFunction(() => window.PHVJ && PHVJ.state.kpack === 'locked', null, { timeout: 15000 });
@@ -94,7 +97,7 @@ if (LOCAL) {
     assert(PASS, 'password file present');
     await p2.fill('#k-pass', PASS);
     await p2.click('#k-go');
-    await p2.waitForFunction(() => PHVJ.state.kpack === 'encrypted' && PHVJ.state.kscenes === 36, null, { timeout: 20000 });
+    await p2.waitForFunction(n => PHVJ.state.kpack === 'encrypted' && PHVJ.state.kscenes === n, KSCENES, { timeout: 20000 });
     await kodama(p2);
     assert((await st(p2)).kready, 'encrypted scene plays');
     await p2.reload(); await p2.waitForFunction(() => window.PHVJ && PHVJ.state.kpack === 'encrypted', null, { timeout: 20000 });
@@ -264,7 +267,8 @@ if (PLAYABLE) {
     assert(await p.evaluate(() => Number(getComputedStyle(document.getElementById('mfade')).opacity)) < 0.05, 'back from black');
     let s = await st(p);
     assert(s.dur === 90 || s.list.find(i => i.id === s.cur).dur === 90, 'kodama default duration 90 s');
-    assert(!s.list.some(i => ['pk26', 'pk27', 'pk28', 'pk29'].includes(i.id)), 'drafts not in the default playlist');
+    assert(['pk26', 'pk27', 'pk28', 'pk29'].every(id => s.list.some(i => i.id === id)), 'approved pk26 to pk29 in the default playlist');
+    assert(!s.list.some(i => ['pk30', 'pk31', 'pk32', 'pk33'].includes(i.id)), 'drafts pk30 to pk33 not in the default playlist');
     // short durations, crossfade 1 s, play
     await p.evaluate(() => {
       for (const li of document.querySelectorAll('#pl-list li input[data-act=dur]')) { li.value = '3'; li.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -327,6 +331,180 @@ if (PLAYABLE) {
     await out.waitForFunction(id => PHVJ.state.cur === id && PHVJ.state.kready, cur, { timeout: 15000 });
     await p.click('#b-mh');
     await out.waitForFunction(() => PHVJ.state.mode === 'hydra' && PHVJ.state.kframes === 0, null, { timeout: 10000 });
+    await c.close();
+  });
+
+  // ---- handoff-6: view (orbit, pan, zoom), View override, palette UI ----
+  const unlock = async p => { if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); } };
+  const onScene = async (p, id) => {
+    await p.evaluate(id => { PHVJ.setPlaying(false); PHVJ.show(id, { cut: true }); }, id);
+    await p.waitForFunction(id => PHVJ.state.cur === id && PHVJ.state.kready && PHVJ.state.kframes === 1 && PHVJ.view(), id, { timeout: 15000 });
+    await wait(300);
+  };
+  async function dragOn(p, sel, dx, dy, opts = {}) {
+    const b = await p.evaluate(sel => { const r = document.querySelector(sel).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, sel);
+    if (opts.shift) await p.keyboard.down('Shift');
+    await p.mouse.move(b.x, b.y);
+    await p.mouse.down({ button: opts.button || 'left' });
+    for (let k = 1; k <= 8; k++) await p.mouse.move(b.x + dx * k / 8, b.y + dy * k / 8);
+    await p.mouse.up({ button: opts.button || 'left' });
+    if (opts.shift) await p.keyboard.up('Shift');
+  }
+  const near = (a, b, eps) => Math.abs(a - b) <= eps;
+
+  await test('view: drag orbits, shift-drag and right-drag pan, wheel zooms, inside the scene limits; the pad; Reset view', async () => {
+    const c = await ctx(); const p = await open(c, '?i=kcam' + Q);
+    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    const cfg = await p.evaluate(() => PHVJ.camCfg());
+    assert(cfg.r && cfg.y && cfg.pan > 0, 'registry camera entry for pk17: ' + JSON.stringify(cfg));
+    const v0 = await p.evaluate(() => PHVJ.view());
+    const before = await shot(p);
+    await dragOn(p, '#stage', 160, -60);
+    const v1 = await p.evaluate(() => PHVJ.view());
+    assert(Math.abs(v1.a - v0.a) > 0.2 && v1.y > v0.y, 'drag orbits: a ' + v0.a.toFixed(2) + ' -> ' + v1.a.toFixed(2) + ', y ' + v0.y.toFixed(1) + ' -> ' + v1.y.toFixed(1));
+    await wait(300);
+    assert(diff(before, await shot(p)) > 2, 'the picture moved with the drag');
+    // the scene's own limits hold
+    await dragOn(p, '#stage', 0, -2000);
+    assert(near((await p.evaluate(() => PHVJ.view())).y, cfg.y[1], 0.01), 'camY stops at the scene limit ' + cfg.y[1]);
+    await dragOn(p, '#stage', 0, 4000);
+    assert(near((await p.evaluate(() => PHVJ.view())).y, cfg.y[0], 0.01), 'camY stops at the scene limit ' + cfg.y[0]);
+    // zoom
+    const r0 = (await p.evaluate(() => PHVJ.view())).r;
+    const mid = await p.evaluate(() => { const r = document.getElementById('stage').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+    await p.mouse.move(mid[0], mid[1]);
+    await p.mouse.wheel(0, 300); await wait(150);
+    const r1 = (await p.evaluate(() => PHVJ.view())).r;
+    assert(r1 > r0, 'wheel zooms out: ' + r0 + ' -> ' + r1);
+    for (let k = 0; k < 8; k++) await p.mouse.wheel(0, 3000);
+    await wait(150);
+    assert(near((await p.evaluate(() => PHVJ.view())).r, cfg.r[1], 0.01), 'zoom stops at the scene limit ' + cfg.r[1]);
+    // pan, by shift-drag and by right-drag
+    await dragOn(p, '#stage', 120, 40, { shift: true });
+    const v2 = await p.evaluate(() => PHVJ.view());
+    assert(Math.hypot(v2.px, v2.pz) > 1, 'shift-drag pans: ' + JSON.stringify(v2));
+    await dragOn(p, '#stage', -260, 0, { button: 'right' });
+    const v3 = await p.evaluate(() => PHVJ.view());
+    assert(Math.hypot(v3.px - v2.px, v3.pz - v2.pz) > 1 && Math.hypot(v3.px, v3.pz) <= cfg.pan + 1e-6, 'right-drag pans, inside the pan limit: ' + JSON.stringify(v3));
+    // the pad in the Scene tab
+    await p.click('[data-tab=scene]');
+    assert(await p.isVisible('#k-pad') && await p.isVisible('#k-view-reset'), 'pad and Reset view in the Scene tab');
+    const a4 = (await p.evaluate(() => PHVJ.view())).a;
+    await dragOn(p, '#k-pad', 50, 0);
+    assert(Math.abs((await p.evaluate(() => PHVJ.view())).a - a4) > 0.2, 'pad drag orbits');
+    // Reset view: the scene's own start
+    await p.click('#k-view-reset');
+    const v5 = await p.evaluate(() => PHVJ.view()), z = await p.evaluate(() => PHVJ.view0());
+    assert(near(v5.a, z.a, 0.01) && near(v5.y, z.y, 0.01) && near(v5.r, z.r, 0.01) && !v5.px && !v5.py && !v5.pz, 'Reset view back to the start ' + JSON.stringify([v5, z]));
+    // Hydra mode: dragging does nothing (and nothing breaks)
+    await c.close();
+  });
+
+  await test('turntable rests while steering and resumes 2 s after from the new angle', async () => {
+    const c = await ctx(); const p = await open(c, '?i=ktt' + Q);
+    await unlock(p); await kodama(p); await onScene(p, 'pk18');
+    const a0 = await p.evaluate(() => PHVJ.angle());
+    await wait(600);
+    assert((await p.evaluate(() => PHVJ.angle())) - a0 > 0.005, 'turning before the drag');
+    await dragOn(p, '#stage', 120, 0);
+    const a1 = await p.evaluate(() => PHVJ.angle());
+    await wait(1200);
+    const a2 = await p.evaluate(() => PHVJ.angle());
+    assert(near(a2, a1, 0.002), 'rests after the drag: ' + a1.toFixed(4) + ' -> ' + a2.toFixed(4));
+    await wait(1800);
+    const a3 = await p.evaluate(() => PHVJ.angle());
+    assert(a3 - a2 > 0.005, 'resumes from the new angle: ' + a2.toFixed(4) + ' -> ' + a3.toFixed(4));
+    await c.close();
+  });
+
+  await test('output window follows the view, and steering in the output reports back', async () => {
+    const c = await ctx(); const p = await open(c, '?i=kvout' + Q);
+    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await p.evaluate(() => { const el = document.getElementById('k-tt'); el.value = '0'; el.dispatchEvent(new Event('input')); });
+    const [out] = await Promise.all([c.waitForEvent('page'), p.click('[data-tab=live]').then(() => p.click('#out-open'))]);
+    out.on('pageerror', e => consoleProblems.push('out pageerror: ' + e.message));
+    out.on('console', m => { if (m.type() === 'error') consoleProblems.push('out: ' + m.text()); });
+    await out.waitForFunction(() => window.PHVJ && PHVJ.state.cur === 'pk17' && PHVJ.state.kready && PHVJ.view(), null, { timeout: 20000 });
+    await dragOn(p, '#stage', 140, -50);
+    await dragOn(p, '#stage', 60, 20, { shift: true });
+    await wait(400);
+    let vc = await p.evaluate(() => PHVJ.view()), vo = await out.evaluate(() => PHVJ.view());
+    assert(near(vc.a, vo.a, 0.01) && near(vc.y, vo.y, 0.01) && near(vc.px, vo.px, 0.01) && near(vc.pz, vo.pz, 0.01), 'output follows the controller ' + JSON.stringify([vc, vo]));
+    // the pad steers the projector view
+    await p.click('[data-tab=scene]');
+    await dragOn(p, '#k-pad', -40, 10);
+    await p.mouse.move(5, 5);
+    await p.evaluate(() => {}); await wait(400);
+    vc = await p.evaluate(() => PHVJ.view()); vo = await out.evaluate(() => PHVJ.view());
+    assert(near(vc.a, vo.a, 0.01), 'pad steers the output ' + vc.a + ' ' + vo.a);
+    // dragging in the output window itself
+    await out.bringToFront();
+    await dragOn(out, '#stage', -150, 30);
+    await out.mouse.wheel(0, 200);
+    await wait(500);
+    vc = await p.evaluate(() => PHVJ.view()); vo = await out.evaluate(() => PHVJ.view());
+    assert(near(vc.a, vo.a, 0.01) && near(vc.r, vo.r, 0.01), 'controller follows a drag in the output ' + JSON.stringify([vc, vo]));
+    await c.close();
+  });
+
+  await test('View override per playlist item: saved from the scene, applied when it plays again, kept on reload', async () => {
+    const c = await ctx(); const p = await open(c, '?i=kview' + Q);
+    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await dragOn(p, '#stage', 200, -40);
+    await p.mouse.move(400, 300);
+    await p.mouse.wheel(0, 250); await wait(200);
+    await p.click('[data-tab=playlist]');
+    await p.click('#pl-list li[data-id="pk17"] [data-act=view]');
+    const saved = (await st(p)).list.find(i => i.id === 'pk17').view;
+    assert(saved && Number.isFinite(saved.a), 'view saved on the item');
+    assert(await p.getAttribute('#pl-list li[data-id="pk17"] [data-act=view]', 'aria-pressed') === 'true', 'View button shows it is on');
+    await onScene(p, 'pk18');
+    await onScene(p, 'pk17');
+    const v = await p.evaluate(() => PHVJ.view());
+    assert(near(v.y, saved.y, 0.01) && near(v.r, saved.r, 0.01) && near(v.a, saved.a, 0.15), 'saved view applied ' + JSON.stringify([v, saved]));
+    await p.reload(); await p.waitForFunction(() => window.PHVJ && PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 15000 });
+    assert((await st(p)).list.find(i => i.id === 'pk17').view, 'view override survives reload');
+    await c.close();
+  });
+
+  await test('palette UI: menu bar dropdown and P in Kodama mode, kept across scenes and mode switches, item override shown and edited', async () => {
+    const c = await ctx(); const p = await open(c, '?i=kpui' + Q);
+    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    assert(await p.isVisible('#b-pal'), 'palette dropdown in the menu bar');
+    await p.selectOption('#b-pal', 'grayscale');
+    await wait(300);
+    assert((await st(p)).pal.style === 'grayscale' && stats(await shot(p)).chroma <= 3, 'menu bar dropdown sets grayscale');
+    // a scene switch keeps it
+    await onScene(p, 'pk18'); await wait(300);
+    assert(stats(await shot(p)).chroma <= 3, 'grayscale kept on the next scene');
+    // a trip to Hydras and back keeps it
+    await p.click('#b-mh');
+    await p.waitForFunction(() => PHVJ.state.mode === 'hydra', null, { timeout: 5000 });
+    assert(!(await p.isVisible('#b-pal')), 'no kodama palette dropdown in Hydras');
+    await p.click('#b-mk');
+    await p.waitForFunction(() => PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 15000 });
+    await wait(400);
+    assert((await st(p)).pal.style === 'grayscale', 'palette kept after Hydras and back: ' + (await st(p)).pal.style);
+    // P cycles
+    await p.mouse.click(5, 300); await p.keyboard.press('p');
+    assert((await st(p)).pal.style === 'bw', 'P cycles to the next style: ' + (await st(p)).pal.style);
+    // the start palette applies at once too
+    await p.click('[data-tab=scene]');
+    await p.selectOption('#p-kdef', 'mono');
+    assert((await st(p)).pal.style === 'mono', 'On start palette applies now');
+    // an item's own palette is shown, and the controls edit it
+    await onScene(p, 'pk17');
+    await p.click('[data-tab=playlist]');
+    await p.click('#pl-list li[data-id="pk17"] [data-act=pal]');
+    await p.click('[data-tab=scene]');
+    assert(await p.isVisible('#p-item') && /pk17|Ayutthaya/i.test(await p.textContent('#p-item-t')), 'own palette shown in the Scene tab');
+    await p.selectOption('#p-style', 'duotone');
+    let s = await st(p);
+    assert(s.list.find(i => i.id === 'pk17').pal.style === 'duotone' && s.settings.pal.kodama.style === 'mono', 'controls edit the item palette, not the mode palette');
+    assert(await p.evaluate(() => document.getElementById('b-pal').value) === 'duotone', 'menu bar shows the palette on screen');
+    await p.click('#p-item-x');
+    s = await st(p);
+    assert(!s.list.find(i => i.id === 'pk17').pal && s.pal.style === 'mono', 'Use the mode palette clears the override');
     await c.close();
   });
 }

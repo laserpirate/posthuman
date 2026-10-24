@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const MIN = Number(args.find(a => /^\d+(\.\d+)?$/.test(a)) || 32);
 const BASE = args.find(a => a.startsWith('http')) || 'http://localhost:8091/';
 const headless = args.includes('--headless');
-const KODAMA = args.includes('--kodama'); // Kodama mode: the kodama pool at 20 s per scene
+const KODAMA = args.includes('--kodama'); // Kodama mode: the kodama pool at 20 s per scene, steered, palettes cycling
 const PER = KODAMA ? 20 : 10;
 
 const browser = await chromium.launch({
@@ -60,7 +60,10 @@ while (Date.now() - t0 < MIN * 60000) {
     const s = await page.evaluate(() => PHVJ.state);
     if (s.cur !== lastCur) { switches++; lastCur = s.cur; seen.add(s.cur); }
     kframesMax = Math.max(kframesMax, s.kframes);
+    // kodamas: steer the view now and then, and change the palette every minute
+    if (KODAMA && k % 10 === 5) await page.evaluate(k => { PHVJ.steer('orbit', 40, k === 5 ? -8 : 8); PHVJ.steer('pan', 20, 0); PHVJ.steer('zoom', 0, k === 25 ? 120 : -60); }, k);
   }
+  if (KODAMA && samples.length % 2) await page.evaluate(() => PHVJ.cyclePal());
   const s = await page.evaluate(() => ({ ...PHVJ.state, dom: document.getElementsByTagName('*').length }));
   const row = { min: +((Date.now() - t0) / 60000).toFixed(2), fps: +s.fps.toFixed(1), heapMB: +(await heap()).toFixed(2), level: s.level, hydras: s.hydras, ctxLost: s.ctxLost, skips: s.skips, errors: s.errors, dom: s.dom, iframes: s.kframes, mode: s.mode, cur: s.cur };
   samples.push(row);
