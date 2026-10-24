@@ -994,7 +994,6 @@
         clearTimeout(outFadeT);
         outFadeT = setTimeout(() => { fe.style.opacity = '0'; }, 900);
       }
-      if (m.t === 'kkey' && typeof m.key === 'string' && !CTX.kodama) loadKodamas(m.key);
       if (m.t === 'kset' && m.k) S.k = { speed: clamp(m.k.speed, 0.1, 3, 1), tt: clamp(m.k.tt, 0, 3, 1), rev: !!m.k.rev };
       if (m.t === 'kclick' && m.id === RT.cur && typeof m.sel === 'string') kClick(m.sel);
       if (m.t === 'pal' && m.pal) applyPalette(cleanPal(m.pal));
@@ -1027,7 +1026,6 @@
       RT.outSeen = performance.now();
       if (fresh) {
         log('Output window connected');
-        if (PHKODA.P.raw) post({ t: 'kkey', key: PHKODA.P.raw });
         post({ t: 'kset', k: S.k });
         post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level, mode: MODE });
         post({ t: 'pal', pal: effPal() });
@@ -1608,14 +1606,14 @@
     Object.assign(d, { frame: null, ready: false, rendered: false });
   }
 
-  // the pack: plain local folder or the encrypted copy; every scene is in memory once it opens
+  // the pack: plain local folder or the public copy; every scene is in memory once it opens
   let kOpening = null;
-  function loadKodamas(rawKey) {
+  function loadKodamas() {
     if (CTX.kodama) return Promise.resolve(true);
-    if (kOpening && !rawKey) return kOpening;
-    kOpening = PHKODA.open(rawKey).then(P => {
-      const ok = (P.mode === 'local' || P.mode === 'encrypted') && P.scenes.length > 0;
-      if (ok) { buildKodamaCtx(P); log('Kodama pack open (' + (P.mode === 'local' ? 'local folder' : 'encrypted pack') + '): ' + P.scenes.length + ' scenes, ' + P.scenes.filter(s => s.quarantine).length + ' quarantined'); }
+    if (kOpening) return kOpening;
+    kOpening = PHKODA.open().then(P => {
+      const ok = (P.mode === 'local' || P.mode === 'public') && P.scenes.length > 0;
+      if (ok) { buildKodamaCtx(P); log('Kodama pack open (' + (P.mode === 'local' ? 'local folder' : 'public pack') + '): ' + P.scenes.length + ' scenes, ' + P.scenes.filter(s => s.quarantine).length + ' quarantined'); }
       else if (!OUT) log(P.why || 'Kodama pack not loaded');
       if (!OUT) { renderPack(); renderBar(); }
       if (ok && OUT && pendingMsg) { const m = pendingMsg; pendingMsg = null; onMsg(m); }
@@ -1655,34 +1653,13 @@
     save('k:approved', [...had]);
     if (add.length) { save('k:lists', L); log('Added to the Kodamas playlist (approved): ' + add.join(', ')); }
   }
-  let kPackErr = '';
   function renderPack() {
     const P = PHKODA.P, open = !!CTX.kodama;
     $('#k-pack').hidden = open && MODE !== 'kodama';
     $('#k-pack-st').textContent = open
-      ? 'Kodama pack: ' + P.scenes.length + ' scenes, from the ' + (P.mode === 'local' ? 'local folder' : 'encrypted pack') + '. Drafts are marked.'
-      : kPackErr || (P.why || 'Kodama pack not loaded') + '.';
-    $('#k-unlock').hidden = open || P.mode !== 'locked';
-    $('#k-forget').hidden = !(open && P.mode === 'encrypted');
+      ? 'Kodama pack: ' + P.scenes.length + ' scenes, from the ' + (P.mode === 'local' ? 'local folder' : 'public pack') + '. Drafts are marked.'
+      : (P.why || 'Kodama pack not loaded') + '.';
   }
-  $('#k-unlock').addEventListener('submit', async e => {
-    e.preventDefault();
-    const pass = $('#k-pass').value;
-    if (!pass) return;
-    $('#k-go').disabled = true;
-    try {
-      const P = await PHKODA.unlock(pass, $('#k-remember').checked);
-      buildKodamaCtx(P);
-      kPackErr = '';
-      $('#k-pass').value = '';
-      log('Kodama pack unlocked: ' + P.scenes.length + ' scenes');
-      post({ t: 'kkey', key: P.raw });
-    } catch (err) { log('Kodama pack: ' + (err.message || err), true); kPackErr = 'Wrong password, or the pack could not be read.'; }
-    $('#k-go').disabled = false;
-    renderPack(); renderBar();
-    if (MODE === 'kodama' || CTX.kodama) $('#k-pass').blur();
-  });
-  $('#k-forget').addEventListener('click', () => { PHKODA.forget(); log('Saved kodama key removed from this laptop (it still works until reload)'); });
 
   // switching modes: stop this mode's decks, swap the pools, start the other mode
   function stopDecks() {

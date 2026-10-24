@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- © 2026 Marko Manriquez. All rights reserved. -->
+<title>remy astral (study)</title>
+<style>
+  :root{--cream:#F2E6D4;--gold:#FFC46A;--pale:#B8C8F0;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#07031A;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px;text-shadow:0 1px 10px #000}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px;text-shadow:0 1px 10px #000}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(16,10,40,.55);border:1px solid rgba(184,200,240,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="37"><h1>remy astral</h1>
+  <div class="sub">phylla-kodama study · © 2026 Marko Manriquez · all rights reserved</div>
+  <div id="phase">—</div></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill" data-t="auto">⟳</button><button class="pill on" data-t="0">astral</button><button class="pill" data-t="1">deep</button><button class="pill" data-t="2">ember</button><button class="pill" data-t="3">void</button></span>
+  <span class="grp">pulse <button class="pill on" data-p="auto">⟳</button><button class="pill" data-p="6">slow</button><button class="pill" data-p="4">calm</button><button class="pill" data-p="2.2">fast</button></span>
+  <span class="grp">aura <button class="pill" data-a="auto">⟳</button><button class="pill" data-a="0.6">low</button><button class="pill on" data-a="1">mid</button><button class="pill" data-a="1.45">high</button></span>
+  <span class="grp">glow <button class="pill" data-g="0.5">low</button><button class="pill on" data-g="1">mid</button><button class="pill" data-g="1.6">high</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study · all rights reserved</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* remy astral: Remy, an orange tabby, seated and facing the viewer as a calm astral being. His body
+   is a dense point cloud (one draw call) built from a union of ellipsoid surfaces, mirrored so he is
+   perfectly symmetrical, with the tabby markings coloured into the points: the M on the forehead,
+   crown and cheek stripes, cream chin and chest, pink nose, faint leg rings. A cyan rim pass outlines
+   the silhouette; eyes are shader planes (green-gold iris, vertical slit) that glow and pulse, with a
+   lens-flare streak. Behind him a portal ring of counter-rotating particle bands, electric arcs,
+   outward pulse waves, a tunnel vortex to a warm far glow, a nebula (one textured quad), stars, a
+   planet limb, diagonal light beams and a faint constellation of a giant ghost cat.
+   Turntable: the rig adds rate x slider to camA every step; this scene takes those small steps back
+   out of camA and turns them into the phase of a gentle +-15 degree sway, so the turntable slider
+   sets the sway speed (0 stops) and he never turns away. Manual orbit keeps camA, clamped to +-60.
+   r128. All rights reserved. */
+const PAL={orange:0xD9822F,deep:0xA24A16,light:0xF0A458,cream:0xF6E0B8,pink:0xEC9C96,inner:0xC97E70,dark:0x4A200C,rim:0x9FF4FF};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261037);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);},C=h=>new THREE.Color(h);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x07031A);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.5,3000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+// software GL (SwiftShader etc.) gets a thinner sky; Remy himself is never thinned
+let LOWQ=/[?&]q=low/.test(location.search);
+try{const gl=renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');const r=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'';if(/swiftshader|llvmpipe|software/i.test(r))LOWQ=true;}catch(e){}
+const U={uT:{value:0},uScale:{value:1},uPulse:{value:0},uPPh:{value:0},uAura:{value:1},uGlowE:{value:1},uFlare:{value:0},uBreath:{value:0},uTwL:{value:0},uTwR:{value:0},
+  uNebA:{value:C(0x6A2BD8)},uNebB:{value:C(0xD23CB4)},uNebI:{value:1},uRingA:{value:C(0x8FF0FF)},uRingB:{value:C(0xB070FF)},uRingC:{value:C(0xFF5AC8)},uWarm:{value:C(0xFFB27C)},uStarI:{value:1}};
+const ADD={transparent:true,depthWrite:false,blending:THREE.AdditiveBlending};
+
+/* ================= Remy: union of ellipsoids, sampled on the surface, mirrored ================= */
+// [cx,cy,cz, rx,ry,rz, tag, density, fur, breath, mirror]
+const E=[
+ [0,19,1.8, 6.6,6.0,5.6,'head',1.7,0.12,0,0],
+ [3.9,16.4,2.7, 3.9,3.2,3.9,'cheek',1.7,0.14,0,1],
+ [1.35,16.0,6.55, 1.75,1.35,1.5,'pad',2.4,0.06,0,1],
+ [0,14.75,5.55, 1.5,1.1,1.2,'chin',2.2,0.08,0,0],
+ [0,12.3,1.3, 6.9,4.4,5.0,'ruff',1.05,0.85,0.5,0],
+ [0,7.6,1.8, 6.8,7.4,5.2,'chest',1.0,0.45,1,0],
+ [0,6.6,-4, 7.6,7.4,7.2,'body',0.55,0.4,0.8,0],
+ [5.6,3.8,-1.8, 3.9,3.9,6.2,'haunch',0.75,0.35,0.3,1],
+ [2.75,5.3,5.0, 1.85,5.2,1.9,'leg',1.15,0.18,0,1],
+ [2.75,0.95,6.3, 2.05,1.05,2.3,'paw',1.5,0.1,0,1]];
+const ELL=[];for(const e of E){ELL.push(e);if(e[10])ELL.push([-e[0],...e.slice(1)]);}
+const inside=(x,y,z,skip)=>{for(const e of ELL){if(e===skip)continue;const dx=(x-e[0])/e[3],dy=(y-e[1])/e[4],dz=(z-e[2])/e[5];if(dx*dx+dy*dy+dz*dz<0.985)return true;}return false;};
+const frontZ=(x,y)=>{let z=-99;for(const e of ELL){const dx=(x-e[0])/e[3],dy=(y-e[1])/e[4],k=1-dx*dx-dy*dy;if(k>0)z=Math.max(z,e[2]+e[5]*Math.sqrt(k));}return z;};
+const COL={orange:C(PAL.orange),deep:C(PAL.deep),light:C(PAL.light),cream:C(PAL.cream),pink:C(PAL.pink),inner:C(PAL.inner),dark:C(PAL.dark)};
+const segD=(px,py,ax,ay,bx,by)=>{const vx=bx-ax,vy=by-ay,t=MU.clamp(((px-ax)*vx+(py-ay)*vy)/(vx*vx+vy*vy),0,1);return Math.hypot(px-ax-vx*t,py-ay-vy*t);};
+const tc=new THREE.Color();
+function furColor(x,y,z,nx,ny,nz,tag){const ax=Math.abs(x);
+  tc.copy(COL.orange).lerp(COL.light,rng()*0.35);
+  const isHead=tag==='head'||tag==='cheek'||tag==='pad'||tag==='chin';
+  if(isHead){
+    if(nz>0.25&&y>18.5){// the M
+      const d=Math.min(segD(ax,y,0,22.5,1.45,24.6),segD(ax,y,1.45,24.6,2.45,22.0),segD(ax,y,0,22.5,0,23.6));
+      if(d<0.33)tc.lerp(COL.deep,0.9);}
+    if(y>22.3&&nz<0.75&&Math.sin(ax*2.5+0.4)>0.62)tc.lerp(COL.deep,0.8*ss((y-22.3)/1.2));// crown stripes, running back
+    if(nz>0.1&&segD(ax,y,4.05,20.1,5.9,19.0)<0.3)tc.lerp(COL.deep,0.85);// line from the outer eye corner
+    if(ax>3.3&&y>14.4&&y<18.9&&Math.sin((y+0.24*ax)*3.0)>0.7)tc.lerp(COL.deep,0.75);// cheek stripes
+    const de=Math.hypot(ax-2.75,y-20.1);if(de<2.3&&nz>0.4)tc.lerp(COL.light,0.45*(1-de/2.3));// pale rims round the eyes
+    if(tag==='pad')tc.lerp(COL.cream,0.4);
+    if(tag==='chin')tc.copy(COL.cream).lerp(COL.light,rng()*0.2);
+    if(nz>0.5&&ax<1.0&&y>17.9&&y<21.5)tc.lerp(COL.light,0.35);// bridge of the nose
+  }else{
+    const front=nz>0.15&&z>0;
+    if(front&&y>3&&y<14.6&&(tag==='ruff'||tag==='chest')){const k=ss((4.6-ax)/3.2)*ss((y-3)/2.5);tc.lerp(COL.cream,0.8*k);}
+    if(tag==='ruff'&&nz>0.2&&ax<5.5&&y<13.5)tc.lerp(COL.cream,0.5*ss((5.5-ax)/3));
+    if((tag==='ruff'||tag==='chest')&&ax>4&&Math.sin(ax*1.5+y*0.35)>0.75)tc.lerp(COL.deep,0.55);
+    if(tag==='leg'){if(Math.sin(y*2.1+0.6)>0.82)tc.lerp(COL.deep,0.45);if(nz>0.5)tc.lerp(COL.cream,0.3);}
+    if(tag==='paw'){tc.lerp(COL.cream,0.55);const pc=x>0?2.75:-2.75;if(ny>0.2&&z>6.6&&(Math.abs(Math.abs(x-pc)-0.62)<0.09))tc.lerp(COL.dark,0.7);}
+    if((tag==='body'||tag==='haunch')&&Math.sin(z*1.25+y*0.45)>0.72)tc.lerp(COL.deep,0.6);
+  }
+  return tc;}
+// ear: a slightly hollow triangle, inner face + back face + dense edges. Right ear (x>0); mirrored for the left
+const EA=[1.7,24.2,2.9],EB=[6.6,20.8,1.7],ET=[5.0,30.0,1.0];
+const earN=(()=>{const u=new THREE.Vector3(EB[0]-EA[0],EB[1]-EA[1],EB[2]-EA[2]),v=new THREE.Vector3(ET[0]-EA[0],ET[1]-EA[1],ET[2]-EA[2]);const n=u.cross(v).normalize();if(n.z<0)n.negate();return n;})();
+const EAX=new THREE.Vector3(EB[0]-EA[0],EB[1]-EA[1],EB[2]-EA[2]).normalize();
+// --- count, then fill typed arrays
+const RP=[];// half-side points as flat records: x,y,z,nx,ny,nz,r,g,b,part,breath,size
+function push(x,y,z,nx,ny,nz,col,part,br,sz){RP.push(x,y,z,nx,ny,nz,col.r,col.g,col.b,part,br,sz);}
+{
+  const area=e=>{const p=1.6,a=e[3],b=e[4],c2=e[5];return 4*Math.PI*Math.pow((Math.pow(a*b,p)+Math.pow(a*c2,p)+Math.pow(b*c2,p))/3,1/p);};
+  let tot=0;for(const e of E)tot+=e[7]*area(e)*(e[10]?1:0.5);
+  const K=46000/tot;
+  for(const e of E){const n=Math.round(e[7]*area(e)*(e[10]?1:0.5)*K);
+    for(let i=0;i<n;i++){
+      let ux,uy,uz;do{ux=rand(-1,1);uy=rand(-1,1);uz=rand(-1,1);}while(ux*ux+uy*uy+uz*uz>1||ux*ux+uy*uy+uz*uz<1e-4);
+      const L=Math.hypot(ux,uy,uz);ux/=L;uy/=L;uz/=L;
+      let x=e[0]+e[3]*ux,y=e[1]+e[4]*uy,z=e[2]+e[5]*uz;
+      if(!e[10]&&x<0){x=-x;ux=-ux;}// centred shapes: sample one half, mirrored below
+      if(y<0.05||inside(x,y,z,e))continue;
+      let nx=ux/e[3],ny=uy/e[4],nz=uz/e[5];const nl=Math.hypot(nx,ny,nz);nx/=nl;ny/=nl;nz/=nl;
+      const f=e[8]*Math.pow(rng(),1.6);x+=nx*f;y+=ny*f;z+=nz*f;
+      const col=furColor(x,y,z,nx,ny,nz,e[6]);
+      const br=e[9]*ss((14-y)/6);
+      push(x,y,z,nx,ny,nz,col,0,br,e[6]==='head'||e[6]==='cheek'||e[6]==='pad'||e[6]==='chin'?0.34:0.5);}}
+  // ears
+  const bary=(u,v)=>[EA[0]+(EB[0]-EA[0])*u+(ET[0]-EA[0])*v,EA[1]+(EB[1]-EA[1])*u+(ET[1]-EA[1])*v,EA[2]+(EB[2]-EA[2])*u+(ET[2]-EA[2])*v];
+  for(let i=0;i<2600;i++){let u=rng(),v=rng();if(u+v>1){u=1-u;v=1-v;}const w=1-u-v,m=Math.min(u,v,w),q=bary(u,v);
+    const hollow=-0.9*ss(m/0.25);const front=i<1700;
+    const off=front?hollow:-0.55;
+    const x=q[0]+earN.x*off,y=q[1]+earN.y*off,z=q[2]+earN.z*off;
+    let col;
+    if(front){col=tc.copy(COL.inner).lerp(COL.pink,0.3+rng()*0.4).multiplyScalar(1.25);if(m<0.07)col.copy(COL.orange).lerp(COL.light,rng()*0.4);else if(m<0.13&&v<0.6)col.lerp(COL.cream,0.6);}
+    else col=tc.copy(COL.orange).lerp(COL.deep,rng()*0.25);
+    const s=front?1:-1;push(x,y,z,earN.x*s,earN.y*s,earN.z*s,col,1,0,0.3);}
+  for(const [P0,P1] of [[EA,ET],[EB,ET]])for(let i=0;i<=160;i++){const f=i/160;const x=P0[0]+(P1[0]-P0[0])*f,y=P0[1]+(P1[1]-P0[1])*f,z=P0[2]+(P1[2]-P0[2])*f;
+    push(x,y,z,earN.x*0.4+(P0===EB?0.9:-0.3),earN.y*0.4+0.3,earN.z*0.4,tc.copy(COL.light).lerp(COL.cream,rng()*0.5),1,0,0.26);}
+  // ear tufts: a few cream hairs rising out of the inner ear
+  for(let i=0;i<120;i++){let u=rand(0.1,0.35),v=rand(0.05,0.4);const q=bary(u,v),h=rand(0,1.6);
+    push(q[0]-0.25*h+earN.x*0.2,q[1]+h*0.8,q[2]+earN.z*0.2+0.2,earN.x,earN.y,earN.z,tc.copy(COL.cream),1,0,0.18);}
+  // nose: pink rounded triangle, darker nostrils
+  for(let i=0;i<520;i++){const yy=rand(17.05,17.95),hw=0.8*(yy-17.0)/0.95,xx=rand(0,hw);if(rng()>0.5&&xx>hw*0.9)continue;
+    const z=Math.max(frontZ(xx,yy),7.2)+0.18+0.12*(1-xx/0.8);let col=tc.copy(COL.pink).lerp(C(0xF4B6AE),rng()*0.4);
+    if(Math.hypot(xx-0.38,yy-17.25)<0.16)col=tc.copy(COL.dark).lerp(COL.pink,0.3);
+    push(xx,yy,z,0,0.25,0.97,col,0,0,0.2);}
+  // mouth: a short line down from the nose, then out under each pad
+  for(let i=0;i<=70;i++){const f=i/70;let xx,yy;if(f<0.4){xx=0;yy=17.0-0.75*f/0.4;}else{const g=(f-0.4)/0.6;xx=0.95*g;yy=16.25-0.5*Math.sin(g*1.6);}
+    push(xx,yy,frontZ(xx,yy)+0.08,0,0,1,tc.copy(COL.dark).lerp(COL.deep,0.3),0,0,0.18);}
+}
+// mirror (x -> -x); the right ear (part 1) becomes the left ear (part 2)
+const NHALF=RP.length/12,NREMY=NHALF*2;
+const RM={pos:new Float32Array(NREMY*3),nrm:new Float32Array(NREMY*3),col:new Float32Array(NREMY*3),aux:new Float32Array(NREMY*3)};
+for(let i=0;i<NHALF;i++){const o=i*12;for(let s=0;s<2;s++){const j=i*2+s,sg=s?-1:1,j3=j*3;
+    RM.pos[j3]=RP[o]*sg;RM.pos[j3+1]=RP[o+1];RM.pos[j3+2]=RP[o+2];RM.nrm[j3]=RP[o+3]*sg;RM.nrm[j3+1]=RP[o+4];RM.nrm[j3+2]=RP[o+5];
+    RM.col[j3]=RP[o+6];RM.col[j3+1]=RP[o+7];RM.col[j3+2]=RP[o+8];RM.aux[j3]=RP[o+9]===1?(s?2:1):0;RM.aux[j3+1]=RP[o+10];RM.aux[j3+2]=RP[o+11];}}
+RP.length=0;
+const REMY_VS=`
+attribute vec3 aNrm,aCol,aAux;uniform float uT,uScale,uBreath,uTwL,uTwR,uRimMul,uSzMul;uniform vec3 uRimC;uniform vec3 uEarP,uEarAx;
+varying vec3 vC;varying float vRim;
+vec3 rotAx(vec3 v,vec3 k,float a){return v*cos(a)+cross(k,v)*sin(a)+k*dot(k,v)*(1.0-cos(a));}
+void main(){vec3 p=position,n=aNrm;
+  if(aAux.x>0.5){float s=aAux.x>1.5?-1.0:1.0;float a=aAux.x>1.5?uTwL:uTwR;p.x*=s;n.x*=s;p=uEarP+rotAx(p-uEarP,uEarAx,a);n=rotAx(n,uEarAx,a);p.x*=s;n.x*=s;}
+  float b=uBreath*aAux.y;p.x*=1.0+b;p.z=p.z+(p.z+1.0)*b*0.8;p.y+=b*2.0*smoothstep(0.0,12.0,p.y);
+  vec4 wp=modelMatrix*vec4(p,1.0);vec3 v=normalize(cameraPosition-wp.xyz);float f=dot(normalize(n),v);
+  float rim=pow(1.0-clamp(f,0.0,1.0),2.6);vRim=rim;
+  vC=aCol*(0.6+0.42*clamp(f,0.0,1.0))*1.08+uRimC*rim*uRimMul;
+  vec4 mv=viewMatrix*wp;gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aAux.z*uSzMul*uScale/-mv.z,1.0,uSzMul>1.5?24.0:7.0);}`;
+const remyU={uRimC:{value:C(PAL.rim)},uRimMul:{value:1.25},uSzMul:{value:1},uEarP:{value:new THREE.Vector3(...EA)},uEarAx:{value:EAX}};
+function remyGeo(B,step){const g=new THREE.BufferGeometry(),n=Math.floor(NREMY/step);
+  const pick=(a,k)=>{if(step===1)return a;const o=new Float32Array(n*k);for(let i=0;i<n;i++)for(let j=0;j<k;j++)o[i*k+j]=a[i*step*k+j];return o;};
+  g.setAttribute('position',new THREE.BufferAttribute(pick(B.pos,3),3));g.setAttribute('aNrm',new THREE.BufferAttribute(pick(B.nrm,3),3));
+  g.setAttribute('aCol',new THREE.BufferAttribute(pick(B.col,3),3));g.setAttribute('aAux',new THREE.BufferAttribute(pick(B.aux,3),3));return g;}
+const remy=new THREE.Group();scene.add(remy);
+// a solid core just under the fur, so the gaps between points show dark fur, not the sky
+{const sg=new THREE.SphereGeometry(1,20,14),cm=new THREE.MeshBasicMaterial({color:0xA5581E});
+  for(const e of ELL){const m=new THREE.Mesh(sg,cm);m.position.set(e[0],e[1],e[2]);m.scale.set(e[3]*0.95,e[4]*0.95,e[5]*0.95);remy.add(m);}}
+const remyMat=new THREE.ShaderMaterial({uniforms:Object.assign({},U,remyU),vertexShader:REMY_VS,
+  fragmentShader:'varying vec3 vC;varying float vRim;void main(){vec2 c=gl_PointCoord-0.5;if(dot(c,c)>0.25)discard;gl_FragColor=vec4(vC,1.0);}'});
+const remyObj=new THREE.Points(remyGeo(RM,1),remyMat);remyObj.frustumCulled=false;remy.add(remyObj);
+// rim halo: every third point again, larger, additive, rim only: the cyan-white outline
+const rimMat=new THREE.ShaderMaterial(Object.assign({uniforms:Object.assign({},U,remyU,{uSzMul:{value:2.6},uRimMul:{value:1}}),vertexShader:REMY_VS,
+  fragmentShader:'uniform vec3 uRimC;uniform float uGlowE;varying vec3 vC;varying float vRim;void main(){vec2 c=gl_PointCoord-0.5;float r=dot(c,c)*4.0;if(r>1.0)discard;float a=vRim*vRim*(1.0-r)*0.55;gl_FragColor=vec4(uRimC*a,1.0);}'},ADD));
+const rimObj=new THREE.Points(remyGeo(RM,3),rimMat);rimObj.frustumCulled=false;rimObj.renderOrder=6;remy.add(rimObj);
+// inner glow: soft warm light inside the chest and head, seen through the fur
+{const n=LOWQ?90:160,p=new Float32Array(n*3),a=new Float32Array(n);
+  for(let i=0;i<n;i++){const e=rng()<0.4?E[0]:rng()<0.5?E[5]:E[4];p[i*3]=e[0]+rand(-0.55,0.55)*e[3];p[i*3+1]=e[1]+rand(-0.55,0.55)*e[4];p[i*3+2]=e[2]+rand(-0.4,0.4)*e[5];a[i]=rand(0,6.28);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('aPh',new THREE.BufferAttribute(a,1));
+  var innerObj=new THREE.Points(g,new THREE.ShaderMaterial(Object.assign({uniforms:U,depthTest:false,
+    vertexShader:'attribute float aPh;uniform float uT,uScale,uPulse;varying float vA;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;vA=0.011*(0.75+0.25*sin(uT*0.7+aPh))*(0.85+0.3*uPulse);gl_PointSize=clamp(7.0*uScale/-mv.z,2.0,160.0);}',
+    fragmentShader:'uniform vec3 uWarm;varying float vA;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;gl_FragColor=vec4(uWarm*vA*exp(-r*r*3.0),1.0);}'},ADD)));
+  innerObj.frustumCulled=false;innerObj.renderOrder=5;remy.add(innerObj);}
+
+/* ---------- eyes: almond planes, green-gold iris with a vertical slit, glowing ---------- */
+const EYE_Y=20.1,EYE_X=2.75,EYE_Z=frontZ(EYE_X,EYE_Y)+0.28;
+const eyeMats=[],eyes=[];
+for(const side of [1,-1]){const m=new THREE.ShaderMaterial({uniforms:Object.assign({uSide:{value:side},uOpen:{value:1}},U),transparent:true,
+    vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:`uniform float uSide,uOpen,uGlowE,uPulse,uT;varying vec2 vUv;
+      void main(){vec2 q=(vUv-0.5)*2.0;float xo=q.x*uSide;float yy=q.y-0.16*xo;
+        float h=0.8*uOpen*pow(max(1.0-q.x*q.x,0.0),0.7);float e=abs(yy)/max(h,1e-3);if(e>1.0)discard;
+        vec2 m=vec2(q.x*1.7,q.y*1.2);float r=length(m)/1.2;float an=atan(m.y,m.x);
+        vec3 col=mix(vec3(0.98,0.86,0.36),vec3(0.42,0.74,0.30),smoothstep(0.12,0.95,r))*(0.86+0.14*sin(an*26.0));
+        col=mix(col,vec3(0.18,0.34,0.14),smoothstep(0.95,1.2,r));
+        float slit=0.14*(1.0-0.75*q.y*q.y)*(1.0+0.6*(1.0-uGlowE*0.5));float pu=1.0-smoothstep(slit*0.8,slit,abs(m.x));
+        float g=uGlowE*(0.8+0.25*uPulse);
+        col=col*(1.0+0.35*g)+vec3(0.45,0.95,1.0)*g*0.22*smoothstep(0.35,1.0,r);
+        col=mix(col,mix(vec3(0.02,0.05,0.05),vec3(0.2,0.6,0.65),clamp(g*0.25,0.0,0.5)),pu);
+        col+=vec3(1.0)*g*0.9*exp(-dot(m-vec2(-0.32*uSide,0.28),m-vec2(-0.32*uSide,0.28))*30.0);
+        col=mix(col,vec3(0.16,0.07,0.03),smoothstep(0.82,0.98,e));
+        gl_FragColor=vec4(col,1.0);}`});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(3.4,2.4),m);mesh.position.set(EYE_X*side,EYE_Y,EYE_Z);mesh.rotation.y=0.3*side;mesh.renderOrder=2;remy.add(mesh);eyeMats.push(m);eyes.push(mesh);}
+// halo at each eye + a horizontal lens-flare streak across both
+{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([EYE_X,EYE_Y,EYE_Z+0.4,-EYE_X,EYE_Y,EYE_Z+0.4]),3));
+  var haloObj=new THREE.Points(g,new THREE.ShaderMaterial(Object.assign({uniforms:U,depthTest:false,
+    vertexShader:'uniform float uScale,uGlowE,uPulse,uFlare;varying float vI;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;vI=uGlowE*(0.55+0.45*uPulse)+uFlare*1.2;gl_PointSize=clamp((3.0+2.2*vI)*uScale/-mv.z,2.0,420.0);}',
+    fragmentShader:'varying float vI;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;float a=(exp(-r*r*14.0)*0.9+exp(-r*r*3.5)*0.35)*(1.0-r)*vI;gl_FragColor=vec4(vec3(0.62,0.96,1.0)*a+vec3(0.4)*a*a,1.0);}'},ADD)));
+  haloObj.frustumCulled=false;haloObj.renderOrder=8;remy.add(haloObj);}
+const streak=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial(Object.assign({uniforms:U,depthTest:false,
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:`uniform float uGlowE,uPulse,uFlare;varying vec2 vUv;void main(){vec2 q=vUv-0.5;float ex=abs(abs(q.x)-0.0625);
+    float a=exp(-q.y*q.y*260.0)*(exp(-ex*14.0)*0.8+0.22*exp(-abs(q.x)*3.2))+exp(-q.y*q.y*2600.0)*exp(-ex*5.0)*0.6;
+    float I=uGlowE*(0.35+0.4*uPulse)+uFlare*1.6;gl_FragColor=vec4(vec3(0.55,0.92,1.0)*a*I,1.0);}`},ADD)));
+streak.scale.set(44,3.2,1);streak.position.set(0,EYE_Y,EYE_Z+0.7);streak.renderOrder=9;remy.add(streak);
+// whiskers: long fine bright lines from the pads, and two over each eye; they drift a little
+{const P=[],W=[];const wl=(x0,y0,z0,cx,cy,cz,x1,y1,z1,ph)=>{let prev=null;for(let i=0;i<=18;i++){const f=i/18,g=1-f;
+      const v=[g*g*x0+2*g*f*cx+f*f*x1,g*g*y0+2*g*f*cy+f*f*y1,g*g*z0+2*g*f*cz+f*f*z1,f,ph];if(prev){P.push(...prev.slice(0,3),...v.slice(0,3));W.push(prev[3],prev[4],v[3],v[4]);}prev=v;}};
+  for(const s of [1,-1]){for(let k=0;k<4;k++){const y0=16.55-k*0.32;wl(s*(1.6+k*0.25),y0,frontZ(1.6,y0)+0.05,s*8.5,y0+0.9-k*0.4,7.2,s*(15.5+k*0.8-(k===3?2:0)),y0+1.6-k*1.85,3.2,k*1.7+(s>0?0:0.5));}
+    for(let k=0;k<2;k++)wl(s*(2.0+k*0.9),22.0,frontZ(2.4,22)+0.05,s*(4.5+k),25.2,6.8,s*(7.2+k*1.4),27.0+k*0.4,5.0,3+k);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('aW',new THREE.Float32BufferAttribute(W,2));
+  var whiskObj=new THREE.LineSegments(g,new THREE.ShaderMaterial(Object.assign({uniforms:U,
+    vertexShader:'attribute vec2 aW;uniform float uT,uBreath;varying float vA;void main(){vec3 p=position;float f=aW.x;p.y+=(0.45*sin(uT*0.6+aW.y)+0.2*sin(uT*1.3+aW.y*2.0))*f*f;p.z+=0.3*sin(uT*0.45+aW.y)*f*f;vA=0.95*(1.0-0.55*f);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}',
+    fragmentShader:'varying float vA;void main(){gl_FragColor=vec4(vec3(0.94,0.99,1.0)*vA,1.0);}'},ADD)));
+  whiskObj.frustumCulled=false;whiskObj.renderOrder=7;remy.add(whiskObj);}
+
+/* ================= the portal ring, arcs, pulse waves ================= */
+const RING={x:0,y:21.5,z:-22,R:24};
+const ringG=new THREE.Group();ringG.position.set(RING.x,RING.y,RING.z);scene.add(ringG);
+{const NB=LOWQ?3600:9000,NW=LOWQ?1200:2600,n=NB+NW,p=new Float32Array(n*3),a=new Float32Array(n*4);
+  for(let i=0;i<n;i++){const wave=i>=NB;const band=wave?3:(rng()<0.45?0:rng()<0.6?1:2);
+    const rr=wave?0:band===0?rand(-1.1,1.1)*rng():band===1?2.6+rand(-0.7,0.7)*rng():-2.4+rand(-1.2,1.2)*rng();
+    p[i*3]=rand(0,6.2832);p[i*3+1]=rr;p[i*3+2]=rand(-1,1)*(wave?0.6:0.9)*rng();
+    a[i*4]=band;a[i*4+1]=wave?(rng()<0.5?0:1):rand(0.7,1.3);a[i*4+2]=rand(0,6.28);a[i*4+3]=rand(0.5,1.5);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('aB',new THREE.BufferAttribute(a,4));
+  var ringObj=new THREE.Points(g,new THREE.ShaderMaterial(Object.assign({uniforms:Object.assign({uR:{value:RING.R}},U),
+    vertexShader:`attribute vec4 aB;uniform float uT,uScale,uR,uAura,uPulse,uPPh;uniform vec3 uRingA,uRingB,uRingC;varying vec3 vC;
+      void main(){float th=position.x,band=aB.x,a;float r;vec3 col;float sz=aB.w;
+        if(band>2.5){float life=(fract(uPPh)+aB.y)*0.5;th+=uT*0.05;r=uR*(1.0+0.03*uAura)+life*20.0*uAura+position.y;
+          a=pow(1.0-life,2.0)*0.75*uAura;col=mix(uRingA,uRingC,life);sz*=1.3;}
+        else{float dir=band==1.0?-1.0:1.0;float sp=band==0.0?0.16:band==1.0?0.11:0.07;th+=dir*uT*sp*aB.y;
+          float n=sin(th*7.0+uT*0.9+aB.z)*0.5+sin(th*13.0-uT*1.4)*0.3;
+          r=uR*(0.92+0.08*uAura)+position.y*(0.9+0.35*uAura)+n*0.6*uAura+uPulse*0.7*uAura;
+          a=(band==0.0?1.0:band==1.0?0.75:0.45)*(0.55+0.45*uAura)*(0.7+0.3*uPulse);
+          float h=0.5+0.5*sin(th*2.0+uT*0.2+band);col=band==0.0?mix(uRingA,vec3(1.0),0.35+0.3*h):band==1.0?mix(uRingB,uRingA,h*0.6):mix(uRingC,uRingB,h);}
+        vec3 p=vec3(cos(th)*r,sin(th)*r,position.z*(band>2.5?1.0:1.0+aB.y));
+        vec4 mv=modelViewMatrix*vec4(p,1.0);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(0.42*sz*uScale/-mv.z,1.0,9.0);vC=col*a;}`,
+    fragmentShader:'varying vec3 vC;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;gl_FragColor=vec4(vC*(1.0-r*r),1.0);}'},ADD)));
+  ringObj.frustumCulled=false;ringObj.renderOrder=3;ringG.add(ringObj);}
+// a soft glow disc around the ring, one quad
+const ringGlow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial(Object.assign({uniforms:U,
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:`uniform float uAura,uPulse;uniform vec3 uRingA,uRingB,uWarm;varying vec2 vUv;void main(){float r=length(vUv-0.5)*2.0*1.75;
+    float band=exp(-pow((r-1.0)*7.0,2.0))*0.5+exp(-pow((r-1.0)*2.4,2.0))*0.22;float core=exp(-r*r*2.2)*0.5;
+    vec3 c=mix(uRingB,uRingA,0.6)*band*(0.5+0.5*uAura)*(0.8+0.35*uPulse)+uWarm*core*(0.6+0.25*uPulse);gl_FragColor=vec4(c,1.0);}`},ADD)));
+ringGlow.scale.set(RING.R*3.5,RING.R*3.5,1);ringGlow.position.z=-0.5;ringGlow.renderOrder=2;ringG.add(ringGlow);
+// electric arcs crackling along the ring: short jagged polylines, re-drawn every few frames
+const NARC=LOWQ?5:9,ASEG=14;
+const arcPos=new Float32Array(NARC*ASEG*6),arcCol=new Float32Array(NARC*ASEG*6);
+const arcGeo=new THREE.BufferGeometry();arcGeo.setAttribute('position',new THREE.BufferAttribute(arcPos,3));arcGeo.setAttribute('color',new THREE.BufferAttribute(arcCol,3));
+const arcObj=new THREE.LineSegments(arcGeo,new THREE.LineBasicMaterial(Object.assign({vertexColors:true},ADD)));arcObj.frustumCulled=false;arcObj.renderOrder=4;ringG.add(arcObj);
+const arcs=[];for(let i=0;i<NARC;i++)arcs.push({th:rand(0,6.28),span:rand(0.2,0.6),end:0,I:0});
+function stepArcs(t,aura,pulse){const cA=U.uRingA.value;
+  for(let i=0;i<NARC;i++){const A=arcs[i];if(t>A.end){A.th=rand(0,6.28);A.span=rand(0.18,0.6)*(rng()<0.5?-1:1);A.end=t+rand(0.12,0.7);A.I=rand(0.5,1.2);}
+    let prev=null;const R=RING.R*(0.92+0.08*aura)+pulse*0.7*aura;
+    for(let k=0;k<=ASEG;k++){const f=k/ASEG,th=A.th+A.span*f,j=(k===0||k===ASEG)?0:rand(-1.4,1.4)*aura,zz=rand(-0.6,0.6);
+      const v=[Math.cos(th)*(R+j),Math.sin(th)*(R+j),zz];
+      if(prev){const o=(i*ASEG+k-1)*6;arcPos.set(prev,o);arcPos.set(v,o+3);const I=A.I*(0.5+0.5*aura)*(0.6+0.4*Math.sin(f*3.14));
+        for(let q=0;q<2;q++){arcCol[o+q*3]=(0.7+0.3*cA.r)*I;arcCol[o+q*3+1]=(0.85+0.15*cA.g)*I;arcCol[o+q*3+2]=I;}}prev=v;}}
+  arcGeo.attributes.position.needsUpdate=true;arcGeo.attributes.color.needsUpdate=true;}
+
+/* ---------- the tunnel inside the ring: a particle vortex receding to a warm far glow ---------- */
+const TUN_L=210;
+{const n=LOWQ?2200:6500,p=new Float32Array(n*3),a=new Float32Array(n*2);
+  for(let i=0;i<n;i++){p[i*3]=rand(0,6.2832);p[i*3+1]=rand(0,1);p[i*3+2]=rand(0.8,1.05);a[i*2]=rand(0.6,1.4);a[i*2+1]=rand(0,1);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('aA',new THREE.BufferAttribute(a,2));
+  var tunObj=new THREE.Points(g,new THREE.ShaderMaterial(Object.assign({uniforms:Object.assign({uR:{value:RING.R},uL:{value:TUN_L}},U),
+    vertexShader:`attribute vec2 aA;uniform float uT,uScale,uR,uL,uAura;uniform vec3 uRingA,uRingB,uRingC,uWarm;varying vec3 vC;
+      void main(){float d=fract(position.y-uT*0.035*aA.x);float r=uR*position.z*mix(0.95,0.16,pow(d,0.7));float th=position.x+uT*0.22+d*7.0;
+        vec3 p=vec3(cos(th)*r,sin(th)*r,-d*uL-2.0);vec4 mv=modelViewMatrix*vec4(p,1.0);gl_Position=projectionMatrix*mv;
+        vec3 col=d<0.5?mix(uRingA,uRingB,d*2.0):mix(uRingB,uWarm,(d-0.5)*2.0);col=mix(col,uRingC,aA.y*0.35*(1.0-d));
+        float a=smoothstep(0.0,0.08,d)*(0.35+0.65*d)*(0.55+0.3*uAura);gl_PointSize=clamp(0.55*uScale/-mv.z,1.0,6.0);vC=col*a;}`,
+    fragmentShader:'varying vec3 vC;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;gl_FragColor=vec4(vC*(1.0-r*r),1.0);}'},ADD)));
+  tunObj.frustumCulled=false;tunObj.renderOrder=1;ringG.add(tunObj);}
+const farGlow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial(Object.assign({uniforms:U,
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 uWarm;uniform float uPulse;varying vec2 vUv;void main(){float r=length(vUv-0.5)*2.0;float a=exp(-r*r*5.0)*0.95+exp(-r*r*1.4)*0.3;gl_FragColor=vec4(mix(uWarm,vec3(1.0,0.95,0.85),exp(-r*r*30.0))*a*(0.85+0.2*uPulse),1.0);}'},ADD)));
+farGlow.scale.set(70,70,1);farGlow.position.z=-TUN_L+4;farGlow.renderOrder=1;ringG.add(farGlow);
+
+/* ================= deep sky: nebula quad, stars, planet, beams, ghost constellation ================= */
+const NEB=(()=>{const W=LOWQ?512:1024,H=W/2,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,W,H);g.globalCompositeOperation='lighter';
+  const blob=(x,y,r,col,a)=>{const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(${col},${a})`);gr.addColorStop(1,`rgba(${col},0)`);g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r);};
+  // two filaments of cloud sweeping diagonally, plus scattered knots
+  for(let i=0;i<110;i++){const f=rng(),x=W*(0.05+0.9*f)+rand(-60,60)*W/1024,y=H*(0.75-0.5*f+0.18*Math.sin(f*7))+rand(-70,70)*H/512;blob(x,y,rand(30,120)*W/1024,'255,0,0',rand(0.05,0.16));}
+  for(let i=0;i<90;i++){const f=rng(),x=W*(0.1+0.85*f)+rand(-80,80)*W/1024,y=H*(0.25+0.45*f+0.15*Math.cos(f*5))+rand(-60,60)*H/512;blob(x,y,rand(25,110)*W/1024,'0,255,0',rand(0.05,0.15));}
+  for(let i=0;i<70;i++)blob(rand(0,W),rand(0,H),rand(3,14)*W/1024,'0,0,255',rand(0.2,0.6));
+  const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;return t;})();
+const nebula=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial({uniforms:Object.assign({uMap:{value:NEB}},U),depthWrite:false,
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:`uniform sampler2D uMap;uniform vec3 uNebA,uNebB;uniform float uNebI,uT;varying vec2 vUv;void main(){
+    vec4 a=texture2D(uMap,vUv+vec2(uT*0.0015,0.0)),b=texture2D(uMap,vUv*0.94+vec2(0.03-uT*0.001,0.02));
+    float edge=smoothstep(0.0,0.22,vUv.x)*smoothstep(1.0,0.78,vUv.x)*smoothstep(0.0,0.25,vUv.y)*smoothstep(1.0,0.75,vUv.y);
+    vec3 c=uNebA*(a.r*0.9+b.r*0.5)+uNebB*(a.g*0.85+b.g*0.4)+vec3(0.9,0.85,1.0)*a.b*0.5;gl_FragColor=vec4(c*uNebI*edge,1.0);}`}));
+nebula.scale.set(5200,2600,1);nebula.position.set(0,120,-1500);nebula.renderOrder=-10;scene.add(nebula);
+{const n=LOWQ?1800:5200,p=new Float32Array(n*3),a=new Float32Array(n*4);const tint=[[1,1,1],[0.75,0.85,1],[1,0.85,0.7],[0.85,0.75,1]];
+  for(let i=0;i<n;i++){let x,y,z;do{x=rand(-1,1);y=rand(-1,1);z=rand(-1,1);}while(x*x+y*y+z*z>1);const L=Math.hypot(x,y,z)||1,R=rand(1100,1400);
+    p[i*3]=x/L*R;p[i*3+1]=y/L*R;p[i*3+2]=z/L*R;const tt=tint[(rng()*4)|0];const b=Math.pow(rng(),3);a[i*4]=tt[0]*(0.35+b);a[i*4+1]=tt[1]*(0.35+b);a[i*4+2]=tt[2]*(0.35+b);a[i*4+3]=rand(0,6.28)+Math.floor(b*3)*10;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('aC',new THREE.BufferAttribute(a,4));
+  var starObj=new THREE.Points(g,new THREE.ShaderMaterial(Object.assign({uniforms:U,
+    vertexShader:'attribute vec4 aC;uniform float uT,uStarI;varying vec3 vC;void main(){float big=floor(aC.w/10.0);float ph=aC.w-big*10.0;vC=aC.rgb*uStarI*(0.7+0.3*sin(uT*(0.8+ph*0.3)+ph*5.0));gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);gl_PointSize=1.3+big*0.9;}',
+    fragmentShader:'varying vec3 vC;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;gl_FragColor=vec4(vC*(1.0-r*r),1.0);}'},ADD)));
+  starObj.frustumCulled=false;starObj.renderOrder=-9;scene.add(starObj);}
+const planet=new THREE.Mesh(new THREE.SphereGeometry(300,LOWQ?36:64,LOWQ?24:40),new THREE.ShaderMaterial({uniforms:U,depthWrite:false,
+  vertexShader:'varying vec3 vN,vW,vP;void main(){vN=normalize(mat3(modelMatrix)*normal);vP=position;vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
+  fragmentShader:`uniform vec3 uRingA,uRingB,uNebB;varying vec3 vN,vW,vP;void main(){vec3 v=normalize(cameraPosition-vW);float f=clamp(dot(vN,v),0.0,1.0);
+    vec3 L=normalize(vec3(0.7,0.55,0.45));float lit=clamp(dot(vN,L),0.0,1.0);float bands=0.5+0.5*sin(vP.y*0.045+sin(vP.x*0.02)*1.5);
+    vec3 body=mix(vec3(0.03,0.04,0.12),vec3(0.10,0.07,0.22),bands)*(0.25+1.1*lit);vec3 atm=mix(uRingB,uRingA,lit)*pow(1.0-f,3.0)*(0.4+1.4*lit);
+    gl_FragColor=vec4(body+atm,1.0);}`}));
+planet.position.set(-700,-560,-760);planet.renderOrder=-8;scene.add(planet);
+// light beams streaking diagonally across, now and then
+const beams=[];
+for(let i=0;i<3;i++){const m=new THREE.ShaderMaterial(Object.assign({uniforms:{uHead:{value:-1},uI:{value:0},uCol:{value:C(i===1?0xFF9AE8:0xA8F2FF)}},depthTest:false,
+    vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'uniform float uHead,uI;uniform vec3 uCol;varying vec2 vUv;void main(){float d=vUv.x-uHead;float a=d<0.0?exp(d*5.0):exp(-d*60.0);a*=exp(-pow((vUv.y-0.5)*5.0,2.0));gl_FragColor=vec4(uCol*a*uI,1.0);}'},ADD));
+  const b=new THREE.Mesh(new THREE.PlaneGeometry(1,1),m);b.scale.set(900,5,1);b.renderOrder=-5;scene.add(b);beams.push({mesh:b,m,t0:-100,dur:2.6,next:rand(3,12)+i*5});}
+function launchBeam(B,t){const ang=rand(0.35,0.7)*(rng()<0.5?1:-1);B.mesh.rotation.z=-ang;B.mesh.position.set(rand(-120,120),rand(-40,90),-260-rand(0,120));B.t0=t;B.dur=rand(1.8,3.2);B.next=t+rand(9,22);B.m.uniforms.uI.value=rand(0.45,0.9);}
+// a giant ghost cat traced as a constellation: dots and thin lines, very faint, drifting
+const ghost=new THREE.Group();scene.add(ghost);
+{const H=[[0,0.62],[0.22,0.6],[0.4,0.98],[0.52,0.5],[0.64,0.28],[0.62,0.04],[0.47,-0.16],[0.22,-0.3],[0,-0.33]],B=[[0.47,-0.16],[0.66,-0.55],[0.8,-1.15],[0.62,-1.48],[0.22,-1.52],[0,-1.5]];
+  const EYE=[[0.17,0.24],[0.3,0.25]],NOSE=[[0,0.04],[0.08,0.1]];
+  const lp=[],dp=[];const S=150;const seg=(L)=>{for(const s of [1,-1]){for(let i=0;i<L.length-1;i++){lp.push(L[i][0]*S*s,L[i][1]*S,0,L[i+1][0]*S*s,L[i+1][1]*S,0);}for(const q of L)dp.push(q[0]*S*s,q[1]*S,0,1);}};
+  seg(H);seg(B);seg(EYE);seg(NOSE);
+  for(let i=0;i<60;i++)dp.push(rand(-0.85,0.85)*S,rand(-1.5,1)*S,0,0.4);
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
+  const ln=new THREE.LineSegments(lg,new THREE.LineBasicMaterial(Object.assign({color:0x9DB4FF,opacity:0.085},ADD)));ln.renderOrder=-7;ghost.add(ln);
+  const P=new Float32Array(dp.length/4*3),A=new Float32Array(dp.length/4);for(let i=0;i<A.length;i++){P[i*3]=dp[i*4];P[i*3+1]=dp[i*4+1];P[i*3+2]=0;A[i]=dp[i*4+3];}
+  const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(P,3));dg.setAttribute('aB',new THREE.BufferAttribute(A,1));
+  const dots=new THREE.Points(dg,new THREE.ShaderMaterial(Object.assign({uniforms:U,vertexShader:'attribute float aB;uniform float uT;varying float vA;void main(){vA=aB*(0.24+0.1*sin(uT*0.9+position.x));gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);gl_PointSize=2.0+aB*2.0;}',
+    fragmentShader:'varying float vA;void main(){float r=length(gl_PointCoord-0.5)*2.0;if(r>1.0)discard;gl_FragColor=vec4(vec3(0.8,0.88,1.0)*vA*(1.0-r*r),1.0);}'},ADD)));dots.renderOrder=-7;ghost.add(dots);
+  ghost.position.set(430,210,-900);}
+
+/* ================= controls: TIME (mood), PULSE, AURA, GLOW ================= */
+const MOODS=[
+ {nebA:0x6A2BD8,nebB:0xD23CB4,bg:0x07031A,ringA:0x8FF0FF,ringB:0xA070FF,ringC:0xFF5AC8,nebI:1.0,star:1.0},
+ {nebA:0x1E44C8,nebB:0x2FB8E0,bg:0x020818,ringA:0xA0F8FF,ringB:0x5C7CFF,ringC:0x9A5CFF,nebI:0.95,star:1.15},
+ {nebA:0x9A2478,nebB:0xF07048,bg:0x11030E,ringA:0xFFE2B8,ringB:0xFF6AB4,ringC:0xFF8C5A,nebI:1.0,star:0.85},
+ {nebA:0x261246,nebB:0x4A2068,bg:0x010104,ringA:0x9FE8FF,ringB:0x6A5CC8,ringC:0xB04CA8,nebI:0.55,star:1.35}];
+const MNAMES=['astral','deep','ember','void'];
+let mood=0,moodF=0,moodAuto=false,moodTarget=0;
+const mc=(k,f)=>{const i=Math.floor(f)%4,j=(i+1)%4,u=ss(f-Math.floor(f));return C(MOODS[i][k]).lerp(C(MOODS[j][k]),u);};
+let pulseAuto=true,pulsePer=4,auraAuto=false,auraT=1,aura=1,glowT=1,glow=1;
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')moodAuto=true;else{moodAuto=false;moodTarget=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-p]',b);if(b.dataset.p==='auto')pulseAuto=true;else{pulseAuto=false;pulsePer=parseFloat(b.dataset.p);}}));
+document.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-a]',b);if(b.dataset.a==='auto')auraAuto=true;else{auraAuto=false;auraT=parseFloat(b.dataset.a);}}));
+document.querySelectorAll('[data-g]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-g]',b);glowT=parseFloat(b.dataset.g);}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera — straight on, at the height of his eyes. Orbit wider by hand (camA clamped to +-60 deg) */
+const target=new THREE.Vector3(0,18.2,0);
+let camA=0,camR=48,camY=20.1,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,4,40);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,24,95);},{passive:true});
+function setScale(){U.uScale.value=renderer.getSize(new THREE.Vector2()).y*renderer.getPixelRatio()/(2*Math.tan(MU.degToRad(camera.fov/2)));}
+setScale();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);setScale();});
+
+/* ================= animate ================= */
+const SWAY=MU.degToRad(15),SPIN=0.0001,SWAY_K=(2*Math.PI/(38*60))/SPIN;// one sway every ~38 s at turntable 1
+let swayPh=0,lastA=camA;
+const clock=new THREE.Clock();let last=0,pph=0,blinkT=-100,nextBlink=rand(6,12),flareT=-100,nextFlare=rand(12,22),twT=-100,twSide=1,nextTw=rand(5,10),arcTick=0;
+function animate(){requestAnimationFrame(animate);
+  if(turntable&&!drag)camA+=0.0001;
+  // the turntable's small per-step increments become the sway phase; manual orbit stays in camA
+  {const d=camA-lastA;if(d!==0&&Math.abs(d)<=SPIN*4.5){swayPh+=d*SWAY_K;camA=lastA;}camA=MU.clamp(camA,-1.05,1.05);lastA=camA;}
+  const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  const A=camA+SWAY*Math.sin(swayPh);
+  camera.position.set(Math.sin(A)*camR,camY,Math.cos(A)*camR);camera.lookAt(target);
+  // mood (TIME)
+  if(moodAuto)moodF=(moodF+dt/70)%4;else{let d=((moodTarget-moodF+2)%4+4)%4-2;moodF=((moodF+d*Math.min(1,dt*1.2))%4+4)%4;}
+  U.uNebA.value.copy(mc('nebA',moodF));U.uNebB.value.copy(mc('nebB',moodF));scene.background.copy(mc('bg',moodF));
+  U.uRingA.value.copy(mc('ringA',moodF));U.uRingB.value.copy(mc('ringB',moodF));U.uRingC.value.copy(mc('ringC',moodF));
+  {const i=Math.floor(moodF)%4,j=(i+1)%4,u=ss(moodF-Math.floor(moodF));U.uNebI.value=MU.lerp(MOODS[i].nebI,MOODS[j].nebI,u);U.uStarI.value=MU.lerp(MOODS[i].star,MOODS[j].star,u);}
+  // pulse (eyes + ring + waves share one phase)
+  const per=pulseAuto?4+0.6*Math.sin(t*0.05):pulsePer;pph+=dt/per;U.uPPh.value=pph;const pulse=0.5+0.5*Math.cos(pph*2*Math.PI);U.uPulse.value=pulse;
+  const at=auraAuto?1+0.4*Math.sin(t*0.09):auraT;aura+=(at-aura)*Math.min(1,dt*1.5);U.uAura.value=aura;
+  glow+=(glowT-glow)*Math.min(1,dt*2);
+  // blink every 15-25 s: the lids close, the glow dims and comes back
+  if(t>nextBlink){blinkT=t;nextBlink=t+rand(15,25);}
+  const bu=(t-blinkT)/0.42;const open=bu>=0&&bu<1?1-Math.sin(bu*Math.PI):1;
+  const gb=bu<0?1:bu<1?0.15+0.85*open*0.3:0.15+0.85*ss((t-blinkT-0.42)/1.4);
+  for(const m of eyeMats)m.uniforms.uOpen.value=Math.max(open,0.02);
+  // brighter flare every 20-40 s
+  if(t>nextFlare){flareT=t;nextFlare=t+rand(20,40);}
+  const fu=t-flareT;U.uFlare.value=fu<0?0:fu<0.3?fu/0.3:Math.exp(-(fu-0.3)*2.2);
+  U.uGlowE.value=glow*gb;
+  // breathing, ear twitches
+  U.uBreath.value=0.016*Math.sin(t*2*Math.PI/5.2);
+  if(t>nextTw){twT=t;twSide=rng()<0.5?1:-1;nextTw=t+rand(6,15);}
+  const tu=(t-twT)/0.5,tw=tu>=0&&tu<1?0.3*Math.sin(tu*Math.PI*2)*(1-tu):0;U.uTwR.value=twSide>0?tw:0;U.uTwL.value=twSide<0?tw:0;
+  U.uT.value=t;
+  if(++arcTick%3===0)stepArcs(t,aura,pulse);
+  for(const B of beams){if(t>B.next)launchBeam(B,t);const u=(t-B.t0)/B.dur;B.m.uniforms.uHead.value=u<=1.2?-0.1+u*1.2:-1;}
+  ghost.position.x=430+25*Math.sin(t*0.013);ghost.position.y=210+12*Math.cos(t*0.011);ghost.rotation.z=0.06*Math.sin(t*0.009);
+  phaseEl.textContent='— '+MNAMES[Math.round(moodF)%4]+' · pulse '+per.toFixed(1)+' s —';
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

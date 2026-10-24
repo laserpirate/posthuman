@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forest of Selective Memories (study)</title>
+<style>
+  :root{--bg:#060B0C;--silver:#D8DEE6;--pale:#AEC2C4;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(174,194,214,.22)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pale);opacity:.9;margin-top:11px}
+  #season{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);opacity:.7;margin-top:6px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(18,26,24,.5);border:1px solid rgba(174,194,214,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5;border-color:rgba(174,194,214,.18)}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Forest of Selective Memories.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the forest keeps only the seasons it chooses to</div>
+  <div id="season">— season —</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Forest of Selective Memories — a seasonal forest section. Leaves cycle
+   winter/spring-bud/summer-sway/autumn-fall; roots 'talk' to mushrooms via a
+   pulsing mycelial net; wells ripple, rivers run, a cascade falls; seasonal rain,
+   summer fireflies, stars, motes, a moon + suspended orbs. r128. */
+const PAL={bg:0x060B0C,silver:0xD8DEE6,pale:0xAEC2C4,trunkHi:0xAEB6BE,trunkLo:0x2A3038,
+  moss:0x4E7A46,mossLo:0x24361F,root:0xB6BEC8,rootLo:0x2A323C,myco:0xA8E0C8,pulse:0xDFFFF0,
+  mush:0xE8B8C0,mushLo:0x7A4E58,water:0x1E6E8C,waterHi:0x8FE0F0,moon:0xF4F6F8,moonLo:0x8A96A2,
+  fire:0xF6E06A,rain:0xAEC8E0,strata:0x1E2630};
+const WIN=0xCFE0EA,SPR=0xA6DE86,SUM=0x3E9E6A,AUT=0xE07A42,GOLD=0xF6C544;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260717);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x07100F,0.0040);
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+const GROUND=36;
+
+/* mossy ground + strata */
+{const p=[],col=[];for(let i=0;i<2600;i++){const x=rand(-74,74),z=rand(-16,16);p.push(x,GROUND+1.2*Math.sin(x*0.06)*Math.cos(z*0.08)+rand(-.6,.6),z);const c=lerpC(PAL.mossLo,PAL.moss,0.2+0.5*rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,0.7,0.55));}
+{const p=[],col=[];for(const yb of [28,20,12]){for(let i=0;i<700;i++){const x=rand(-72,72),z=rand(-15,15);p.push(x,yb+rand(-1.2,1.2),z);const c=lerpC(PAL.strata,PAL.pale,0.1+0.2*rng());col.push(c.r,c.g,c.b);}}world.add(glowPoints(p,col,0.55,0.35));}
+
+/* deciduous trees: trunks/branches (static) + seasonal leaf cloud + roots */
+const leafBase=[],leafPh=[],rootP=[],rootBase=[],rootY=[],rootTips=[],mushrooms=[];
+function tree(x,z){const sp=[],sc=[];const h=rand(20,30);
+  (function grow(o,dir,len,depth){const e=o.clone().addScaledVector(dir,len);const c=lerpC(PAL.trunkLo,PAL.trunkHi,0.3+0.5*(o.y-GROUND)/h);sp.push(o.x,o.y,o.z,e.x,e.y,e.z);sc.push(c.r,c.g,c.b,c.r,c.g,c.b);
+    if(depth<=0||len<1.4){ // leaf cluster at branch ends
+      for(let k=0;k<10;k++){leafBase.push(e.x+rand(-2.2,2.2),e.y+rand(-1.6,2.4),e.z+rand(-2.2,2.2));leafPh.push(rand(0,6.28));}return;}
+    const nb=depth>3?1:(rng()<.6?2:3);for(let b=0;b<nb;b++){const roll=rand(0,6.28),ax=new THREE.Vector3(Math.cos(roll),0,Math.sin(roll)),nd=dir.clone().applyAxisAngle(ax,MU.degToRad(rand(18,34)));nd.y+=rand(.05,.25);nd.normalize();grow(e,nd,len*rand(.72,.82),depth-1);}})
+    (new THREE.Vector3(x,GROUND,z),new THREE.Vector3(rand(-.08,.08),1,rand(-.08,.08)).normalize(),rand(6,8),5);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));g.setAttribute('color',new THREE.Float32BufferAttribute(sc,3));
+  world.add(new THREE.Points(g,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.85})));
+  // roots percolating down
+  const nS=5+(rand(0,3)|0);for(let s=0;s<nS;s++){let rx=x+rand(-2,2),rz=z+rand(-2,2),y=GROUND-0.5;while(y>4){rx+=rand(-.3,.3);rz+=rand(-.3,.3);rootP.push(rx,y,rz);const c=new THREE.Color(PAL.root);rootBase.push(c.r,c.g,c.b);rootY.push(y);if(rng()<0.22)for(let f=0;f<2;f++){rootP.push(rx+rand(-1.2,1.2),y+rand(-.8,.8),rz+rand(-1.2,1.2));const fc=lerpC(PAL.rootLo,PAL.root,0.5);rootBase.push(fc.r,fc.g,fc.b);rootY.push(y);}y-=rand(0.9,1.4);}rootTips.push([rx,y,rz]);}
+  // mushrooms at the base
+  const nm=1+(rng()<0.6?1:0);for(let m=0;m<nm;m++)mushrooms.push([x+rand(-4,4),GROUND,z+rand(-3,3)]);
+}
+let tx=-64;const treeXs=[];while(tx<=64){const z=pick([-9,0,9,0]);tree(tx,z);treeXs.push([tx,z]);tx+=rand(8,10);}
+// leaf cloud object (seasonal color/opacity/sway via material + position)
+const leafN=leafPh.length,leafPos=new Float32Array(leafBase),leafCol=new Float32Array(leafN*3);
+for(let i=0;i<leafN;i++){leafCol[i*3]=1;leafCol[i*3+1]=1;leafCol[i*3+2]=1;}
+const leafGeo=new THREE.BufferGeometry();leafGeo.setAttribute('position',new THREE.BufferAttribute(leafPos,3));leafGeo.setAttribute('color',new THREE.BufferAttribute(leafCol,3));
+const leaves=new THREE.Points(leafGeo,new THREE.PointsMaterial({size:1.7,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(leaves);
+const leafBaseF=new Float32Array(leafBase);
+
+/* falling leaves (autumn) */
+const flN=260,fl=[],flPos=new Float32Array(flN*3),flCol=new Float32Array(flN*3);
+for(let i=0;i<flN;i++){fl.push({x:rand(-64,64),z:rand(-12,12),y:rand(GROUND,GROUND+26),vy:rand(0.15,0.4),sw:rand(0,6.28)});const c=lerpC(AUT,GOLD,rng());flCol[i*3]=c.r;flCol[i*3+1]=c.g;flCol[i*3+2]=c.b;}
+const flGeo=new THREE.BufferGeometry();flGeo.setAttribute('position',new THREE.BufferAttribute(flPos,3));flGeo.setAttribute('color',new THREE.BufferAttribute(flCol,3));
+const fallLeaves=new THREE.Points(flGeo,new THREE.PointsMaterial({size:1.6,vertexColors:true,map:GLOW,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(fallLeaves);
+
+/* roots object (percolation pulse) */
+const rootGeo=new THREE.BufferGeometry();rootGeo.setAttribute('position',new THREE.Float32BufferAttribute(rootP,3));rootGeo.setAttribute('color',new THREE.Float32BufferAttribute(rootBase.slice(),3));
+world.add(new THREE.Points(rootGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false})));
+const rootBaseF=new Float32Array(rootBase),rootYF=new Float32Array(rootY),rootN=rootYF.length;
+
+/* mushrooms (glowing caps) */
+for(const [mx,my,mz] of mushrooms){const p=[],col=[];const R=rand(1.2,2.4);
+  for(let i=0;i<40;i++){const a=rand(0,6.28),v=rand(0,Math.PI/2),r=R*Math.sin(v);p.push(mx+r*Math.cos(a),my+R*Math.cos(v)+1.5,mz+r*Math.sin(a));const c=lerpC(PAL.mushLo,PAL.mush,0.4+0.5*rng());col.push(c.r,c.g,c.b);}
+  for(let s=0;s<6;s++){p.push(mx+rand(-.2,.2),my+s*0.25,mz+rand(-.2,.2));const c=new THREE.Color(PAL.mush);col.push(c.r*0.7,c.g*0.7,c.b*0.7);}
+  world.add(glowPoints(p,col,1.3,0.75));}
+
+/* MYCELIUM — roots talk to mushrooms (travelling pulses) */
+const nodes=rootTips.concat(mushrooms.map(m=>[m[0],m[1]-0.5,m[2]]));
+const myThreadP=[],myThreadC=[],myFilP=[],myFilBase=[],myFilPhase=[];
+for(let k=0;k<Math.min(240,nodes.length*2);k++){const n1=pick(nodes);let n2=null,bd=1e9;for(let tr=0;tr<6;tr++){const cand=pick(nodes),d=Math.hypot(cand[0]-n1[0],cand[1]-n1[1],cand[2]-n1[2]);if(d>3&&d<26&&d<bd){bd=d;n2=cand;}}if(!n2)continue;
+  const c=lerpC(PAL.rootLo,PAL.myco,0.5);myThreadP.push(n1[0],n1[1],n1[2],n2[0],n2[1],n2[2]);myThreadC.push(c.r,c.g,c.b,c.r,c.g,c.b);
+  for(let f=0;f<4;f++){const u=rand(0,1),x=MU.lerp(n1[0],n2[0],u),y=MU.lerp(n1[1],n2[1],u),z=MU.lerp(n1[2],n2[2],u);myFilP.push(x,y,z);const bc=new THREE.Color(PAL.myco);myFilBase.push(bc.r,bc.g,bc.b);myFilPhase.push(u);}}
+const myTGeo=new THREE.BufferGeometry();myTGeo.setAttribute('position',new THREE.Float32BufferAttribute(myThreadP,3));myTGeo.setAttribute('color',new THREE.Float32BufferAttribute(myThreadC,3));
+world.add(new THREE.LineSegments(myTGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false})));
+const myFGeo=new THREE.BufferGeometry();myFGeo.setAttribute('position',new THREE.Float32BufferAttribute(myFilP,3));myFGeo.setAttribute('color',new THREE.Float32BufferAttribute(myFilBase.slice(),3));
+world.add(new THREE.Points(myFGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false})));
+const myFilBaseF=new Float32Array(myFilBase),myFilPhF=new Float32Array(myFilPhase),myFilN=myFilPhF.length;
+
+/* WELLS + iterated ripples + reflection + rivers + cascade */
+const wells=[];const wP=[],wC=[],rimP=[],rimC=[];let wx=-46;
+while(wx<=46){const cx=wx,cz=rand(-3,3),R=rand(5,8),wy=4+rand(-0.5,0.5);wells.push({cx,cz,R,wy});
+  for(let i=0;i<Math.floor(R*R*2.4);i++){const rr=R*Math.sqrt(rng()),a=rand(0,6.28);wP.push(cx+rr*Math.cos(a),wy,cz+rr*Math.sin(a));const c=lerpC(PAL.water,PAL.waterHi,0.15+0.3*rng());wC.push(c.r,c.g,c.b);}
+  for(let k=0;k<Math.floor(R*7);k++){const a=k/Math.floor(R*7)*Math.PI*2;rimP.push(cx+R*Math.cos(a),wy+0.2,cz+R*Math.sin(a));const c=new THREE.Color(PAL.waterHi);rimC.push(c.r,c.g,c.b);}wx+=rand(14,18);}
+world.add(new THREE.Points((()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(wP,3));g.setAttribute('color',new THREE.Float32BufferAttribute(wC,3));return g;})(),new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+world.add(glowPoints(rimP,rimC,1.2,0.6));
+// ripple rings (2 per well, organic)
+const RPP=40,RINGSper=2,ringPos=new Float32Array(wells.length*RINGSper*RPP*3),ringCol=new Float32Array(wells.length*RINGSper*RPP*3),ringState=[];
+for(const W of wells)for(let r=0;r<RINGSper;r++)ringState.push({W,rr:rand(0,W.R),spd:rand(0.05,0.11),ox:rand(-W.R*0.4,W.R*0.4),oz:rand(-W.R*0.4,W.R*0.4)});
+const ringGeo=new THREE.BufferGeometry();ringGeo.setAttribute('position',new THREE.BufferAttribute(ringPos,3));ringGeo.setAttribute('color',new THREE.BufferAttribute(ringCol,3));
+world.add(new THREE.Points(ringGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+// rivers between adjacent wells (flowing particles)
+const riv=[],rivPos=[],rivCol=[];for(let i=0;i<wells.length-1;i++){const A=wells[i],B=wells[i+1];for(let k=0;k<40;k++){riv.push({A,B,s:rand(0,1),spd:rand(0.004,0.008),jit:rand(-1.5,1.5)});rivPos.push(0,0,0);const c=lerpC(PAL.water,PAL.waterHi,rng());rivCol.push(c.r,c.g,c.b);}}
+const rivGeo=new THREE.BufferGeometry();rivGeo.setAttribute('position',new THREE.Float32BufferAttribute(rivPos,3));rivGeo.setAttribute('color',new THREE.Float32BufferAttribute(rivCol,3));
+world.add(new THREE.Points(rivGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false})));
+// cascade from surface into the central well
+const cw=wells[(wells.length/2)|0],CN=260,cas=[],casPos=new Float32Array(CN*3),casCol=new Float32Array(CN*3);
+for(let i=0;i<CN;i++){cas.push({x:cw.cx+rand(-2,2),z:cw.cz+rand(-2,2),y:rand(cw.wy,GROUND-2),vy:rand(0.4,0.8)});const c=lerpC(PAL.waterHi,PAL.pale,rng());casCol[i*3]=c.r;casCol[i*3+1]=c.g;casCol[i*3+2]=c.b;}
+const casGeo=new THREE.BufferGeometry();casGeo.setAttribute('position',new THREE.BufferAttribute(casPos,3));casGeo.setAttribute('color',new THREE.BufferAttribute(casCol,3));
+world.add(new THREE.Points(casGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* RAIN (seasonal) — diagonal streaks */
+const raN=520,ra=[],raPos=new Float32Array(raN*2*3),raCol=new Float32Array(raN*2*3);
+for(let i=0;i<raN;i++){ra.push({x:rand(-80,80),y:rand(0,80),z:rand(-20,20),v:rand(1.2,2.0)});const c=new THREE.Color(PAL.rain);for(let e=0;e<2;e++){raCol[i*6+e*3]=c.r;raCol[i*6+e*3+1]=c.g;raCol[i*6+e*3+2]=c.b;}}
+const raGeo=new THREE.BufferGeometry();raGeo.setAttribute('position',new THREE.BufferAttribute(raPos,3));raGeo.setAttribute('color',new THREE.BufferAttribute(raCol,3));
+const rainObj=new THREE.LineSegments(raGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(rainObj);
+
+/* FIREFLIES (summer) */
+const fiN=48,fi=[],fiPos=new Float32Array(fiN*3),fiCol=new Float32Array(fiN*3),fiBase=[];
+for(let i=0;i<fiN;i++){fi.push({x:rand(-60,60),z:rand(-12,12),y:rand(GROUND,GROUND+14),ph:rand(0,6.28),dx:rand(-.05,.05),dy:rand(-.03,.03),dz:rand(-.05,.05),freq:rand(1.5,3)});fiBase.push(new THREE.Color(PAL.fire));}
+const fiGeo=new THREE.BufferGeometry();fiGeo.setAttribute('position',new THREE.BufferAttribute(fiPos,3));fiGeo.setAttribute('color',new THREE.BufferAttribute(fiCol,3));
+world.add(new THREE.Points(fiGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* stars + moon + suspended orbs + motes */
+{const p=[],col=[];for(let i=0;i<900;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.2,1)),R=rand(140,240);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.8+40,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,PAL.moon,rng());col.push(c.r*b,c.g*b,c.b*b);}world.add(glowPoints(p,col,0.9,0.7));}
+(function(){const p=[],col=[],R=13;for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(x,80+y,-40+z);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.4,0.9));world.add(glowPoints([0,80,-40],[...new THREE.Color(0xE8EEF4).toArray()],34,0.25));})();
+const orbs=[];for(let i=0;i<4;i++){const cx=rand(-40,40),cy=rand(12,26),cz=rand(-8,8),R=rand(2,4),p=[],col=[];for(let k=0;k<(R*R*8|0);k++){const u=rand(0,6.28),v=Math.acos(rand(-1,1));p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const c=lerpC(PAL.moonLo,PAL.moon,0.5+0.4*rng());col.push(c.r,c.g,c.b);}const g=glowPoints(p,col,1.1,0.85);g.position.set(cx,cy,cz);world.add(g);orbs.push({g,baseY:cy,ph:rand(0,6.28)});}
+const mtN=240,mtPos=new Float32Array(mtN*3),mtCol=[];for(let i=0;i<mtN;i++){mtPos[i*3]=rand(-70,70);mtPos[i*3+1]=rand(4,GROUND+24);mtPos[i*3+2]=rand(-16,16);const c=lerpC(PAL.pale,PAL.silver,rng());mtCol.push(c.r,c.g,c.b);}
+const mtGeo=new THREE.BufferGeometry();mtGeo.setAttribute('position',new THREE.BufferAttribute(mtPos,3));mtGeo.setAttribute('color',new THREE.Float32BufferAttribute(mtCol,3));
+const motes=new THREE.Points(mtGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(motes);
+
+/* SEASON cycle */
+const SEASON_P=64;
+function season(t){const sp=(t%SEASON_P)/SEASON_P;let leaf;
+  if(sp<0.20)leaf=0.05;else if(sp<0.34)leaf=ss((sp-0.20)/0.14);else if(sp<0.72)leaf=1;else if(sp<0.92)leaf=MU.lerp(1,0.12,ss((sp-0.72)/0.20));else leaf=MU.lerp(0.12,0.05,ss((sp-0.92)/0.08));
+  let fall=0;if(sp>=0.74&&sp<0.94)fall=Math.sin((sp-0.74)/0.20*Math.PI);
+  let lc;if(sp<0.25)lc=lerpC(WIN,SPR,ss(sp/0.25)*0.4);else if(sp<0.5)lc=lerpC(SPR,SUM,ss((sp-0.25)/0.25));else if(sp<0.72)lc=new THREE.Color(SUM);else lc=lerpC(SUM,AUT,ss((sp-0.72)/0.28));
+  const wind=sp<0.20?0.3:sp<0.72?1.0:0.6;
+  let rain=0;if(sp>=0.26&&sp<0.4)rain=Math.sin((sp-0.26)/0.14*Math.PI)*0.6;if(sp>=0.76&&sp<0.9)rain=Math.max(rain,Math.sin((sp-0.76)/0.14*Math.PI)*0.9);
+  const fire=(sp>=0.5&&sp<0.72)?Math.sin((sp-0.5)/0.22*Math.PI):0;
+  const name=sp<0.25?'winter':sp<0.5?'spring':sp<0.72?'summer':'autumn';
+  return {sp,leaf,fall,lc,wind,rain,fire,name};}
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+const seasonEl=document.getElementById('season');
+
+/* camera */
+const target=new THREE.Vector3(0,20,0);let camA=Math.PI*0.5,camR=126,camY=32,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,10,90);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,78,210);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[SUM,'seasonal canopy','buds → sway → fall'],[PAL.myco,'roots talk','to the mushrooms'],[PAL.waterHi,'wells & rivers','ripple and run'],[PAL.fire,'summer fireflies','& seasonal rain']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4400);
+
+/* animate */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0009;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  const S=season(t);seasonEl.textContent='— '+S.name+' —';
+  // leaves: seasonal color + presence + wind sway
+  leaves.material.color.copy(S.lc);leaves.material.opacity=0.25+0.7*S.leaf;
+  for(let i=0;i<leafN;i++){const ph=leafPh[i];leafPos[i*3]=leafBaseF[i*3]+S.wind*1.6*Math.sin(t*1.1+ph);leafPos[i*3+1]=leafBaseF[i*3+1]+S.wind*0.6*Math.sin(t*1.5+ph);leafPos[i*3+2]=leafBaseF[i*3+2]+S.wind*1.2*Math.cos(t*1.0+ph);}leafGeo.attributes.position.needsUpdate=true;
+  // falling leaves
+  fallLeaves.material.opacity=0.85*S.fall;
+  if(S.fall>0.02)for(let i=0;i<flN;i++){const p=fl[i];p.y-=p.vy;p.x+=Math.sin(t*1.5+p.sw)*0.15;if(p.y<GROUND-1){p.y=GROUND+rand(6,24);p.x=rand(-64,64);}flPos[i*3]=p.x;flPos[i*3+1]=p.y;flPos[i*3+2]=p.z;}
+  flGeo.attributes.position.needsUpdate=true;
+  // roots percolation
+  {const arr=rootGeo.attributes.color.array;for(let i=0;i<rootN;i++){const pul=0.35+0.65*Math.max(0,Math.sin(t*1.6-rootYF[i]*0.35));arr[i*3]=rootBaseF[i*3]*pul;arr[i*3+1]=rootBaseF[i*3+1]*pul;arr[i*3+2]=rootBaseF[i*3+2]*pul;}rootGeo.attributes.color.needsUpdate=true;}
+  // mycelium "talking" — bidirectional pulses
+  {const arr=myFGeo.attributes.color.array;for(let i=0;i<myFilN;i++){const u=myFilPhF[i];const pul=0.3+0.7*Math.max(0,Math.sin(t*2.2-u*7)+0.4*Math.sin(t*1.5+u*9));arr[i*3]=myFilBaseF[i*3]*pul;arr[i*3+1]=myFilBaseF[i*3+1]*pul;arr[i*3+2]=myFilBaseF[i*3+2]*pul;}myFGeo.attributes.color.needsUpdate=true;}
+  // orbs bob
+  for(const o of orbs){o.g.position.y=o.baseY+1.2*Math.sin(t*0.3+o.ph);o.g.rotation.y+=0.004;}
+  // wells: ripples
+  let idx=0;for(const R of ringState){R.rr+=R.spd*(1+S.rain*1.2);if(R.rr>R.W.R){R.rr=rand(0,1.5);R.ox=rand(-R.W.R*0.4,R.W.R*0.4);R.oz=rand(-R.W.R*0.4,R.W.R*0.4);}const fade=(1-R.rr/R.W.R)*(0.6+S.rain*0.5);for(let k=0;k<RPP;k++){const a=k/RPP*Math.PI*2;ringPos[idx*3]=R.W.cx+R.ox+R.rr*Math.cos(a);ringPos[idx*3+1]=R.W.wy+0.15;ringPos[idx*3+2]=R.W.cz+R.oz+R.rr*Math.sin(a);const c=new THREE.Color(PAL.waterHi);ringCol[idx*3]=c.r*fade;ringCol[idx*3+1]=c.g*fade;ringCol[idx*3+2]=c.b*fade;idx++;}}ringGeo.attributes.position.needsUpdate=true;ringGeo.attributes.color.needsUpdate=true;
+  // rivers
+  for(let i=0;i<riv.length;i++){const r=riv[i];r.s+=r.spd;if(r.s>1)r.s-=1;const x=MU.lerp(r.A.cx,r.B.cx,r.s),z=MU.lerp(r.A.cz,r.B.cz,r.s)+r.jit*(1-Math.abs(r.s-0.5)*2),y=MU.lerp(r.A.wy,r.B.wy,r.s)+0.3;rivPos[i*3]=x;rivPos[i*3+1]=y;rivPos[i*3+2]=z;}rivGeo.attributes.position.needsUpdate=true;
+  // cascade
+  for(let i=0;i<CN;i++){const p=cas[i];p.y-=p.vy;if(p.y<cw.wy){p.y=GROUND-2;p.x=cw.cx+rand(-2,2);p.z=cw.cz+rand(-2,2);}casPos[i*3]=p.x;casPos[i*3+1]=p.y;casPos[i*3+2]=p.z;}casGeo.attributes.position.needsUpdate=true;
+  // rain
+  rainObj.material.opacity=0.5*S.rain;
+  if(S.rain>0.02)for(let i=0;i<raN;i++){const p=ra[i];p.y-=p.v*2.4;p.x-=p.v*0.7;if(p.y<0){p.y=80;p.x=rand(-80,80);}raPos[i*6]=p.x;raPos[i*6+1]=p.y;raPos[i*6+2]=p.z;raPos[i*6+3]=p.x-1.4;raPos[i*6+4]=p.y-4;raPos[i*6+5]=p.z;}
+  raGeo.attributes.position.needsUpdate=true;
+  // fireflies
+  for(let i=0;i<fiN;i++){const f=fi[i];f.x+=f.dx*Math.sin(t*0.5+f.ph);f.y+=f.dy*Math.sin(t*0.4+f.ph);f.z+=f.dz*Math.cos(t*0.5+f.ph);f.y=MU.clamp(f.y,GROUND-1,GROUND+18);fiPos[i*3]=f.x;fiPos[i*3+1]=f.y;fiPos[i*3+2]=f.z;const pulse=Math.pow(0.5+0.5*Math.sin(t*f.freq+f.ph),3)*S.fire;const b=fiBase[i];fiCol[i*3]=b.r*pulse;fiCol[i*3+1]=b.g*pulse;fiCol[i*3+2]=b.b*pulse;}fiGeo.attributes.position.needsUpdate=true;fiGeo.attributes.color.needsUpdate=true;
+  const mp=motes.geometry.attributes.position;for(let i=0;i<mtN;i++){let y=mp.getY(i)+0.015;if(y>GROUND+24)y=4;mp.setY(i,y);}mp.needsUpdate=true;
+  renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

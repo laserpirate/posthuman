@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rings around Fire (study)</title>
+<style>
+  :root{--bg:#06060A;--silver:#D8DEE6;--gold:#F6D9A0;--fire:#FFE39A;--pale:#B7C2CE;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(246,217,160,.25)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(24,22,18,.5);border:1px solid rgba(246,217,160,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5;border-color:rgba(246,217,160,.18)}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Rings around Fire.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; look up — the long light falls, and a wing crosses it</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look around · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Rings around Fire — an upward cup-shot. Camera looks up from the pool at a
+   terraced oculus; a waterfall falls, a bird crosses the bright opening, warm
+   god-rays pour down. Monochrome walls, warm shaft, color-breath, turntable. r128 */
+const PAL={bg:0x06060A,silver:0xD8DEE6,rockLo:0x1C222A,rockHi:0xBFC8D2,gold:0xF6D9A0,fire:0xFFE39A,
+  pale:0xB7C2CE,water:0x1A2430,waterHi:0xCFE0F0,vine:0x8FA36A,vineLo:0x2E3A26,spirit:0xE6ECF2,foam:0xEFF6FF};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260715);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x08080E,0.0050);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+const TOP=82,R_CH=46,R_OC=24,R_POOL=32,TERR=[16,32,48,64];
+
+/* chamber walls (cylinder narrowing to the oculus) + terraced ring ledges */
+function wallR(y){const p=MU.clamp((y)/TOP,0,1);return R_CH-(R_CH-R_OC)*ss(MU.clamp((p-0.6)/0.4,0,1));}
+{const p=[],col=[];for(let y=2;y<TOP;y+=1.5){const R=wallR(y),n=Math.max(20,(2*Math.PI*R/1.9)|0);for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=R+1.6*Math.sin(a*7+y*0.2)+rand(-0.8,0.8),x=rr*Math.cos(a),z=rr*Math.sin(a);const L=MU.clamp(1-Math.abs(Math.hypot(x,z))/60,0,1)*0.4+0.3;const c=lerpC(PAL.rockLo,PAL.rockHi,L+0.15*rng());p.push(x,y,z);col.push(c.r,c.g,c.b);}}world.add(glowPoints(p,col,0.7,0.85));}
+// terrace ledges + hanging vegetation
+const vines=[];
+for(const ty of TERR){const R=wallR(ty),p=[],col=[];for(let k=0;k<Math.floor(2*Math.PI*R/1.2);k++){const a=k/Math.floor(2*Math.PI*R/1.2)*Math.PI*2;p.push(R*Math.cos(a),ty+rand(-.5,.5),R*Math.sin(a));const c=lerpC(PAL.rockHi,PAL.silver,0.3+0.3*rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,0.9,0.7));
+  for(let k=0;k<26;k++){const a=rand(0,Math.PI*2),R=wallR(ty)-1;vines.push({a,R,y0:ty,len:rand(6,16),ph:rand(0,6.28),sway:rand(1,2.4)});}}
+// vine buffers
+let vc=0;for(const v of vines)vc+=8;const vP=new Float32Array(vc*2*3),vCol=new Float32Array(vc*2*3);
+{let i=0;for(const v of vines)for(let s=0;s<8;s++){const c=lerpC(PAL.vineLo,PAL.vine,s/7);vCol[i*6]=c.r;vCol[i*6+1]=c.g;vCol[i*6+2]=c.b;vCol[i*6+3]=c.r;vCol[i*6+4]=c.g;vCol[i*6+5]=c.b;i++;}}
+const vGeo=new THREE.BufferGeometry();vGeo.setAttribute('position',new THREE.BufferAttribute(vP,3));vGeo.setAttribute('color',new THREE.BufferAttribute(vCol,3));
+world.add(new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6})));
+
+/* oculus: bright sky disc + forest silhouette ring at the rim */
+{const p=[],col=[];for(let i=0;i<520;i++){const r=R_OC*Math.sqrt(rng()),a=rand(0,6.28);p.push(r*Math.cos(a),TOP+3,r*Math.sin(a));const c=lerpC(PAL.fire,PAL.pale,rng()*0.4);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,2.4,0.95));}
+{const p=[],col=[];for(let k=0;k<70;k++){const a=k/70*Math.PI*2;for(let s=0;s<14;s++){const f=s/13;p.push(R_OC*Math.cos(a)+rand(-1,1),TOP+f*rand(4,12),R_OC*Math.sin(a)+rand(-1,1));const c=lerpC(0x2A3038,PAL.silver,0.2+0.4*f);col.push(c.r,c.g,c.b);}}world.add(glowPoints(p,col,0.8,0.7));}  // rim trees
+
+/* warm god-ray shaft + dust */
+const beamMat=new THREE.MeshBasicMaterial({color:PAL.fire,transparent:true,opacity:0.06,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+const beam=new THREE.Mesh(new THREE.CylinderGeometry(R_OC*0.55,R_OC*0.95,TOP,30,1,true),beamMat);beam.position.set(0,TOP/2,0);world.add(beam);
+const dmN=340,dm=[],dmPos=new Float32Array(dmN*3),dmCol=[];for(let i=0;i<dmN;i++){const r=rand(0,R_OC),a=rand(0,6.28);dm.push({r,a,y:rand(2,TOP),spd:rand(0.05,0.14)});const c=lerpC(PAL.fire,PAL.gold,rng());dmCol.push(c.r,c.g,c.b);}
+const dmGeo=new THREE.BufferGeometry();dmGeo.setAttribute('position',new THREE.BufferAttribute(dmPos,3));dmGeo.setAttribute('color',new THREE.Float32BufferAttribute(dmCol,3));
+const motes=new THREE.Points(dmGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(motes);
+
+/* waterfall + splash + pool */
+const WN=560,wf=[],wfPos=new Float32Array(WN*3),wfCol=new Float32Array(WN*3);for(let i=0;i<WN;i++){wf.push({x:rand(-4,4),z:rand(-4,4),y:rand(2,TOP-4),vy:rand(0.55,1.0)});const c=lerpC(PAL.foam,PAL.fire,rng()*0.4);wfCol[i*3]=c.r;wfCol[i*3+1]=c.g;wfCol[i*3+2]=c.b;}
+const wfGeo=new THREE.BufferGeometry();wfGeo.setAttribute('position',new THREE.BufferAttribute(wfPos,3));wfGeo.setAttribute('color',new THREE.BufferAttribute(wfCol,3));
+world.add(new THREE.Points(wfGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})));
+const splash=glowPoints((()=>{const a=[];for(let i=0;i<200;i++)a.push(rand(-8,8),2+rand(0,7),rand(-8,8));return a;})(),(()=>{const a=[];for(let i=0;i<200;i++){const c=lerpC(PAL.foam,PAL.gold,rng());a.push(c.r,c.g,c.b);}return a;})(),2.4,0.4);world.add(splash);
+const poolP=[],poolC=[];for(let r=0;r<R_POOL;r+=1.1){const n=Math.max(6,(2*Math.PI*r/1.5)|0);for(let k=0;k<Math.max(1,n);k++){const a=k/Math.max(1,n)*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a);poolP.push(x,1.5,z);const near=MU.clamp(1-r/16,0,1);const c=lerpC(PAL.water,PAL.fire,0.2+0.5*near);poolC.push(c.r,c.g,c.b);}}
+const poolGeo=new THREE.BufferGeometry();poolGeo.setAttribute('position',new THREE.Float32BufferAttribute(poolP,3));poolGeo.setAttribute('color',new THREE.Float32BufferAttribute(poolC,3));
+const pool=new THREE.Points(poolGeo,new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(pool);
+
+/* a bird crossing the oculus */
+function wing(){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0, 3.0,0.7,-0.6, 2.2,-0.4,0.4],3));return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0x0E1014,transparent:true,opacity:0.9,side:THREE.DoubleSide,depthWrite:false}));}
+const bird=new THREE.Group();const wl=wing(),wr=wing();wr.scale.x=-1;bird.add(wl);bird.add(wr);world.add(bird);
+bird.userData={a:0,r:R_OC*0.7,y:TOP-6,flap:0};
+
+/* kodamas on terraces */
+const spirits=[];
+function makeSpirit(){const g=new THREE.Group();const hp=[],hc=[];for(let i=0;i<70;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=1.9*(0.9+rand(0,0.1));hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v)+2,r*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.spirit);hc.push(c.r,c.g,c.b);}const head=glowPoints(hp,hc,1.3,0);g.add(head);
+  const fp=[-0.5,2.3,1.7,0.5,2.3,1.7,0,1.6,1.8],fc=[0.02,0.02,0.04,0.02,0.02,0.04,0.02,0.02,0.04];const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fg.setAttribute('color',new THREE.Float32BufferAttribute(fc,3));const face=new THREE.Points(fg,new THREE.PointsMaterial({size:0.95,vertexColors:true,transparent:true,opacity:0}));g.add(face);
+  g.visible=false;world.add(g);const sp={g,head,face,state:'wait',timer:rand(0,5),op:0};spirits.push(sp);repos(sp);return sp;}
+function repos(sp){const ty=pick(TERR),R=wallR(ty)-2,a=rand(0,Math.PI*2);sp.g.position.set(R*Math.cos(a),ty+1,R*Math.sin(a));}
+for(let i=0;i<5;i++)makeSpirit();
+function updSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.4;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.4,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(3,6);}}
+  else if(sp.state==='hold'){if(sp.timer<=0){sp.state='out';sp.timer=1.6;}}
+  else if(sp.state==='out'){sp.op=MU.clamp(sp.op-dt/1.6,0,1);if(sp.timer<=0){sp.state='wait';sp.timer=rand(2,6);sp.g.visible=false;repos(sp);}}
+  sp.head.material.opacity=0.85*sp.op;sp.face.material.opacity=0.9*sp.op;}}
+
+/* color-breath + turntable */
+const tint=new THREE.Color(),CYC=36;
+function updTint(t){const p=(t%CYC)/CYC;let s,l;if(p<0.34){s=0;l=0.82;}else if(p<0.56){const k=ss((p-0.34)/0.22);s=k;l=MU.lerp(0.82,0.6,k);}else if(p<0.72){s=1;l=0.6;}else if(p<0.86){const k=ss((p-0.72)/0.14);s=1;l=MU.lerp(0.6,0.06,k);}else{const k=ss((p-0.86)/0.14);s=1-k;l=MU.lerp(0.06,0.82,k);}tint.setHSL((0.08+p*0.9+t*0.008)%1,s,l);scene.traverse(o=>{if(o.material&&o.material.color)o.material.color.copy(tint);});}
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+
+/* camera — low, looking UP */
+const target=new THREE.Vector3(0,58,0);let camA=Math.PI*0.5,camR=26,camY=8,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;target.y=MU.clamp(target.y+(e.clientY-py)*.3,30,78);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.04,10,40);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.fire,'the oculus','the long light'],[PAL.foam,'the waterfall','falling forever'],[PAL.silver,'ring terraces','stacked & green'],[0x0E1014,'a wing crosses','and is gone']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4200);
+
+/* animate */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0009;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  // vines sway
+  {let i=0;for(const v of vines){for(let s=0;s<8;s++){const f=s/7,sw=v.sway*f*Math.sin(t*0.7+v.ph-f*1.6);const x=(v.R+sw)*Math.cos(v.a),z=(v.R+sw)*Math.sin(v.a),y=v.y0-f*v.len;if(s>0){vP[i*6]=vP[(i-1)*6+3];vP[i*6+1]=vP[(i-1)*6+4];vP[i*6+2]=vP[(i-1)*6+5];}else{vP[i*6]=v.R*Math.cos(v.a);vP[i*6+1]=v.y0;vP[i*6+2]=v.R*Math.sin(v.a);}vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;i++;}}vGeo.attributes.position.needsUpdate=true;}
+  // waterfall + splash
+  for(let i=0;i<WN;i++){const p=wf[i];p.y-=p.vy;if(p.y<2){p.y=TOP-4;p.x=rand(-4,4);p.z=rand(-4,4);}wfPos[i*3]=p.x;wfPos[i*3+1]=p.y;wfPos[i*3+2]=p.z;}wfGeo.attributes.position.needsUpdate=true;
+  splash.material.opacity=0.3+0.2*Math.abs(Math.sin(t*2.2));pool.material.opacity=0.5+0.12*Math.sin(t*1.2);
+  // dust in the shaft
+  for(let i=0;i<dmN;i++){const m=dm[i];m.y-=m.spd;m.a+=0.004;if(m.y<2){m.y=TOP;m.r=rand(0,R_OC);}const rr=m.r*(0.55+0.45*(m.y/TOP));dmPos[i*3]=rr*Math.cos(m.a);dmPos[i*3+1]=m.y;dmPos[i*3+2]=rr*Math.sin(m.a);}dmGeo.attributes.position.needsUpdate=true;
+  // bird crossing the oculus
+  const b=bird.userData;b.a+=0.006;b.flap+=dt*10;const fl=0.4+0.8*Math.abs(Math.sin(b.flap));
+  bird.position.set(Math.cos(b.a)*b.r,b.y+Math.sin(b.a*2)*2,Math.sin(b.a)*b.r);bird.rotation.y=-b.a+Math.PI/2;wl.rotation.y=-fl;wr.rotation.y=fl;
+  updSpirits(t,dt);
+  beamMat.opacity=0.05+0.025*Math.sin(t*0.7);
+  updTint(t);renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

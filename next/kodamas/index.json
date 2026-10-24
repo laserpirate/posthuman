@@ -1,0 +1,403 @@
+{
+ "format": "posthuman-kodama-pack",
+ "version": 1,
+ "author": "Marko Manriquez",
+ "scenes": [
+  {
+   "id": "pk17",
+   "file": "phylla-kodama-topo-17-ayutthaya.html",
+   "title": "Ayutthaya 3000",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk17.jpg"
+  },
+  {
+   "id": "pk18",
+   "file": "phylla-kodama-topo-18-neo-bangkok.html",
+   "title": "neo-Bangkok 2126 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk18.jpg"
+  },
+  {
+   "id": "pk19",
+   "file": "phylla-kodama-topo-19-nusantara.html",
+   "title": "Nusantara 2076 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk19.jpg"
+  },
+  {
+   "id": "pk20",
+   "file": "phylla-kodama-topo-20-singapore.html",
+   "title": "Singapore 2226 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk20.jpg"
+  },
+  {
+   "id": "pk21",
+   "file": "phylla-kodama-topo-21-jakarta.html",
+   "title": "Jakarta 2046 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk21.jpg"
+  },
+  {
+   "id": "pk22",
+   "file": "phylla-kodama-topo-22-manila.html",
+   "title": "Manila 2126 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk22.jpg"
+  },
+  {
+   "id": "pk23",
+   "file": "phylla-kodama-topo-23-kuala-lumpur.html",
+   "title": "Kuala Lumpur 2176 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk23.jpg"
+  },
+  {
+   "id": "pk24",
+   "file": "phylla-kodama-topo-24-neo-saigon.html",
+   "title": "neo-Saigon 2126 CE",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk24.jpg"
+  },
+  {
+   "id": "kv01",
+   "file": "kodama-v1_topography-1-vana-pointfield.html",
+   "title": "VA·NA · animated topography — study",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv01.jpg"
+  },
+  {
+   "id": "kv02",
+   "file": "kodama-v1_topography-2-the-plot.html",
+   "title": "VA·NA · the Plot — forest / river / cascade",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv02.jpg"
+  },
+  {
+   "id": "kv03",
+   "file": "kodama-v1_topography-3-littoral-edge.html",
+   "title": "VA·NA · the littoral edge — tidal wetland",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv03.jpg"
+  },
+  {
+   "id": "kv04",
+   "file": "kodama-v1_topography-4-kelp-forest.html",
+   "title": "VA·NA · the kelp forest — moonlit shallows",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv04.jpg"
+  },
+  {
+   "id": "kv05",
+   "file": "kodama-v1_topography-5-cenote-oculus.html",
+   "title": "VA·NA · the cenote — oculus & pool",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv05.jpg"
+  },
+  {
+   "id": "kv06",
+   "file": "kodama-v1_topography-6-cenote.html",
+   "title": "Cenote — Forgotten Portal to the Mayan Underworld",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv06.jpg"
+  },
+  {
+   "id": "kv07",
+   "file": "kodama-v1_topography-7-whisper-well.html",
+   "title": "Whisper Well — lunar reflecting pool",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv07.jpg"
+  },
+  {
+   "id": "kv08",
+   "file": "kodama-v1_topography-8-soul-pools.html",
+   "title": "Soul Pools — a forest of reflecting moons",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv08.jpg"
+  },
+  {
+   "id": "kv09",
+   "file": "kodama-v1_topography-9-whisper-well-mycelium.html",
+   "title": "Whisper Well — mycelium underworld",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv09.jpg"
+  },
+  {
+   "id": "kv10",
+   "file": "kodama-v1_topography-10-soul-pools-v2.html",
+   "title": "Soul Pools — a forest of reflecting moons",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv10.jpg"
+  },
+  {
+   "id": "kv11",
+   "file": "kodama-v1_topography-11-whisper-well-v3.html",
+   "title": "Whisper Well — mycelium underworld",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv11.jpg"
+  },
+  {
+   "id": "kv12",
+   "file": "kodama-v1_topography-12-whisper-well-v3b.html",
+   "title": "Whisper Well — mycelium underworld",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv12.jpg"
+  },
+  {
+   "id": "kv13",
+   "file": "kodama-v1_topography-13-atlas-lost-moons.html",
+   "title": "Atlas of Lost Moons and Future Forests",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv13.jpg"
+  },
+  {
+   "id": "kv14",
+   "file": "kodama-v1_topography-14-rings-around-fire.html",
+   "title": "Rings around Fire",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv14.jpg"
+  },
+  {
+   "id": "kv15",
+   "file": "kodama-v1_topography-15-future-subsidence.html",
+   "title": "Poems of Future Subsidence",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv15.jpg"
+  },
+  {
+   "id": "kv16",
+   "file": "kodama-v1_topography-16-selective-memories.html",
+   "title": "Forest of Selective Memories",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv16.jpg"
+  },
+  {
+   "id": "kv17",
+   "file": "kodama-v1_topography-17-murmurations.html",
+   "title": "Murmurations and Incantations",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv17.jpg"
+  },
+  {
+   "id": "kv18",
+   "file": "kodama-v1_topography-18-point-cloud-forests.html",
+   "title": "Point Cloud Forests",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv18.jpg"
+  },
+  {
+   "id": "kv19",
+   "file": "kodama-v1_topography-19-tropics.html",
+   "title": "Tropics of Cancer & Capricorn",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv19.jpg"
+  },
+  {
+   "id": "kv20",
+   "file": "kodama-v1_topography-20-arctic-suns.html",
+   "title": "Arctic Suns & Deserts Inclemencies",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv20.jpg"
+  },
+  {
+   "id": "kv21",
+   "file": "kodama-v1_topography-21-beyond-ecliptic.html",
+   "title": "Beyond the Ecliptic",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv21.jpg"
+  },
+  {
+   "id": "kv23",
+   "file": "kodama-v1_topography-23-bangkok.html",
+   "title": "Bangkok 2126 CE",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv23.jpg"
+  },
+  {
+   "id": "kv24",
+   "file": "kodama-v1_topography-24-nusantara.html",
+   "title": "Nusantara 2076 CE",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv24.jpg"
+  },
+  {
+   "id": "kv25",
+   "file": "kodama-v1_topography-25-singapore.html",
+   "title": "Singapore 2226 CE",
+   "series": "kodama-v1",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/kv25.jpg"
+  },
+  {
+   "id": "pk26",
+   "file": "phylla-kodama-topo-26-airfield.html",
+   "title": "airfield",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk26.jpg"
+  },
+  {
+   "id": "pk27",
+   "file": "phylla-kodama-topo-27-under-city.html",
+   "title": "under-city",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk27.jpg"
+  },
+  {
+   "id": "pk28",
+   "file": "phylla-kodama-topo-28-drowned-towers.html",
+   "title": "drowned towers",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk28.jpg"
+  },
+  {
+   "id": "pk29",
+   "file": "phylla-kodama-topo-29-cloud-city.html",
+   "title": "cloud city",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk29.jpg"
+  },
+  {
+   "id": "pk30",
+   "file": "phylla-kodama-topo-30-cloud-airfield.html",
+   "title": "cloud airfield",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk30.jpg"
+  },
+  {
+   "id": "pk31",
+   "file": "phylla-kodama-topo-31-flooded-under-city.html",
+   "title": "flooded under-city",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk31.jpg"
+  },
+  {
+   "id": "pk32",
+   "file": "phylla-kodama-topo-32-storm-runway.html",
+   "title": "storm runway",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk32.jpg"
+  },
+  {
+   "id": "pk33",
+   "file": "phylla-kodama-topo-33-hanging-city.html",
+   "title": "hanging city",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk33.jpg"
+  },
+  {
+   "id": "pk34",
+   "file": "phylla-kodama-topo-34-gund-trays.html",
+   "title": "gund trays",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk34.jpg"
+  },
+  {
+   "id": "pk35",
+   "file": "phylla-kodama-topo-35-gund-ruin.html",
+   "title": "gund ruin",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk35.jpg"
+  },
+  {
+   "id": "pk36",
+   "file": "phylla-kodama-topo-36-paper-forest.html",
+   "title": "paper forest",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk36.jpg"
+  },
+  {
+   "id": "pk37",
+   "file": "phylla-kodama-topo-37-remy-astral.html",
+   "title": "remy astral",
+   "series": "phylla-kodama-topo",
+   "draft": false,
+   "quarantine": "",
+   "thumb": "thumbs/pk37.jpg"
+  }
+ ]
+}

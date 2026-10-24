@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: vana-kodama (render) · phylla (sound, OSC) — engine credit lives in this header comment only, per naming canon -->
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuala Lumpur 2176 CE (study)</title>
+<style>
+  :root{--cream:#ECEAE0;--teal:#3FD0E0;--pale:#B6C2BC;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0B100E;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:70vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);opacity:.9;margin-top:11px}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(11,16,14,.55);border:1px solid rgba(63,208,224,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--teal);color:var(--teal)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Kuala Lumpur 2176 CE.</h1>
+  <div class="sub">phylla-kodama study · she was named for the muddy confluence, and the rivers still remember · Kuala Lumpur · كوالا لومڤور</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">climate
+    <button class="pill on" data-m="auto">⟳</button><button class="pill" data-m="0">dry</button><button class="pill" data-m="0.25">monsoon</button><button class="pill" data-m="0.5">banjir</button><button class="pill" data-m="0.75">night</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Kuala Lumpur 2176 — the muddy confluence, lit like a vein. Petronas twins
+   still holding hands, Merdeka needle, the Tower on its hill, Masjid Jamek at
+   the fork where two rivers become her name. r128. */
+const PAL={water:0x122A2A,waterHi:0x3A8C8C,cur:0x4EC8B0,bio:0x74D6AE,ref:0xC8E4E0,life:0x3FD0E0,
+  steel:0x8FA6AE,steelHi:0xD8E4E8,twr:0x16333C,twrHi:0x3A8CA0,winW:0xFFC98A,winC:0x8FE0FF,
+  stone:0xC8B890,dome:0xE0B6D8,gold:0xF6C544,green:0x3E7D46,greenHi:0x6FBE5E,
+  moon:0xF4F6F8,moonLo:0xB2BCB8,pale:0xB6C2BC,fire:0xBFF06A,sun:0xFFC080,rain:0xAEC8C4};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260731);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:op||0.92}));}
+function lineSegs(pos,col,op){return new THREE.LineSegments(mkGeo(pos,col),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0B100E);scene.fog=new THREE.FogExp2(0x0B100E,0.0042);
+const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);let waterY=1.2;
+
+/* THE CONFLUENCE — two rivers become one name */
+const chans=[
+ {f:u=>[-80*(1-u),-70*(1-u)],w:u=>6},
+ {f:u=>[70*(1-u),-80*(1-u)],w:u=>6},
+ {f:u=>[6*Math.sin(u*3),94*u],w:u=>9+6*u}];
+const chanSamp=[];for(const C of chans)for(let s=0;s<=16;s++){const q=C.f(s/16);chanSamp.push([q[0],q[1],C.w(s/16)]);}
+function nearChan(x,z,pad){for(const q of chanSamp){const dx=x-q[0],dz=z-q[1];if(dx*dx+dz*dz<(q[2]+pad)*(q[2]+pad))return true;}return false;}
+const wPts=[],wCol=[],wPh=[],edgeP=[],edgeC=[];
+for(const C of chans)for(let s=0;s<=60;s++){const u=s/60,q=C.f(u),q2=C.f(Math.min(1,u+0.02));let tx=q2[0]-q[0],tz=q2[1]-q[1];const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;const px=-tz,pz=tx,w=C.w(u);
+  for(let k=-3;k<=3;k++){const off=k/3*w*0.85;wPts.push(q[0]+px*off,0.35,q[1]+pz*off);wPh.push(rand(0,6.28));const c=lerpC(PAL.water,PAL.waterHi,0.15+0.25*rng());wCol.push(c.r,c.g,c.b);}
+  for(const sgn of [-1,1]){edgeP.push(q[0]+px*sgn*(w+0.9),0.5,q[1]+pz*sgn*(w+0.9));const c=lerpC(PAL.life,0xFFFFFF,rng()*0.2);edgeC.push(c.r,c.g,c.b);}}
+const wGeo=mkGeo(wPts,wCol),river=new THREE.Points(wGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(river);
+const wPos=wGeo.attributes.position.array,wN=wPh.length;
+const lifeEdge=glowPoints(edgeP,edgeC,1.1,0.6);world.add(lifeEdge);
+const curLines=[];for(const C of chans){const S=60,pos=new Float32Array(S*3),cl=new Float32Array(S*3);
+ for(let k=0;k<S;k++){const c=lerpC(PAL.cur,PAL.bio,rng()*0.5);cl[k*3]=c.r;cl[k*3+1]=c.g;cl[k*3+2]=c.b;}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(cl,3));
+ world.add(new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+ curLines.push({C,pos,geo:g,base:cl.slice(),phase:rand(0,6.28)});}
+const RRN=8,RRP=40,{a:ripPos,g:ripGeo}=dynBuf(RRN*RRP),ripState=[],ripCol=new Float32Array(RRN*RRP*3);
+for(let r=0;r<RRN;r++){const q=pick(chanSamp);ripState.push({x:q[0],z:q[1],rr:rand(0,8),spd:rand(0.08,0.16),max:rand(8,16)});for(let k=0;k<RRP;k++){ripCol[(r*RRP+k)*3]=0.24;ripCol[(r*RRP+k)*3+1]=0.5;ripCol[(r*RRP+k)*3+2]=0.48;}}
+ripGeo.setAttribute('color',new THREE.BufferAttribute(ripCol,3));world.add(new THREE.Points(ripGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false})));
+const refN=60,{a:refPos,g:refGeo}=dynBuf(refN),refItems=[],refCol=new Float32Array(refN*3);
+for(let i=0;i<refN;i++){refItems.push({z:rand(4,88),ph:rand(0,6.28)});const c=lerpC(PAL.ref,PAL.moon,rng());refCol[i*3]=c.r;refCol[i*3+1]=c.g;refCol[i*3+2]=c.b;}
+refGeo.setAttribute('color',new THREE.BufferAttribute(refCol,3));const moonRef=new THREE.Points(refGeo,new THREE.PointsMaterial({size:1.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(moonRef);
+
+/* ground + shophouse districts */
+{const p=[],col=[];for(let x=-120;x<=120;x+=5)for(let z=-110;z<=118;z+=5){if(nearChan(x,z,2))continue;p.push(x+rand(-1,1),0.05,z+rand(-1,1));const c=lerpC(0x080D0A,0x12201A,rng()*0.6);col.push(c.r,c.g,c.b);}
+ world.add(new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.7})));}
+{const p=[],col=[];for(let d=0;d<9;d++){let cx,cz,tries=0;do{cx=rand(-100,100);cz=rand(-90,100);tries++;}while(nearChan(cx,cz,6)&&tries<20);
+  const W=rand(9,16),D=rand(7,13);for(let x=-W;x<=W;x+=1.5)for(let z=-D;z<=D;z+=1.5){if(rng()<0.2)continue;p.push(cx+x+rand(-.3,.3),0.9+rand(0,0.6),cz+z+rand(-.3,.3));const c=lerpC(0x5A3220,0xB0662E,rng()*0.6);col.push(c.r,c.g,c.b);}}
+ world.add(new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.8})));}
+
+/* tower jungle + PETRONAS TWINS + skybridge + MERDEKA 118 + KL TOWER + MASJID JAMEK */
+const winArr=[],winColArr=[];
+{const p=[],col=[];let placed=0,tries=0;
+ while(placed<70&&tries<400){tries++;const klcc=rng()<0.5;const cx=klcc?-26+rand(-24,24):rand(-112,112),cz=klcc?-48+rand(-20,20):rand(-90,110);
+  if(nearChan(cx,cz,5)||Math.hypot(cx+26,cz+46)<13||Math.hypot(cx-32,cz+72)<10||Math.hypot(cx-60,cz+30)<12||(cx>-32&&cx<-9&&cz>2&&cz<28))continue;
+  const h=klcc?rand(10,34):rand(5,16),w=rand(1.6,3.2),cc=lerpC(PAL.twr,PAL.twrHi,MU.clamp(h/34,0,1));
+  for(const s of [[-w,-w],[w,-w],[-w,w],[w,w]]){p.push(cx+s[0],0.3,cz+s[1],cx+s[0],h,cz+s[1]);for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}
+  for(const q of [[-w,-w,w,-w],[w,-w,w,w],[w,w,-w,w],[-w,w,-w,-w]]){p.push(cx+q[0],h,cz+q[1],cx+q[2],h,cz+q[3]);for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}
+  const nw=1+((rng()*3)|0);for(let k=0;k<nw;k++){winArr.push(cx+rand(-w,w),rand(2,h*0.92),cz+(rng()<0.5?w:-w));const c=new THREE.Color(rng()<0.55?PAL.winW:PAL.winC);winColArr.push(c.r,c.g,c.b);}
+  placed++;}
+ world.add(lineSegs(p,col,0.55));}
+/* Rub el Hizb ۞ — two squares interlocked at 45°, eight points, circles in the notches: the plan Pelli drew, the geometry of unity */
+function rubR(a){const sq=x=>{x=((x%(Math.PI/2))+Math.PI/2)%(Math.PI/2)-Math.PI/4;return 1/Math.cos(x);};
+ const star=Math.max(sq(a),sq(a-Math.PI/4)),circ=1.14*Math.pow(Math.abs(Math.cos(4*(a-Math.PI/8))),0.9);
+ return Math.max(star,circ)/1.4142;}
+function petronas(cx,cz){const p=[],col=[];
+ const TIERS=[[0,0.24,1],[0.24,0.52,0.88],[0.52,0.74,0.76],[0.74,0.88,0.64],[0.88,1.01,0.52]];
+ function tf(f){let v=1;for(const T of TIERS)if(f>=T[0]&&f<T[1])v=T[2];return v;}
+ for(let y=2;y<52;y+=0.6){const f=(y-2)/50,r0=6.4*tf(f)*(1-0.12*f),n=Math.max(16,(2*Math.PI*r0/0.5)|0);
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r0*rubR(a)+rand(-.07,.07);p.push(cx+rr*Math.cos(a),y,cz+rr*Math.sin(a));const c=lerpC(PAL.steel,PAL.steelHi,0.3+0.4*rng());col.push(c.r,c.g,c.b);}}
+ for(const fb of [0.24,0.52,0.74,0.88]){const y=2+fb*50,r0=6.4*tf(fb-0.001)*(1-0.12*fb),n=(2*Math.PI*r0/0.45)|0;
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r0*rubR(a);p.push(cx+rr*Math.cos(a),y,cz+rr*Math.sin(a));const c=lerpC(PAL.steelHi,0xFFFFFF,0.3+0.3*rng());col.push(c.r,c.g,c.b);}}
+ for(let k=0;k<8;k++){const a=k*Math.PI/4;for(let y=2;y<52;y+=0.8){const f=(y-2)/50,rr=6.4*tf(f)*(1-0.12*f)*rubR(a)+0.06;p.push(cx+rr*Math.cos(a),y,cz+rr*Math.sin(a));const c=lerpC(PAL.steelHi,0xFFFFFF,0.4+0.5*rng());col.push(c.r,c.g,c.b);}}
+ for(let y=52;y<58.5;y+=0.35){p.push(cx+rand(-.2,.2),y,cz+rand(-.2,.2));const c=lerpC(PAL.steelHi,0xFFFFFF,(y-52)/6.5);col.push(c.r,c.g,c.b);}
+ world.add(rockPoints(p,col,0.62,0.95));
+ {const gp=[],gc=[],R=8.6;
+  for(let k=0;k<160;k++){const a=k/160*Math.PI*2,rr=R*rubR(a);gp.push(cx+rr*Math.cos(a),0.42,cz+rr*Math.sin(a));const c=lerpC(PAL.life,PAL.bio,rng()*0.4);gc.push(c.r,c.g,c.b);}
+  const sq=x=>{x=((x%(Math.PI/2))+Math.PI/2)%(Math.PI/2)-Math.PI/4;return 1/Math.cos(x);};
+  for(const rot of [0,Math.PI/4])for(let k=0;k<72;k++){const a=k/72*Math.PI*2,rr=R*0.98*sq(a-rot)/1.4142;gp.push(cx+rr*Math.cos(a),0.38,cz+rr*Math.sin(a));const c=lerpC(PAL.gold,0xFFE9A0,rng()*0.4);gc.push(c.r,c.g,c.b);}
+  world.add(glowPoints(gp,gc,1.0,0.5));}
+ for(let k=0;k<8;k++){winArr.push(cx+rand(-4,4),rand(4,48),cz+rand(-4,4));const c=new THREE.Color(PAL.winW);winColArr.push(c.r,c.g,c.b);}}
+petronas(-34,-46);petronas(-18,-46);
+{/* the skybridge — double-deck, Λ-struts meeting beneath its center */
+ const x0=-30.8,x1=-21.2,zc=-46,p=[],col=[],gp=[],gc=[];
+ for(const dy of [19.6,21.7])for(let x=x0;x<=x1;x+=0.26)for(const dz of [-0.75,0.75]){p.push(x+rand(-.05,.05),dy,zc+dz);const c=lerpC(PAL.steel,PAL.steelHi,0.4+0.4*rng());col.push(c.r,c.g,c.b);}
+ for(let x=x0+0.4;x<=x1;x+=1.15)for(const yy of [20.1,20.65,21.2])for(const dz of [-0.75,0.75]){p.push(x,yy,zc+dz);const c=lerpC(PAL.steel,PAL.steelHi,0.5);col.push(c.r,c.g,c.b);}
+ for(const leg of [[-31.6,12.4],[-20.4,12.4]])for(let s=0;s<=26;s++){const u=s/26,lx=leg[0]+(-26-leg[0])*u,ly=leg[1]+(19.3-leg[1])*u;for(const dz of [-0.5,0.5]){p.push(lx,ly,zc+dz);const c=lerpC(PAL.steel,PAL.steelHi,0.4+0.4*rng());col.push(c.r,c.g,c.b);}}
+ world.add(rockPoints(p,col,0.72,0.98));
+ for(let x=x0;x<=x1;x+=0.5)for(const dy of [19.6,21.7]){gp.push(x,dy,zc);const c=lerpC(PAL.steelHi,0xFFFFFF,rng()*0.5);gc.push(c.r,c.g,c.b);}
+ gp.push(-26,19.3,zc);gc.push(1,1,1);
+ world.add(glowPoints(gp,gc,1.15,0.6));
+ for(let x=x0+0.8;x<=x1-0.6;x+=0.85){winArr.push(x,20.7,zc+0.95);const c=new THREE.Color(PAL.winW);winColArr.push(c.r,c.g,c.b);}}
+{const p=[],col=[];const cx=32,cz=-72;for(let y=2;y<72;y+=0.6){const f=y/72,r0=Math.max(0.8,5.5*(1-f*0.9)),n=Math.max(6,(2*Math.PI*r0/0.9)|0);
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r0*(1+0.12*Math.cos(a*3))+rand(-.12,.12);p.push(cx+rr*Math.cos(a),y,cz+rr*Math.sin(a));const c=lerpC(0x46586A,0xAEC6D6,0.3+0.4*rng());col.push(c.r,c.g,c.b);}}
+ for(let y=72;y<84;y+=0.4){p.push(cx+rand(-.15,.15),y,cz+rand(-.15,.15));const c=lerpC(0xAEC6D6,0xFFFFFF,(y-72)/12);col.push(c.r,c.g,c.b);}
+ world.add(rockPoints(p,col,0.6,0.95));}
+{const p=[],col=[];const cx=60,cz=-30;
+ for(let i=0;i<160;i++){const a=rand(0,6.28),rr=12*Math.sqrt(rng());p.push(cx+rr*Math.cos(a),Math.max(0.4,5*(1-rr/12))*rand(0.6,1),cz+rr*Math.sin(a));const c=lerpC(0x1E4030,0x3A6E4A,rng());col.push(c.r,c.g,c.b);}
+ for(let y=5;y<40;y+=0.7){const n=6;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;p.push(cx+1.6*Math.cos(a),y,cz+1.6*Math.sin(a));const c=lerpC(0x6A625A,0xB0AAA0,0.3+0.4*rng());col.push(c.r,c.g,c.b);}}
+ for(let i=0;i<120;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),R=4;p.push(cx+R*Math.sin(v)*Math.cos(u),42+R*Math.cos(v)*0.8,cz+R*Math.sin(v)*Math.sin(u));const c=lerpC(0x8FA6AE,0xFFD9A0,rng()*0.5);col.push(c.r,c.g,c.b);}
+ world.add(rockPoints(p,col,0.62,0.95));
+ world.add(lineSegs([cx,45,cz,cx,54,cz],[...new THREE.Color(0xAEC6D6).toArray(),...new THREE.Color(0xFFFFFF).toArray()],0.8));}
+let mjWin;{const p=[],col=[];const cx=0,cz=-8;
+ for(const [dx,dz,r] of [[0,0,2.6],[-4.5,1.5,1.7],[4.5,1.5,1.7]])for(let i=0;i<70;i++){const u=rand(0,6.28),v=Math.acos(rand(0,1));p.push(cx+dx+r*Math.sin(v)*Math.cos(u),4.5+r*1.15*Math.cos(v),cz+dz+r*Math.sin(v)*Math.sin(u));const c=lerpC(0x8C5A6E,PAL.dome,0.3+0.4*rng());col.push(c.r,c.g,c.b);}
+ for(const mx of [-8,8]){for(let y=1;y<11;y+=0.5){p.push(cx+mx+rand(-.4,.4),y,cz+rand(-.4,.4));const c=lerpC(0x9A8C74,PAL.stone,0.3+0.4*rng());col.push(c.r,c.g,c.b);}
+  for(let i=0;i<24;i++){const u=rand(0,6.28),v=Math.acos(rand(0,1));p.push(cx+mx+0.9*Math.sin(v)*Math.cos(u),11+0.9*Math.cos(v),cz+0.9*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.dome);col.push(c.r,c.g,c.b);}}
+ for(let x=-7;x<=7;x+=0.8){p.push(cx+x,2.2,cz+2.6);const c=lerpC(0x9A8C74,PAL.stone,0.4);col.push(c.r,c.g,c.b);}
+ world.add(rockPoints(p,col,0.7,0.95));
+ const wp=[],wc=[];for(let k=0;k<6;k++){wp.push(cx+rand(-6,6),rand(1.5,3.5),cz+2.8);const c=new THREE.Color(PAL.winW);wc.push(c.r,c.g,c.b);}
+ const o=glowPoints(wp,wc,1.4,0.9);mjWin=o.material;world.add(o);}
+/* MERDEKA SQUARE — the padang, the flagpole, Sultan Abdul Samad along its edge */
+const FLN=18,{a:flPos,g:flGeo}=dynBuf(FLN),flCol=new Float32Array(FLN*3);
+{const p=[],col=[];
+ for(let x=-30;x<=-18;x+=0.9)for(let z=4;z<=26;z+=0.9){if(rng()<0.15)continue;p.push(x+rand(-.3,.3),0.5,z+rand(-.3,.3));const c=lerpC(0x1E4030,0x3A6E4A,rng()*0.7);col.push(c.r,c.g,c.b);}
+ for(const bx of [-14,-11])for(let z=3;z<=27;z+=0.8)for(let y=1;y<6.5;y+=1.0){p.push(bx+rand(-.2,.2),y,z+rand(-.2,.2));const c=lerpC(0x6E4A34,0xB07A46,0.3+0.4*rng());col.push(c.r,c.g,c.b);}
+ for(let z=3.4;z<=27;z+=1.4){p.push(-14.3,1.6,z);const c=lerpC(0x2A1C12,0x4A3222,0.5);col.push(c.r,c.g,c.b);}
+ for(const td of [[6,10],[15,13],[24,10]]){const tz=td[0],th=td[1];
+  for(let y=6;y<th;y+=0.6){const n=7;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;p.push(-12.5+1.3*Math.cos(a),y,tz+1.3*Math.sin(a));const c=lerpC(0x6E4A34,0xB07A46,0.3+0.4*rng());col.push(c.r,c.g,c.b);}}
+  for(let i=0;i<26;i++){const u=rand(0,6.28),v=Math.acos(rand(0,1));p.push(-12.5+1.5*Math.sin(v)*Math.cos(u),th+1.5*Math.cos(v),tz+1.5*Math.sin(v)*Math.sin(u));const c=lerpC(0xB87333,0xF6C544,rng()*0.5);col.push(c.r,c.g,c.b);}}
+ world.add(rockPoints(p,col,0.68,0.95));
+ world.add(lineSegs([-24,0.5,20,-24,12.5,20],[...new THREE.Color(0xC8CCD0).toArray(),...new THREE.Color(0xFFFFFF).toArray()],0.85));
+ winArr.push(-12.5,8.4,15.05);{const cw=new THREE.Color(0xFFF0C0);winColArr.push(cw.r,cw.g,cw.b);}
+ for(let k=0;k<5;k++){winArr.push(-13.8,rand(1.5,5),rand(4,26));const c=new THREE.Color(PAL.winW);winColArr.push(c.r,c.g,c.b);}
+ for(let i=0;i<FLN;i++){const ix=i%6,iv=(i/6)|0;let c;
+  if(ix<2&&iv===0)c=new THREE.Color(i===0?0xF6C544:0x2E4A8C);else c=new THREE.Color(iv===1?0xECEAE0:0xE0483A);
+  flCol[i*3]=c.r;flCol[i*3+1]=c.g;flCol[i*3+2]=c.b;}
+ flGeo.setAttribute('color',new THREE.BufferAttribute(flCol,3));
+ world.add(new THREE.Points(flGeo,new THREE.PointsMaterial({size:1.15,vertexColors:true,transparent:true,opacity:0.95})));}
+const windows=glowPoints(winArr,winColArr,1.2,0.85);world.add(windows);
+
+/* palms + rain-trees along the banks */
+const palms=[];function palm(x,y,z,s){const sp=[],sc=[];let px=x,py=y,pz=z;for(let k=0;k<6;k++){const nx=px+rand(-.2,.2)*s,ny=py+1.1*s,nz=pz+rand(-.2,.2)*s;sp.push(px,py,pz,nx,ny,nz);const c=lerpC(0x5A4632,0x8C7050,k/5);for(let e=0;e<2;e++)sc.push(c.r,c.g,c.b);px=nx;py=ny;pz=nz;}
+ world.add(new THREE.LineSegments(mkGeo(sp,sc),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.85})));
+ const fr=[],meta=[];for(let f=0;f<7;f++){const a=f/7*Math.PI*2;for(let k=0;k<6;k++){const u=k/5;fr.push(px+u*3*s*Math.cos(a),py+1-u*u*2*s,pz+u*3*s*Math.sin(a));meta.push(a,u);}}
+ const frc=[];for(let i=0;i<fr.length/3;i++){const c=lerpC(PAL.green,PAL.greenHi,rng());frc.push(c.r,c.g,c.b);}
+ const o=new THREE.Points(mkGeo(fr,frc),new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0.95}));world.add(o);palms.push({o,base:new Float32Array(fr),meta,ph:rand(0,6.28)});}
+for(let i=0;i<10;i++){const q=pick(chanSamp);const a=rand(0,6.28);palm(q[0]+Math.cos(a)*(q[2]+3),1,q[1]+Math.sin(a)*(q[2]+3),rand(0.7,1.2));}
+
+/* boats on the main channel */
+const boats=[{u:0.2,spd:0.0011,ph:0},{u:0.65,spd:-0.0009,ph:2}];
+const BPTS=22,{a:bPos,g:bGeo}=dynBuf(boats.length*BPTS),bColA=new Float32Array(boats.length*BPTS*3);
+{let i=0;for(const b of boats)for(let k=0;k<BPTS;k++){const c=lerpC(0x3A2C1E,0x6A5238,rng()*0.5);bColA[i*3]=c.r;bColA[i*3+1]=c.g;bColA[i*3+2]=c.b;i++;}}
+bGeo.setAttribute('color',new THREE.BufferAttribute(bColA,3));world.add(new THREE.Points(bGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0.95})));
+
+/* rain, sky, fireflies (kelip-kelip) */
+const raN=420,ra=[],{a:raPos,g:raGeo}=dynBuf(raN*2),raCol=new Float32Array(raN*2*3);
+for(let i=0;i<raN;i++){ra.push({x:rand(-140,140),y:rand(0,100),z:rand(-130,130),v:rand(1.6,2.6)});const c=new THREE.Color(PAL.rain);for(let e=0;e<2;e++){raCol[i*6+e*3]=c.r;raCol[i*6+e*3+1]=c.g;raCol[i*6+e*3+2]=c.b;}}
+raGeo.setAttribute('color',new THREE.BufferAttribute(raCol,3));const rainObj=new THREE.LineSegments(raGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(rainObj);
+const MC=new THREE.Vector3(58,88,-72);let moonMat,haloMat;
+{const R=11,p=[],col=[];for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(MC.x+x,MC.y+y,MC.z+z);col.push(c.r,c.g,c.b);}
+ const m=glowPoints(p,col,1.25,0.9);moonMat=m.material;world.add(m);const h=glowPoints([MC.x,MC.y,MC.z],[...new THREE.Color(0xC2CEC8).toArray()],46,0.24);haloMat=h.material;world.add(h);}
+let sunMat;{const s=glowPoints([-72,28,-98],[...new THREE.Color(PAL.sun).toArray()],58,0);sunMat=s.material;world.add(s);}
+const cloudBands=[];function cloudBand(cx,cy,cz,w,near){const p=[],col=[];for(let i=0;i<58;i++){p.push(cx+rand(-w,w),cy+rand(-4,4),cz+rand(-6,6));const c=lerpC(0x1E2622,near?0x788278:0x36403A,rng());col.push(c.r,c.g,c.b);}const o=glowPoints(p,col,near?3.1:2.6,near?0.4:0.26);world.add(o);cloudBands.push({o,base:new Float32Array(o.geometry.attributes.position.array),w,near,cx});}
+cloudBand(MC.x-6,MC.y+3,MC.z+3,17,true);for(let i=0;i<5;i++)cloudBand(rand(-140,140),rand(62,96),rand(-150,-40),rand(24,42),false);
+let stars,starBase,starPh,starMat;{const p=[],col=[],ph=[];for(let i=0;i<720;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.05,1)),R=rand(160,270);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+44,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,0xFFFFFF,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,0.9,0);starMat=stars.material;world.add(stars);}
+const fiN=30,fi=[],{a:fiPos,g:fiGeo}=dynBuf(fiN),fiCol=new Float32Array(fiN*3),fireC=new THREE.Color(PAL.fire);
+for(let i=0;i<fiN;i++){const q=pick(chanSamp);fi.push({x:q[0]+rand(-10,10),z:q[1]+rand(-10,10),y:rand(2,12),ph:rand(0,6.28),freq:rand(1.5,3)});}
+fiGeo.setAttribute('color',new THREE.BufferAttribute(fiCol,3));world.add(new THREE.Points(fiGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* mirage skyline — twins, needles, minarets, karst w/ gold statue, canopy */
+const skyline=new THREE.Group();scene.add(skyline);let skyEdgeMat,skyDotMat;
+{const R0=300,N=52,linP=[],linC=[],dots=[],dotCol=[];
+ function prof(kind,hw,h){if(kind==='twins')return [[-hw,0],[-hw*0.95,h*0.6],[-hw*0.75,h],[-hw*0.55,h*0.6],[-hw*0.55,h*0.34],[-hw*0.2,h*0.34],[0,h*0.34]];
+  if(kind==='needle')return [[-hw*0.6,0],[-hw*0.6,h*0.4],[-hw*0.3,h*0.6],[-hw*0.3,h*0.84],[0,h]];
+  if(kind==='minaret')return [[-hw,0],[-hw,h*0.4],[-hw*0.8,h*0.55],[-hw*0.45,h*0.8],[-hw*0.16,h*0.9],[0,h]];
+  if(kind==='karst')return [[-hw,0],[-hw*0.6,h*0.6],[-hw*0.35,h*0.9],[-hw*0.1,h*0.7],[0,h]];
+  if(kind==='canopy')return [[-hw,0],[-hw*0.85,h*0.5],[-hw*0.5,h*0.9],[-hw*0.15,h*0.95],[0,h]];
+  return [[-hw,0],[-hw,h*0.88],[-hw*0.5,h*0.94],[0,h]];}
+ for(let i=0;i<N;i++){const a=i/N*Math.PI*2,bx=R0*Math.cos(a),bz=R0*Math.sin(a),tx=-Math.sin(a),tz=Math.cos(a);
+  const r=rng();let kind,h,hw,dcol;
+  if(r<0.1){kind='twins';h=rand(28,36);hw=rand(11,14);dcol=new THREE.Color(0xD8E4E8);}
+  else if(r<0.34){kind='needle';h=rand(30,52);hw=rand(5,8);dcol=new THREE.Color(0x8FD8E8);}
+  else if(r<0.46){kind='minaret';h=rand(14,20);hw=rand(8,11);dcol=new THREE.Color(0xE0B6D8);}
+  else if(r<0.58){kind='karst';h=rand(16,24);hw=rand(12,18);dcol=new THREE.Color(0xF6C544);}
+  else if(r<0.84){kind='canopy';h=rand(6,11);hw=rand(9,14);dcol=new THREE.Color(0x6FBE5E);}
+  else{kind='slab';h=rand(18,30);hw=rand(6,9);dcol=new THREE.Color(0x8FD8E8);}
+  const half=prof(kind,hw,h),full=half.concat(half.slice(0,-1).reverse().map(q=>[-q[0],q[1]]));
+  for(const q of full){linP.push(bx+tx*q[0],q[1],bz+tz*q[0]);const c=lerpC(0x3A5A4E,0x5A7A96,MU.clamp(q[1]/44,0,1));linC.push(c.r,c.g,c.b);}
+  linP.push(R0*Math.cos(a+Math.PI/N),0,R0*Math.sin(a+Math.PI/N));linC.push(0.24,0.32,0.28);
+  if(kind==='karst'){dots.push(bx-tx*hw*0.2,h*0.75,bz-tz*hw*0.2);dotCol.push(0.96,0.77,0.27);}
+  for(let k=0;k<2;k++){dots.push(bx+tx*rand(-hw*0.6,hw*0.6),rand(h*0.2,h*0.8),bz+tz*rand(-hw*0.6,hw*0.6));dotCol.push(dcol.r,dcol.g,dcol.b);}}
+ const eo=new THREE.LineLoop(mkGeo(linP,linC),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.26,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));skyEdgeMat=eo.material;skyline.add(eo);
+ const do2=new THREE.Points(mkGeo(dots,dotCol),new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.36,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));skyDotMat=do2.material;skyline.add(do2);}
+
+/* climate cycle — Malay */
+const CK=[
+ {p:0.00,sky:0x242A20,moonO:0.4,veil:0.35,rain:0.0,wtr:0.12,star:0.2,win:0.5,ref:0.5,chop:0.7,sunO:0.6,fire:0.15},
+ {p:0.25,sky:0x20262C,moonO:0.12,veil:0.9,rain:1.0,wtr:0.5,star:0.0,win:0.6,ref:0.3,chop:1.4,sunO:0.1,fire:0.0},
+ {p:0.50,sky:0x122028,moonO:0.55,veil:0.5,rain:0.45,wtr:1.0,star:0.4,win:0.75,ref:0.7,chop:1.1,sunO:0.0,fire:0.25},
+ {p:0.75,sky:0x0B100E,moonO:1.0,veil:0.25,rain:0.0,wtr:0.4,star:1.0,win:1.0,ref:1.0,chop:0.7,sunO:0.0,fire:1.0}];
+function cparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<CK.length;k++)if(CK[k].p<=p)i=k;const A=CK[i],B=CK[(i+1)%CK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);const o={};for(const k2 of ['moonO','veil','rain','wtr','star','win','ref','chop','sunO','fire'])o[k2]=MU.lerp(A[k2],B[k2],f);o.sky=lerpC(A.sky,B.sky,f);return o;}
+let P=0.75,auto=true,targetP=0.75;const NAMES=['kemarau','tengkujuh','banjir','malam'];
+document.querySelectorAll('[data-m]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-m]').forEach(x=>x.classList.remove('on'));b.classList.add('on');if(b.dataset.m==='auto')auto=true;else{auto=false;targetP=parseFloat(b.dataset.m);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+const target=new THREE.Vector3(0,18,-16);let camA=Math.PI*0.52,camR=124,camY=26,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,6,110);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,60,210);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.cur,'the confluence','where she was named'],[0xD8E4E8,'the twins','still holding hands'],[PAL.life,'river of life','lit teal, remembering'],[PAL.greenHi,'the canopy','rainforest, returning']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0007;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  if(auto)P=(P+dt/108)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  const par=cparams(P);scene.background.copy(par.sky);scene.fog.color.copy(par.sky);
+  moonMat.opacity=0.9*par.moonO*(1-0.5*par.veil);haloMat.opacity=0.24*par.moonO*(1-0.4*par.veil);sunMat.opacity=0.75*par.sunO;starMat.opacity=0.85*par.star;
+  windows.material.opacity=0.2+0.75*par.win;mjWin.opacity=0.25+0.7*par.win;lifeEdge.material.opacity=0.25+0.5*par.win;
+  rainObj.material.opacity=0.5*par.rain;moonRef.material.opacity=0.5*par.ref*par.moonO;
+  waterY=0.35+par.wtr*3.2;const chop=par.chop;phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · air '+((par.wtr*100)|0)+'% —';
+  const sSc=MU.clamp(0.72*Math.pow(camR/110,1.5),0.32,2.0);skyline.position.set(camera.position.x,0,camera.position.z);skyline.scale.setScalar(sSc);skyEdgeMat.opacity=0.22+0.05*Math.sin(t*0.25);skyDotMat.opacity=0.3;
+  for(let i=0;i<wN;i++)wPos[i*3+1]=waterY+chop*0.3*Math.sin(t*1.5+wPh[i]);wGeo.attributes.position.needsUpdate=true;
+  for(const L of curLines){const arr=L.pos,ca=L.geo.attributes.color.array;for(let k=0;k<60;k++){const u=k/59,q=L.C.f(u);arr[k*3]=q[0];arr[k*3+1]=waterY+0.35;arr[k*3+2]=q[1];const pulse=0.35+0.65*Math.max(0,Math.sin(t*1.0-u*8+L.phase));ca[k*3]=L.base[k*3]*pulse;ca[k*3+1]=L.base[k*3+1]*pulse;ca[k*3+2]=L.base[k*3+2]*pulse;}L.geo.attributes.position.needsUpdate=true;L.geo.attributes.color.needsUpdate=true;}
+  {let idx=0;for(const R of ripState){R.rr+=R.spd;if(R.rr>R.max){const q=pick(chanSamp);R.rr=0;R.x=q[0];R.z=q[1];R.max=rand(8,16);}const fade=1-R.rr/R.max;for(let k=0;k<RRP;k++){const a=k/RRP*Math.PI*2;ripPos[idx*3]=R.x+R.rr*Math.cos(a);ripPos[idx*3+1]=waterY+0.3;ripPos[idx*3+2]=R.z+R.rr*Math.sin(a);const c=ripGeo.attributes.color.array;c[idx*3]=0.24*fade;c[idx*3+1]=0.5*fade;c[idx*3+2]=0.48*fade;idx++;}}ripGeo.attributes.position.needsUpdate=true;ripGeo.attributes.color.needsUpdate=true;}
+  for(let i=0;i<refN;i++){const r=refItems[i];refPos[i*3]=6*Math.sin(r.z/94*3)+2*Math.sin(t*2+r.ph);refPos[i*3+1]=waterY+0.4;refPos[i*3+2]=r.z;}refGeo.attributes.position.needsUpdate=true;
+  {let i=0;for(const b of boats){b.u+=b.spd;if(b.u>0.97)b.u=0.03;if(b.u<0.03)b.u=0.97;const q=chans[2].f(b.u),q2=chans[2].f(b.u+0.01),bob=0.12*Math.sin(t*1.3+b.ph);let tx=q2[0]-q[0],tz=q2[1]-q[1];const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;
+    for(let k=0;k<BPTS;k++){const s=(k/(BPTS-1))*2-1,w2=(k%2?0.6:-0.6)*(1-Math.abs(s)*0.6);bPos[i*3]=q[0]+tx*s*4+(-tz)*w2;bPos[i*3+1]=waterY+0.35+bob+Math.pow(Math.abs(s),1.8)*1.1;bPos[i*3+2]=q[1]+tz*s*4+tx*w2;i++;}}
+   bGeo.attributes.position.needsUpdate=true;}
+  for(let i=0;i<FLN;i++){const ix=i%6,iv=(i/6)|0,u=ix/5,amp=0.5+chop*0.5;
+    flPos[i*3]=-23.6+u*5;flPos[i*3+1]=12.1-iv*1.05+amp*0.35*u*Math.sin(t*3+u*4+iv);flPos[i*3+2]=20+amp*0.6*u*Math.sin(t*2.4+u*5);}
+  flGeo.attributes.position.needsUpdate=true;
+  if(par.rain>0.02)for(let i=0;i<raN;i++){const p2=ra[i];p2.y-=p2.v*2.6;p2.x-=p2.v*0.5;if(p2.y<waterY){p2.y=100;p2.x=rand(-140,140);}raPos[i*6]=p2.x;raPos[i*6+1]=p2.y;raPos[i*6+2]=p2.z;raPos[i*6+3]=p2.x-1.2;raPos[i*6+4]=p2.y-4.5;raPos[i*6+5]=p2.z;}raGeo.attributes.position.needsUpdate=true;
+  for(const cb of cloudBands){const arr=cb.o.geometry.attributes.position.array,B=cb.base,off=(t*(cb.near?2.2:1.3))%(cb.w*4)-cb.w*2;for(let i=0;i<arr.length/3;i++)arr[i*3]=B[i*3]+off;cb.o.geometry.attributes.position.needsUpdate=true;if(cb.near)cb.o.material.opacity=(0.3+0.16*Math.sin(t*0.3+cb.cx))*(0.4+0.6*par.moonO);}
+  for(const pm of palms){const arr=pm.o.geometry.attributes.position.array,B=pm.base,M=pm.meta;for(let i=0;i<arr.length/3;i++){const a=M[i*2],u=M[i*2+1],sw=(0.5+chop*0.4)*u*0.7*Math.sin(t*1.2+pm.ph+a);arr[i*3]=B[i*3]+sw*Math.cos(a+1.57);arr[i*3+1]=B[i*3+1]+0.2*sw;arr[i*3+2]=B[i*3+2]+sw*Math.sin(a+1.57);}pm.o.geometry.attributes.position.needsUpdate=true;}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  for(let i=0;i<fiN;i++){const f=fi[i];f.x+=0.04*Math.sin(t*0.5+f.ph);f.z+=0.04*Math.cos(t*0.4+f.ph);fiPos[i*3]=f.x;fiPos[i*3+1]=f.y+2*Math.sin(t*0.5+f.ph);fiPos[i*3+2]=f.z;const pu=Math.pow(0.5+0.5*Math.sin(t*f.freq+f.ph),3)*par.fire;fiCol[i*3]=fireC.r*pu;fiCol[i*3+1]=fireC.g*pu;fiCol[i*3+2]=fireC.b*pu;}fiGeo.attributes.position.needsUpdate=true;fiGeo.attributes.color.needsUpdate=true;
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

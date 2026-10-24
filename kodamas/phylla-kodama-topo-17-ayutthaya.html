@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ayutthaya 3000 (study)</title>
+<style>
+  :root{--cream:#ECEAE0;--gold:#F6C544;--pale:#AEC2D6;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#060A14;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(14,18,28,.55);border:1px solid rgba(174,194,214,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="17"><h1>Ayutthaya 3000.</h1>
+  <div class="sub">phylla-kodama study · the city floods, and answers with ten thousand lanterns</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time
+    <button class="pill on" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill" data-t="0.75">night</button></span>
+  <span class="grp">flood
+    <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<audio id="pk-track" loop preload="none"></audio>
+<button id="pk-snd" style="position:fixed;bottom:22px;left:calc(50% + 120px);transform:translateX(-50%);z-index:20;display:none;pointer-events:auto;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ECEAE0;background:rgba(20,26,34,.5);border:1px solid rgba(174,194,214,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)">♪ sound</button>
+<script src="phylla-kodama-manifest.js"></script>
+<script>
+/* text is NOT baked in: pull title / subtitle / scientific name / soundtrack from
+   phylla-kodama-manifest.js by topo id. The h1 + .sub in the HTML above are an
+   OFFLINE FALLBACK ONLY — edit canonical text in the manifest, never here. */
+(function(){
+  var id=(document.getElementById("title")||{}).dataset&&document.getElementById("title").dataset.topo;
+  var m=(window.PK&&PK.byId&&id)?PK.byId[id]:null; if(!m)return;
+  var h=document.querySelector("#title h1"), sub=document.querySelector("#title .sub");
+  if(m.title&&h)h.textContent=m.title;
+  if(m.sub&&sub)sub.innerHTML="phylla-kodama study \u00a0\u00b7\u00a0 "+m.sub;
+  if(m.sci){var lg=document.getElementById("legend");
+    if(lg)lg.insertAdjacentHTML("afterbegin",'<div style="font-family:Cambria,Georgia,serif;font-style:italic;font-size:12px;color:#B7C6D2;opacity:.72;margin-bottom:9px;letter-spacing:.01em">'+m.sci+'</div>');}
+  var track=document.getElementById("pk-track"), snd=document.getElementById("pk-snd");
+  if(m.audio&&track&&snd){track.src=m.audio;snd.style.display="";var on=false;
+    snd.addEventListener("click",function(){on=!on;if(on){track.play();snd.textContent="\u266a sound \u00b7 on";}else{track.pause();snd.textContent="\u266a sound";}});}
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Ayutthaya 3000 — the flooded Wat-metropolis. A prang fused into scaffold, sky
+   lanterns rising, krathong drifting the floodwater, boats, a neon glyph, spirits.
+   Day/night + monsoon flood cycles, auto or pinned. r128. */
+const PAL={stone:0xB0A088,stoneLo:0x4A4234,moss:0x2E5A3A,mossHi:0x5A9A5E,scaf:0x5A7078,
+  lant:0xFFC46A,paper:0xB07A46,flame:0xF6C544,petal:0x5A9A5E,petal2:0xE07AA8,
+  neon:0xC94FD6,win:0xFFB868,wood:0x3A2C1E,moon:0xF4F6F8,moonLo:0x8A96A2,pale:0xAEC2D6,
+  sun:0xFFC98A,spirit:0xE6ECF2};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260723);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:0.92}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x060A14);scene.fog=new THREE.FogExp2(0x060A14,0.0052);
+const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* stepped terraces rising from the flood */
+for(const TR of [[26,1],[22,3],[18,5],[14,7]]){const R=TR[0],y=TR[1],p=[],col=[];
+  const n=(2*Math.PI*R/1.0)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=R+rand(-.3,.3);p.push(rr*Math.cos(a),y+rand(-.2,.2),rr*Math.sin(a));const c=(rng()<0.22)?lerpC(PAL.moss,PAL.mossHi,rng()):lerpC(PAL.stoneLo,PAL.stone,0.35+0.4*rng());col.push(c.r,c.g,c.b);}
+  for(let i=0;i<R*R*0.5;i++){const rr=R*Math.sqrt(rng()),a=rand(0,6.28);p.push(rr*Math.cos(a),y+0.2,rr*Math.sin(a));const c=lerpC(PAL.stoneLo,PAL.stone,0.3+0.3*rng());col.push(c.r,c.g,c.b);}
+  world.add(rockPoints(p,col,0.7));}
+
+/* scaffold lattice fused to the wat */
+{const sp=[],G=[-12,-4,4,12];
+  for(const x of G)for(const z of G)sp.push(x,8,z,x,58,z);
+  for(let y=8;y<=58;y+=10){for(const x of G)sp.push(x,y,-12,x,y,12);for(const z of G)sp.push(-12,y,z,12,y,z);}
+  for(let i=0;i<28;i++){const y1=8+((rng()*5)|0)*10;sp.push(pick(G),y1,pick(G),pick(G),y1+10,pick(G));}
+  const col=[];for(let i=0;i<sp.length/3;i++){const c=lerpC(0x2E3A40,PAL.scaf,0.3+0.5*rng());col.push(c.r,c.g,c.b);}
+  world.add(new THREE.LineSegments(mkGeo(sp,col),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5})));}
+
+/* stone pavilion + ridged prang + gold finial + overgrowth */
+{const p=[],col=[];
+  for(let i=0;i<900;i++){const face=(rng()*4)|0,u=rand(-9,9),v=rand(8,20);let x,z;if(face===0){x=u;z=9;}else if(face===1){x=u;z=-9;}else if(face===2){x=9;z=u;}else{x=-9;z=u;}
+    if(face===0&&Math.abs(u)<2.4&&v<15)continue;
+    const c=(rng()<0.16)?lerpC(PAL.moss,PAL.mossHi,rng()):lerpC(PAL.stoneLo,PAL.stone,0.35+0.45*rng());p.push(x+rand(-.3,.3),v,z+rand(-.3,.3));col.push(c.r,c.g,c.b);}
+  for(let r=0;r<8;r++){const w=9-r*1.1;for(let k=0;k<Math.max(2,(w*4)|0);k++){p.push(rand(-w,w),20.4+r*0.7,9.4);const c=lerpC(PAL.stone,PAL.moss,rng()*0.4);col.push(c.r,c.g,c.b);}}
+  for(let y=20;y<64;y+=0.55){const f=(y-20)/44,r0=Math.max(1.4,8.5*(1-f*0.85)),n=Math.max(10,(2*Math.PI*r0/0.8)|0);
+    for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r0*(1+0.13*Math.cos(a*7))+rand(-.3,.3);
+      const green=rng()<(0.1+0.2*(1-f));const c=green?lerpC(PAL.moss,PAL.mossHi,rng()):lerpC(PAL.stoneLo,PAL.stone,0.35+0.45*rng());
+      p.push(rr*Math.cos(a),y,rr*Math.sin(a));col.push(c.r,c.g,c.b);}}
+  for(let i=0;i<60;i++){const a=rand(0,6.28),v2=rand(0,Math.PI/2),r=1.6*Math.sin(v2);p.push(r*Math.cos(a),64+2.2*Math.cos(v2),r*Math.sin(a));const c=new THREE.Color(0xF6C544);col.push(c.r,c.g,c.b);}
+  world.add(rockPoints(p,col,0.72));}
+
+/* warm windows (lit by night) */
+let winMat;{const p=[],col=[];for(let i=0;i<46;i++){const y=rand(9,56),side=(rng()*4)|0,off=rand(-11,11);let x,z;if(side===0){x=off;z=(rng()<0.5?12.4:9.4);}else if(side===1){x=off;z=-(rng()<0.5?12.4:9.4);}else if(side===2){x=12.4;z=off;}else{x=-12.4;z=off;}
+  p.push(x,y,z);const c=new THREE.Color(PAL.win);col.push(c.r,c.g,c.b);}
+  const o=glowPoints(p,col,1.8,0);winMat=o.material;world.add(o);}
+
+/* neon glyph sign (flickers) */
+let neonMat;{const p=[],col=[];for(let gx=0;gx<5;gx++)for(let gy=0;gy<3;gy++){p.push(12.8,33+gy*1.5,-2+gx*1.4);const c=new THREE.Color(PAL.neon);col.push(c.r,c.g,c.b);}
+  for(let k=0;k<18;k++){const u=k/18;p.push(12.8,32.2+(u<0.5?0:5.2),-2.8+ (u<0.5?u*2:(u-0.5)*2)*8.4);const c=lerpC(PAL.neon,0xFFFFFF,0.3);col.push(c.r,c.g,c.b);}
+  const o=glowPoints(p,col,1.6,0.9);neonMat=o.material;world.add(o);}
+
+/* hanging vines off the scaffold */
+const vines=[];for(let k=0;k<30;k++){const G=[-12,-4,4,12];vines.push({ax:pick(G)+rand(-1,1),ay:pick([38,48,58]),az:pick(G)+rand(-1,1),len:rand(7,18),ph:rand(0,6.28),sway:rand(0.8,2.2)});}
+let vtot=0;for(const v of vines)vtot+=8;const vP=new Float32Array(vtot*2*3),vCol=new Float32Array(vtot*2*3);
+{let i=0;for(const v of vines)for(let s=0;s<8;s++){const c=lerpC(0x24421E,PAL.mossHi,1-s/7);for(let e=0;e<2;e++){vCol[i*6+e*3]=c.r;vCol[i*6+e*3+1]=c.g;vCol[i*6+e*3+2]=c.b;}i++;}}
+const vGeo=mkGeo(Array.from(vP),Array.from(vCol));vGeo.attributes.position=new THREE.BufferAttribute(vP,3);
+world.add(new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6})));
+
+/* distant spire city */
+for(let i=0;i<7;i++){const a=rand(0,6.28),R=rand(66,100),cx=R*Math.cos(a),cz=R*Math.sin(a),h=rand(24,52),p=[],col=[];
+  for(let y=0;y<h;y+=0.8){const r0=Math.max(0.8,4.5*(1-y/h)),n=Math.max(4,(2*Math.PI*r0/1.2)|0);for(let k=0;k<n;k++){const aa=k/n*Math.PI*2;p.push(cx+r0*Math.cos(aa),y,cz+r0*Math.sin(aa));const c=lerpC(0x1E2834,0x46586A,0.3+0.4*rng());col.push(c.r,c.g,c.b);}}
+  world.add(rockPoints(p,col,0.65));
+  const wp=[],wc=[];for(let w=0;w<5;w++){wp.push(cx+rand(-2,2),rand(3,h*0.7),cz+rand(-2,2));const c=new THREE.Color(PAL.win);wc.push(c.r,c.g,c.b);}
+  const o=glowPoints(wp,wc,1.4,0);o.userData.win=true;world.add(o);}
+
+/* WATER — flood plane, level animated */
+const wPts=[],wCol=[],wPh=[];for(let x=-100;x<=100;x+=2.8)for(let z=-100;z<=100;z+=3.0){if(Math.hypot(x,z)<2)continue;wPts.push(x,0,z);wPh.push(rand(0,6.28));const g2=0.55+0.45*rng();wCol.push(g2,g2,g2);}
+const wGeo=mkGeo(wPts,wCol),water=new THREE.Points(wGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.42,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(water);
+const wPos=wGeo.attributes.position.array,wN=wPh.length;
+
+/* SKY LANTERNS (night) */
+const LN=64,lan=[],lanPos=new Float32Array(LN*3),shPos=new Float32Array(LN*3);
+for(let i=0;i<LN;i++)lan.push({x:rand(-80,80),z:rand(-80,80),y:rand(10,90),vy:rand(0.04,0.1),dx:rand(-.02,.02),ph:rand(0,6.28)});
+const lanCol=[],shCol=[];for(let i=0;i<LN;i++){const c=lerpC(PAL.lant,0xFFE8B0,rng());lanCol.push(c.r,c.g,c.b);const s2=new THREE.Color(PAL.paper);shCol.push(s2.r,s2.g,s2.b);}
+const lanterns=new THREE.Points(mkGeo(Array.from(lanPos),lanCol),new THREE.PointsMaterial({size:2.2,vertexColors:true,map:GLOW,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+lanterns.geometry.attributes.position=new THREE.BufferAttribute(lanPos,3);world.add(lanterns);
+const shells=new THREE.Points(mkGeo(Array.from(shPos),shCol),new THREE.PointsMaterial({size:3.6,vertexColors:true,map:GLOW,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+shells.geometry.attributes.position=new THREE.BufferAttribute(shPos,3);world.add(shells);
+
+/* KRATHONG — floating lotus candles + reflections */
+const KN=28,kra=[],kfPos=new Float32Array(KN*3),kpPos=new Float32Array(KN*6*3),krPos=new Float32Array(KN*3);
+for(let i=0;i<KN;i++)kra.push({x:rand(-70,70),z:rand(-70,70),vx:rand(-.015,.015),vz:rand(-.015,.015),ph:rand(0,6.28)});
+const kfCol=[],kpCol=[],krCol=[];
+for(let i=0;i<KN;i++){const c=lerpC(PAL.flame,0xFFF0C0,rng());kfCol.push(c.r,c.g,c.b);const rc=lerpC(PAL.flame,PAL.paper,0.4);krCol.push(rc.r*0.6,rc.g*0.6,rc.b*0.6);
+  for(let k2=0;k2<6;k2++){const pc=lerpC(k2%2?PAL.petal:PAL.petal2,0xFFFFFF,rng()*0.2);kpCol.push(pc.r,pc.g,pc.b);}}
+const kFlame=new THREE.Points(mkGeo(Array.from(kfPos),kfCol),new THREE.PointsMaterial({size:2.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));kFlame.geometry.attributes.position=new THREE.BufferAttribute(kfPos,3);world.add(kFlame);
+const kPetal=new THREE.Points(mkGeo(Array.from(kpPos),kpCol),new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));kPetal.geometry.attributes.position=new THREE.BufferAttribute(kpPos,3);world.add(kPetal);
+const kRef=new THREE.Points(mkGeo(Array.from(krPos),krCol),new THREE.PointsMaterial({size:2.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false}));kRef.geometry.attributes.position=new THREE.BufferAttribute(krPos,3);world.add(kRef);
+
+/* longtail boats */
+const boats=[];for(let i=0;i<3;i++)boats.push({x:rand(-55,55),z:rand(-55,55),ha:rand(0,6.28),ph:rand(0,6.28)});
+const BPTS=30,bPos=new Float32Array(boats.length*BPTS*3),bCol=new Float32Array(boats.length*BPTS*3);
+{let i=0;for(const b of boats)for(let k=0;k<BPTS;k++){const c=lerpC(PAL.wood,0x6A5238,rng()*0.5);bCol[i*3]=c.r;bCol[i*3+1]=c.g;bCol[i*3+2]=c.b;i++;}}
+const boatCloud=new THREE.Points(mkGeo(Array.from(bPos),Array.from(bCol)),new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0.95}));
+boatCloud.geometry.attributes.position=new THREE.BufferAttribute(bPos,3);world.add(boatCloud);
+const prowPos=new Float32Array(boats.length*3),prowCol=[];for(const b of boats){const c=new THREE.Color(PAL.lant);prowCol.push(c.r,c.g,c.b);}
+const prow=new THREE.Points(mkGeo(Array.from(prowPos),prowCol),new THREE.PointsMaterial({size:2.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false}));
+prow.geometry.attributes.position=new THREE.BufferAttribute(prowPos,3);world.add(prow);
+
+/* sky: stars, moon, sun */
+let stars,starBase,starPh,starMat;
+{const p=[],col=[],ph=[];for(let i=0;i<900;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.05,1)),R=rand(150,260);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+40,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,0xFFF6E8,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}
+  starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,0.95,0.85);starMat=stars.material;world.add(stars);}
+let moonMat,moonHaloMat;{const cx=-46,cy=76,cz=-64,R=10,p=[],col=[];for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(cx+x,cy+y,cz+z);col.push(c.r,c.g,c.b);}
+  const m=glowPoints(p,col,1.3,0.9);moonMat=m.material;world.add(m);
+  const h=glowPoints([cx,cy,cz],[...new THREE.Color(0xDCE8F4).toArray()],40,0.22);moonHaloMat=h.material;world.add(h);}
+let sunMat;{const s=glowPoints([64,36,-92],[...new THREE.Color(PAL.sun).toArray()],56,0);sunMat=s.material;world.add(s);}
+
+/* kodama spirits on the terraces */
+const spirits=[];function makeSpirit(){const hp=[],hc=[];for(let i=0;i<60;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=1.7;hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v)+2,r*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.spirit);hc.push(c.r,c.g,c.b);}
+  const g=new THREE.Group(),head=glowPoints(hp,hc,1.2,0);g.add(head);g.visible=false;world.add(g);
+  const sp={g,head,state:'wait',timer:rand(0,6),op:0};spirits.push(sp);repos(sp);}
+function repos(sp){const a=rand(0,6.28),R=pick([15,19,23]);sp.g.position.set(R*Math.cos(a),pick([2,4,6])+1,R*Math.sin(a));}
+for(let i=0;i<3;i++)makeSpirit();
+let nightAmt=1;
+function updSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.5;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.5,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(3,6);}}
+  else if(sp.state==='hold'){if(sp.timer<=0){sp.state='out';sp.timer=1.7;}}
+  else{sp.op=MU.clamp(sp.op-dt/1.7,0,1);if(sp.timer<=0){sp.state='wait';sp.timer=rand(3,7);sp.g.visible=false;repos(sp);}}
+  sp.head.material.opacity=0.8*sp.op*(0.25+0.75*nightAmt);}}
+
+/* TIME + FLOOD cycles */
+const TK=[
+ {p:0.00,sky:0x2A3050,star:0.25,lant:0.12,sunO:0.35,moonO:0.15,neon:0.35,win:0.35,wat:0x24485E,kraO:0.3},
+ {p:0.25,sky:0x3E5C7A,star:0.0, lant:0.0, sunO:0.9, moonO:0.0, neon:0.15,win:0.08,wat:0x2E7D8C,kraO:0.12},
+ {p:0.50,sky:0x462E4E,star:0.3, lant:0.55,sunO:0.25,moonO:0.3, neon:0.85,win:0.6, wat:0x2E4A6E,kraO:0.6},
+ {p:0.75,sky:0x060A14,star:1.0, lant:1.0, sunO:0.0, moonO:1.0, neon:1.0, win:1.0, wat:0x102A46,kraO:1.0}];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],B=TK[(i+1)%TK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of ['star','lant','sunO','moonO','neon','win','kraO'])o[k2]=MU.lerp(A[k2],B[k2],f);
+  o.sky=lerpC(A.sky,B.sky,f);o.wat=lerpC(A.wat,B.wat,f);return o;}
+let P=0.75,timeAuto=true,targetP=0.75,F=0.8,floodAuto=true,targetF=0.8;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')timeAuto=true;else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto')floodAuto=true;else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera */
+const target=new THREE.Vector3(0,26,0);let camA=Math.PI*0.42,camR=112,camY=30,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,8,92);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,56,200);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.lant,'sky lanterns','loosed at night'],[PAL.flame,'krathong','wishes on the flood'],[PAL.neon,'the neon glyph','still advertising'],[PAL.mossHi,'the wat','scaffolded, overgrown']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+/* animate */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0008;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  // cycles
+  if(timeAuto)P=(P+dt/110)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto)F=0.5+0.5*Math.sin(t*0.045);else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);nightAmt=par.star;
+  scene.background.copy(par.sky);scene.fog.color.copy(par.sky);
+  starMat.opacity=0.85*par.star;moonMat.opacity=0.9*par.moonO;moonHaloMat.opacity=0.22*par.moonO;sunMat.opacity=0.8*par.sunO;
+  lanterns.material.opacity=0.95*par.lant;shells.material.opacity=0.4*par.lant;
+  winMat.opacity=0.9*par.win;world.traverse(o=>{if(o.userData&&o.userData.win&&o.material)o.material.opacity=0.85*par.win;});
+  neonMat.opacity=par.neon*(Math.sin(t*13.7)>0.93?0.25:1)*(0.75+0.25*Math.sin(t*7.3));
+  water.material.color.copy(par.wat);
+  kFlame.material.opacity=(0.25+0.7*par.kraO);kPetal.material.opacity=(0.2+0.5*par.kraO);kRef.material.opacity=(0.1+0.35*par.kraO);
+  const waterY=0.6+F*6.2;
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · flood '+((F*100)|0)+'% —';
+  // water surface
+  for(let i=0;i<wN;i++)wPos[i*3+1]=waterY+0.22*Math.sin(t*1.6+wPh[i]);
+  wGeo.attributes.position.needsUpdate=true;
+  // lanterns rise
+  for(let i=0;i<LN;i++){const l=lan[i];l.y+=l.vy;l.x+=l.dx+0.02*Math.sin(t*0.4+l.ph);if(l.y>96){l.y=rand(12,24);l.x=rand(-70,70);l.z=rand(-70,70);}
+    lanPos[i*3]=l.x;lanPos[i*3+1]=l.y;lanPos[i*3+2]=l.z;shPos[i*3]=l.x;shPos[i*3+1]=l.y+0.7;shPos[i*3+2]=l.z;}
+  lanterns.geometry.attributes.position.needsUpdate=true;shells.geometry.attributes.position.needsUpdate=true;
+  // krathong drift + reflections
+  for(let i=0;i<KN;i++){const k2=kra[i];k2.x+=k2.vx;k2.z+=k2.vz;if(Math.abs(k2.x)>78)k2.vx*=-1;if(Math.abs(k2.z)>78)k2.vz*=-1;
+    const y=waterY+0.35+0.12*Math.sin(t*2+k2.ph);kfPos[i*3]=k2.x;kfPos[i*3+1]=y+0.4;kfPos[i*3+2]=k2.z;
+    for(let j=0;j<6;j++){const a=j/6*Math.PI*2+k2.ph;kpPos[(i*6+j)*3]=k2.x+0.8*Math.cos(a);kpPos[(i*6+j)*3+1]=y;kpPos[(i*6+j)*3+2]=k2.z+0.8*Math.sin(a);}
+    krPos[i*3]=k2.x;krPos[i*3+1]=waterY-0.5;krPos[i*3+2]=k2.z;}
+  kFlame.geometry.attributes.position.needsUpdate=true;kPetal.geometry.attributes.position.needsUpdate=true;kRef.geometry.attributes.position.needsUpdate=true;
+  // boats
+  {let i=0,bi=0;for(const b of boats){b.ha+=0.0012;b.x+=Math.cos(b.ha)*0.03;b.z+=Math.sin(b.ha)*0.03;if(Math.abs(b.x)>66)b.x*=-0.98;if(Math.abs(b.z)>66)b.z*=-0.98;
+    const bob=0.15*Math.sin(t*1.4+b.ph),dx=Math.cos(b.ha),dz=Math.sin(b.ha),pxv=-dz,pzv=dx;
+    for(let k2=0;k2<BPTS;k2++){const s=(k2/(BPTS-1))*2-1,w=(k2%2?0.7:-0.7)*(1-Math.abs(s)*0.6);
+      bPos[i*3]=b.x+dx*s*6+pxv*w;bPos[i*3+1]=waterY+0.35+bob+Math.pow(Math.abs(s),1.8)*1.5;bPos[i*3+2]=b.z+dz*s*6+pzv*w;i++;}
+    prowPos[bi*3]=b.x+dx*6;prowPos[bi*3+1]=waterY+2+bob;prowPos[bi*3+2]=b.z+dz*6;bi++;}
+   boatCloud.geometry.attributes.position.needsUpdate=true;prow.geometry.attributes.position.needsUpdate=true;}
+  // vines
+  {let i=0;for(const v of vines){let prev=[v.ax,v.ay,v.az];for(let s=1;s<=8;s++){const f=s/8,x=v.ax+v.sway*f*Math.sin(t*0.7+v.ph-f*1.4),y=v.ay-f*v.len,z=v.az+v.sway*0.5*f*Math.cos(t*0.6+v.ph);
+    vP[i*6]=prev[0];vP[i*6+1]=prev[1];vP[i*6+2]=prev[2];vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;prev=[x,y,z];i++;}}vGeo.attributes.position.needsUpdate=true;}
+  // stars twinkle
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  updSpirits(t,dt);
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

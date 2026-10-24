@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point Cloud Forests (study)</title>
+<style>
+  :root{--bg:#06100C;--cream:#ECEAE0;--pale:#B7C6C0;--teal:#74D6AE;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(18,26,22,.5);border:1px solid rgba(174,214,190,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Point Cloud Forests.</h1><div class="sub">vana-kodama study · a night wood of counted light, under a ringed moon</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const PAL={bg:0x06100C,trunkLo:0x2E2A26,trunkHi:0x8A7A6A,ground:0x1A241C,groundHi:0x3E5240,
+  grass:0x9FD98A,agent:0x8FE0FF,moon:0xF4F6F8,moonLo:0x8A96A2,pale:0xB7C6C0,fire:0xF6E06A};
+const LEAF=[0xE0704A,0xC94F5E,0xF6C544,0x4EA36A,0x3FA9C9,0xF07AB8,0xE8845A];
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260719);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x081410,0.0060);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* wavy contour ground (set 2) */
+function hf(x,z,t){return 3*Math.sin(x*0.03+z*0.02)+2*Math.sin(x*0.05-z*0.04)+1.2*Math.sin(x*0.09+t*0.3);}
+const gP=[],gC=[],gXY=[];for(let x=-92;x<=92;x+=2.4)for(let z=-92;z<=92;z+=2.6){gP.push(x,0,z);gXY.push(x,z);const c=lerpC(PAL.ground,PAL.groundHi,0.2+0.4*rng());gC.push(c.r,c.g,c.b);}
+const gGeo=new THREE.BufferGeometry();gGeo.setAttribute('position',new THREE.Float32BufferAttribute(gP,3));gGeo.setAttribute('color',new THREE.Float32BufferAttribute(gC,3));
+const ground=new THREE.Points(gGeo,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.75}));world.add(ground);
+const gPos=gGeo.attributes.position.array,gN=gXY.length/2;
+
+/* colorful point-cloud forest (set 1): trunks + canopies + agents + grass */
+const leafBase=[],leafPh=[],leafCol=[],agents=[];
+function tree(x,z){const y0=hf(x,z,0),h=rand(16,26),tp=[],tc=[];
+  for(let s=0;s<32;s++){const f=s/31;tp.push(x+rand(-.5,.5),y0+f*h,z+rand(-.5,.5));const c=lerpC(PAL.trunkLo,PAL.trunkHi,0.3+0.5*f);tc.push(c.r,c.g,c.b);}
+  world.add(glowPoints(tp,tc,0.7,0.85));
+  // canopy cloud
+  const cy=y0+h,cn=100+((rng()*60)|0),base=pick(LEAF);
+  for(let i=0;i<cn;i++){const a=rand(0,6.28),v=Math.acos(rand(-1,1)),r=rand(4,9);const px=x+r*Math.sin(v)*Math.cos(a),py=cy+r*0.7*Math.cos(v)+3,pz=z+r*Math.sin(v)*Math.sin(a);
+    leafBase.push(px,py,pz);leafPh.push(rand(0,6.28));const c=lerpC(base,pick(LEAF),0.4*rng());leafCol.push(c.r,c.g,c.b);}
+  // wireframe agent glyph hanging in canopy
+  const geoT=pick([()=>new THREE.BoxGeometry(2,2,2),()=>new THREE.TetrahedronGeometry(1.6),()=>new THREE.OctahedronGeometry(1.5),()=>new THREE.TorusGeometry(1.2,.25,6,10)]);
+  const w=new THREE.LineSegments(new THREE.WireframeGeometry(geoT()),new THREE.LineBasicMaterial({color:PAL.agent,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+  const ax=x+rand(-5,5),ay=cy+rand(-2,5),az=z+rand(-5,5);w.position.set(ax,ay,az);w.userData={bob:rand(0,6.28),spin:rand(-.5,.5),by:ay};world.add(w);agents.push(w);
+  const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute([ax,ay,az,ax,y0,az],3));world.add(new THREE.LineSegments(tg,new THREE.LineBasicMaterial({color:PAL.agent,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false})));
+  // understory grass tufts
+  const grp=[],grc=[];for(let s=0;s<14;s++){const gx=x+rand(-4,4),gz=z+rand(-4,4),gy=hf(gx,gz,0),gh=rand(1.5,3.5),c=lerpC(PAL.grass,PAL.fire,rng());grp.push(gx,gy,gz,gx+rand(-.3,.3),gy+gh,gz);grc.push(c.r*0.4,c.g*0.4,c.b*0.4,c.r,c.g,c.b);}
+  const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.Float32BufferAttribute(grp,3));gg.setAttribute('color',new THREE.Float32BufferAttribute(grc,3));
+  world.add(new THREE.LineSegments(gg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.7})));
+}
+for(let i=0;i<26;i++)tree(rand(-78,78),rand(-78,78));
+const leafN=leafPh.length,leafPos=new Float32Array(leafBase),leafBaseF=new Float32Array(leafBase);
+const leafGeo=new THREE.BufferGeometry();leafGeo.setAttribute('position',new THREE.BufferAttribute(leafPos,3));leafGeo.setAttribute('color',new THREE.Float32BufferAttribute(leafCol,3));
+const leaves=new THREE.Points(leafGeo,new THREE.PointsMaterial({size:1.7,vertexColors:true,map:GLOW,transparent:true,opacity:0.92,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(leaves);
+
+/* falling leaves */
+const flN=240,fl=[],flPos=new Float32Array(flN*3),flCol=new Float32Array(flN*3);
+for(let i=0;i<flN;i++){fl.push({x:rand(-80,80),z:rand(-80,80),y:rand(6,40),vy:rand(0.1,0.3),sw:rand(0,6.28)});const c=new THREE.Color(pick(LEAF));flCol[i*3]=c.r;flCol[i*3+1]=c.g;flCol[i*3+2]=c.b;}
+const flGeo=new THREE.BufferGeometry();flGeo.setAttribute('position',new THREE.BufferAttribute(flPos,3));flGeo.setAttribute('color',new THREE.BufferAttribute(flCol,3));
+world.add(new THREE.Points(flGeo,new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* fireflies */
+const fiN=46,fi=[],fiPos=new Float32Array(fiN*3),fiCol=new Float32Array(fiN*3);
+for(let i=0;i<fiN;i++){fi.push({x:rand(-70,70),z:rand(-70,70),ph:rand(0,6.28),freq:rand(1.5,3),dx:rand(-.05,.05),dz:rand(-.05,.05)});}
+const fiGeo=new THREE.BufferGeometry();fiGeo.setAttribute('position',new THREE.BufferAttribute(fiPos,3));fiGeo.setAttribute('color',new THREE.BufferAttribute(fiCol,3));
+world.add(new THREE.Points(fiGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+const fireC=new THREE.Color(PAL.fire);
+
+/* sky: stars + ringed moon (set 2 orbital motif) */
+let stars,starBase,starPh;
+{const p=[],col=[],ph=[];for(let i=0;i<1100;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.1,1)),R=rand(140,260);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.8+40,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,PAL.moon,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,1.0,0.85);world.add(stars);}
+const MC=new THREE.Vector3(34,74,-46),U=new THREE.Vector3(1,0.18,0).normalize(),V=new THREE.Vector3(0,0.75,0.66).normalize();
+(function(){const R=13,p=[],col=[];for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(MC.x+x,MC.y+y,MC.z+z);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.4,0.9));})();
+for(let ri=0;ri<4;ri++){const RR=20+ri*10,p=[],col=[];for(let k=0;k<160;k++){const a=k/160*Math.PI*2;const v=U.clone().multiplyScalar(RR*Math.cos(a)).add(V.clone().multiplyScalar(RR*Math.sin(a)));p.push(MC.x+v.x,MC.y+v.y,MC.z+v.z);const c=lerpC(PAL.pale,PAL.moon,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,0.8,0.4-ri*0.05));}
+const smallMoons=[];for(let i=0;i<3;i++){const RR=20+((rng()*3)|0)*10,R=rand(1.5,3),p=[],col=[];for(let k=0;k<(R*R*8|0);k++){const u=rand(0,6.28),v=Math.acos(rand(-1,1));p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const c=lerpC(PAL.moonLo,PAL.moon,0.5+0.4*rng());col.push(c.r,c.g,c.b);}const g=glowPoints(p,col,1.1,0.85);world.add(g);smallMoons.push({g,RR,a:rand(0,6.28),spd:rand(0.1,0.25)});}
+
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+const target=new THREE.Vector3(0,14,0);let camA=Math.PI*0.5,camR=82,camY=20,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.35,6,80);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,40,150);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[0xE0704A,'point-cloud canopy','counted in colour'],[PAL.agent,'agent glyphs','the digital fauna'],[PAL.moon,'a ringed moon','orbits, tilted'],[PAL.fire,'fireflies','& falling leaves']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4200);
+
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+  if(turntable&&!drag)camA+=0.0009;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  for(let i=0;i<gN;i++){const x=gXY[i*2],z=gXY[i*2+1];gPos[i*3+1]=hf(x,z,t);}gGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<leafN;i++){const ph=leafPh[i];leafPos[i*3]=leafBaseF[i*3]+1.4*Math.sin(t*1.0+ph);leafPos[i*3+1]=leafBaseF[i*3+1]+0.6*Math.sin(t*1.4+ph);leafPos[i*3+2]=leafBaseF[i*3+2]+1.2*Math.cos(t*0.9+ph);}leafGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<flN;i++){const p=fl[i];p.y-=p.vy;p.x+=Math.sin(t*1.2+p.sw)*0.1;if(p.y<hf(p.x,p.z,t)-1){p.y=rand(20,40);p.x=rand(-80,80);}flPos[i*3]=p.x;flPos[i*3+1]=p.y;flPos[i*3+2]=p.z;}flGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<fiN;i++){const f=fi[i];f.x+=f.dx*Math.sin(t*0.5+f.ph);f.z+=f.dz*Math.cos(t*0.5+f.ph);const y=hf(f.x,f.z,t)+3+3*Math.sin(t*0.5+f.ph);fiPos[i*3]=f.x;fiPos[i*3+1]=y;fiPos[i*3+2]=f.z;const pu=Math.pow(0.5+0.5*Math.sin(t*f.freq+f.ph),3);fiCol[i*3]=fireC.r*pu;fiCol[i*3+1]=fireC.g*pu;fiCol[i*3+2]=fireC.b*pu;}fiGeo.attributes.position.needsUpdate=true;fiGeo.attributes.color.needsUpdate=true;
+  for(const a of agents){a.rotation.y+=a.userData.spin*0.01;a.rotation.x+=a.userData.spin*0.006;a.position.y=a.userData.by+Math.sin(t*0.8+a.userData.bob)*1.2;}
+  for(const m of smallMoons){m.a+=m.spd*0.01;const v=U.clone().multiplyScalar(m.RR*Math.cos(m.a)).add(V.clone().multiplyScalar(m.RR*Math.sin(m.a)));m.g.position.set(MC.x+v.x,MC.y+v.y,MC.z+v.z);}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon -->
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jakarta 2046 CE (study)</title>
+<style>
+  :root{--cream:#ECEAE0;--cyan:#3AC8A0;--pale:#AEC2BC;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#070C0A;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:70vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);opacity:.9;margin-top:11px}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(10,14,12,.55);border:1px solid rgba(58,200,160,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--cyan);color:var(--cyan)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="21"><h1>Jakarta 2046 CE.</h1>
+  <div class="sub">phylla-kodama study · she sinks faster than the sea rises, and still lights thirty million windows · Jakarta · DKI Jakarta</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">climate
+    <button class="pill on" data-m="auto">⟳</button><button class="pill" data-m="0">dry</button><button class="pill" data-m="0.25">monsoon</button><button class="pill" data-m="0.5">banjir</button><button class="pill" data-m="0.75">night</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<audio id="pk-track" loop preload="none"></audio>
+<button id="pk-snd" style="position:fixed;bottom:22px;left:calc(50% + 120px);transform:translateX(-50%);z-index:20;display:none;pointer-events:auto;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ECEAE0;background:rgba(20,26,34,.5);border:1px solid rgba(174,194,214,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)">♪ sound</button>
+<script src="phylla-kodama-manifest.js"></script>
+<script>
+/* text is NOT baked in: pull title / subtitle / scientific name / soundtrack from
+   phylla-kodama-manifest.js by topo id. The h1 + .sub in the HTML above are an
+   OFFLINE FALLBACK ONLY — edit canonical text in the manifest, never here. */
+(function(){
+  var id=(document.getElementById("title")||{}).dataset&&document.getElementById("title").dataset.topo;
+  var m=(window.PK&&PK.byId&&id)?PK.byId[id]:null; if(!m)return;
+  var h=document.querySelector("#title h1"), sub=document.querySelector("#title .sub");
+  if(m.title&&h)h.textContent=m.title;
+  if(m.sub&&sub)sub.innerHTML="phylla-kodama study \u00a0\u00b7\u00a0 "+m.sub;
+  if(m.sci){var lg=document.getElementById("legend");
+    if(lg)lg.insertAdjacentHTML("afterbegin",'<div style="font-family:Cambria,Georgia,serif;font-style:italic;font-size:12px;color:#B7C6D2;opacity:.72;margin-bottom:9px;letter-spacing:.01em">'+m.sci+'</div>');}
+  var track=document.getElementById("pk-track"), snd=document.getElementById("pk-snd");
+  if(m.audio&&track&&snd){track.src=m.audio;snd.style.display="";var on=false;
+    snd.addEventListener("click",function(){on=!on;if(on){track.play();snd.textContent="\u266a sound \u00b7 on";}else{track.pause();snd.textContent="\u266a sound";}});}
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Jakarta 2046 — the megalopolis as circuit. Streets are traces, towers are
+   components, highways are arteries, roundabouts are pads, Monas is the golden
+   pin — and the canals are the water layer of the board, pulsing, spilling when
+   banjir comes. City scale. Tron-lit. r128. */
+const PAL={board:0x0C1612,trace:0x1E6656,traceHi:0x3AC8A0,pad:0x2E9A7C,
+  water:0x123634,waterHi:0x2E8C8C,cur:0x4EC8B0,bio:0x74D6AE,
+  twr:0x16333C,twrHi:0x3A8CA0,winW:0xFFC98A,winC:0x8FE0FF,beacon:0xFF4A3A,
+  head:0xDFF6FF,tail:0xFF5A4A,rail:0x8FE0FF,gold:0xF6C544,
+  moon:0xF4F6F8,moonLo:0xAEB8B6,pale:0xAEC2BC,sun:0xFFC080,rain:0xAEC8C4,foam:0xCFEFE8};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260730);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function lineSegs(pos,col,op){return new THREE.LineSegments(mkGeo(pos,col),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x070C0A);scene.fog=new THREE.FogExp2(0x070C0A,0.0034);
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* the board — dark substrate */
+{const p=[],col=[];for(let x=-124;x<=124;x+=5)for(let z=-124;z<=124;z+=5){if(z<-98)continue;p.push(x+rand(-1,1),0.05,z+rand(-1,1));const c=lerpC(0x060B09,PAL.board,rng()*0.6);col.push(c.r,c.g,c.b);}
+ world.add(new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.75})));}
+
+/* STREET CIRCUIT — trace grid + pads + travelling pulses */
+let traceMat,padMat;
+{const p=[],col=[];const push=(x1,z1,x2,z2,hex)=>{p.push(x1,0.25,z1,x2,0.25,z2);const c=new THREE.Color(hex);for(let e=0;e<2;e++)col.push(c.r,c.g,c.b);};
+ for(let x=-120;x<=120;x+=24)push(x,-96,x,124,PAL.trace);
+ for(let z=-96;z<=120;z+=24)push(-124,z,124,z,PAL.trace);
+ for(let x=-124;x<=124;x+=8){if(((x+124)%24)===0)continue;push(x,-96,x,124,0x123A30);}
+ for(let z=-96;z<=124;z+=8){if(((z+96)%24)===0)continue;push(-124,z,124,z,0x123A30);}
+ const o=lineSegs(p,col,0.5);traceMat=o.material;world.add(o);}
+{const p=[],col=[];for(let x=-120;x<=120;x+=24)for(let z=-96;z<=120;z+=24){p.push(x,0.32,z);const c=new THREE.Color(PAL.pad);col.push(c.r,c.g,c.b);}
+ const o=glowPoints(p,col,1.4,0.5);padMat=o.material;world.add(o);}
+const TP=150,tps=[],{a:tpPos,g:tpGeo}=dynBuf(TP),tpCol=new Float32Array(TP*3);
+for(let i=0;i<TP;i++){const axis=rng()<0.5?0:1,coord=-120+24*((rng()*11)|0);tps.push({axis,coord,s:rng(),spd:rand(0.001,0.003)*(rng()<0.5?1:-1)});const c=lerpC(PAL.traceHi,PAL.bio,rng());tpCol[i*3]=c.r;tpCol[i*3+1]=c.g;tpCol[i*3+2]=c.b;}
+tpGeo.setAttribute('color',new THREE.BufferAttribute(tpCol,3));
+const tpulse=new THREE.Points(tpGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(tpulse);
+
+/* ROUNDABOUTS — pads with rings; Bundaran HI with its fountain column */
+let fountMat;
+{const p=[],col=[];for(const [rx,rz,R] of [[0,24,6.5],[-48,-24,5],[48,48,5],[72,-48,4.5],[-72,24,4.5],[24,-72,4.5]]){
+  const n=(2*Math.PI*R/0.9)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;p.push(rx+R*Math.cos(a),0.35,rz+R*Math.sin(a));const c=lerpC(PAL.traceHi,PAL.pad,rng()*0.4);col.push(c.r,c.g,c.b);}}
+ world.add(glowPoints(p,col,1.1,0.7));}
+{const p=[],col=[];for(let k=0;k<8;k++){p.push(0,0.6+k*0.5,24);const c=lerpC(PAL.gold,0xFFFFFF,k/8);col.push(c.r,c.g,c.b);}
+ const o=glowPoints(p,col,1.6,0.9);fountMat=o.material;world.add(o);}
+
+/* MONAS — the golden pin at her heart */
+let flameMat;
+{const p=[],col=[];for(const s of [[-1.2,-1.2],[1.2,-1.2],[-1.2,1.2],[1.2,1.2]]){p.push(-8+s[0],1,-10+s[1],-8+s[0]*0.22,23,-10+s[1]*0.22);const c=new THREE.Color(0xC8C4B8);for(let e=0;e<2;e++)col.push(c.r,c.g,c.b);}
+ world.add(lineSegs(p,col,0.8));
+ const rp=[],rc=[];for(let k=0;k<30;k++){const a=k/30*Math.PI*2;rp.push(-8+7*Math.cos(a),0.35,-10+7*Math.sin(a));const c=new THREE.Color(PAL.pad);rc.push(c.r,c.g,c.b);}
+ world.add(glowPoints(rp,rc,1.0,0.55));
+ const f=glowPoints([-8,24,-10],[...new THREE.Color(PAL.gold).toArray()],4.5,0.95);flameMat=f.material;world.add(f);}
+
+/* TOWER JUNGLE — wireframe components, windows, beacons */
+const canalFns=[u=>[ -140+200*u, -20+150*u+14*Math.sin(u*5)],u=>[ 140-190*u, -6+140*u-12*Math.sin(u*4.2)],u=>[ -24+10*Math.sin(u*6), 64-176*u]];
+const canalSamp=[];for(const f of canalFns)for(let s=0;s<=20;s++)canalSamp.push(f(s/20));
+function nearCanal(x,z){for(const q of canalSamp){const dx=x-q[0],dz=z-q[1];if(dx*dx+dz*dz<49)return true;}return false;}
+const winArr=[],winColArr=[],beacons=[];
+{const p=[],col=[];let placed=0,tries=0;
+ while(placed<160&&tries<900){tries++;
+  const spine=rng()<0.55;const cx=spine?rand(-30,30):rand(-118,118),cz=spine?rand(-78,72):rand(-92,118);
+  if(cz<-92||nearCanal(cx,cz))continue;
+  const h=spine?rand(12,44):rand(5,18),w=rand(1.6,3.6);
+  const cc=lerpC(PAL.twr,PAL.twrHi,MU.clamp(h/44,0,1));
+  for(const s of [[-w,-w],[w,-w],[-w,w],[w,w]]){p.push(cx+s[0],0.3,cz+s[1],cx+s[0],h,cz+s[1]);for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}
+  const tq=[[-w,-w,w,-w],[w,-w,w,w],[w,w,-w,w],[-w,w,-w,-w]];
+  for(const q of tq){p.push(cx+q[0],h,cz+q[1],cx+q[2],h,cz+q[3]);for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}
+  if(h>24)for(const q of tq){p.push(cx+q[0],h*0.55,cz+q[1],cx+q[2],h*0.55,cz+q[3]);for(let e=0;e<2;e++)col.push(cc.r*0.7,cc.g*0.7,cc.b*0.7);}
+  const nw=2+((rng()*3)|0);for(let k=0;k<nw;k++){winArr.push(cx+rand(-w,w),rand(2,h*0.92),cz+(rng()<0.5?w:-w)*1.02);const c=new THREE.Color(rng()<0.55?PAL.winW:PAL.winC);winColArr.push(c.r,c.g,c.b);}
+  if(h>34)beacons.push([cx,h+0.8,cz,rand(0,6.28)]);
+  placed++;}
+ world.add(lineSegs(p,col,0.6));}
+const windows=glowPoints(winArr,winColArr,1.2,0.85);world.add(windows);
+const bcN=beacons.length,{a:bcPos,g:bcGeo}=dynBuf(bcN),bcCol=new Float32Array(bcN*3);
+for(let i=0;i<bcN;i++){bcPos[i*3]=beacons[i][0];bcPos[i*3+1]=beacons[i][1];bcPos[i*3+2]=beacons[i][2];const c=new THREE.Color(PAL.beacon);bcCol[i*3]=c.r;bcCol[i*3+1]=c.g;bcCol[i*3+2]=c.b;}
+bcGeo.setAttribute('color',new THREE.BufferAttribute(bcCol,3));
+const beaconPts=new THREE.Points(bcGeo,new THREE.PointsMaterial({size:1.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(beaconPts);
+
+/* kampung memory-fields — dense low districts between the components */
+{const p=[],col=[];for(let d=0;d<12;d++){let cx,cz,tries=0;do{cx=rand(-108,108);cz=rand(-84,108);tries++;}while(nearCanal(cx,cz)&&tries<20);
+  const W=rand(10,20),D=rand(8,16);for(let x=-W;x<=W;x+=1.5)for(let z=-D;z<=D;z+=1.5){if(rng()<0.2)continue;p.push(cx+x+rand(-.3,.3),0.9+rand(0,0.5),cz+z+rand(-.3,.3));const c=lerpC(0x5A3220,0xB0662E,rng()*0.6);col.push(c.r,c.g,c.b);}}
+ world.add(new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.8})));}
+
+/* HIGHWAYS — elevated arteries + the JORR ring + traffic */
+const HWS=[
+ {fn:u=>new THREE.Vector3(-140+280*u,6+2*Math.sin(u*3),-40+18*Math.sin(u*2.2)),n:80},
+ {fn:u=>new THREE.Vector3(-140+280*u,7,52-26*u+14*Math.sin(u*3)),n:80},
+ {fn:u=>new THREE.Vector3(30+20*Math.sin(u*2.5),5.5+2.5*Math.sin(u*4),-130+260*u),n:80},
+ {fn:u=>new THREE.Vector3(84*Math.cos(u*Math.PI*2),6,10+84*Math.sin(u*Math.PI*2)),n:150,ring:true}];
+{const p=[],col=[];for(const H of HWS){let prevL=null,prevR=null;
+  for(let s=0;s<=140;s++){const u=s/140,q=H.fn(u),q2=H.fn(Math.min(1,u+0.004));let tx=q2.x-q.x,tz=q2.z-q.z;const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;const px=-tz,pz=tx;
+    const L=[q.x+px*1.3,q.y,q.z+pz*1.3],R=[q.x-px*1.3,q.y,q.z-pz*1.3];
+    if(prevL){p.push(prevL[0],prevL[1],prevL[2],L[0],L[1],L[2],prevR[0],prevR[1],prevR[2],R[0],R[1],R[2]);const c=new THREE.Color(0x2E6A7A);for(let e=0;e<4;e++)col.push(c.r,c.g,c.b);}
+    prevL=L;prevR=R;
+    if(s%14===0&&q.z>-96){p.push(q.x,q.y,q.z,q.x,0.3,q.z);const c=new THREE.Color(0x1E3A44);for(let e=0;e<2;e++)col.push(c.r,c.g,c.b);}}}
+ world.add(lineSegs(p,col,0.55));}
+let TN=0;for(const H of HWS)TN+=H.n;
+const cars=[],{a:carPos,g:carGeo}=dynBuf(TN),carCol=new Float32Array(TN*3);
+{let i=0;for(const H of HWS)for(let k=0;k<H.n;k++){const dir=rng()<0.5?1:-1;cars.push({H,u:rng(),dir,spd:rand(0.0009,0.0018)});
+  const c=new THREE.Color(dir>0?PAL.head:PAL.tail);carCol[i*3]=c.r;carCol[i*3+1]=c.g;carCol[i*3+2]=c.b;i++;}}
+carGeo.setAttribute('color',new THREE.BufferAttribute(carCol,3));
+const traffic=new THREE.Points(carGeo,new THREE.PointsMaterial({size:1.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(traffic);
+
+/* trains — two transit traces with running light-strings */
+const railFns=[u=>new THREE.Vector3(-124+248*u,2.4,-58+6*Math.sin(u*3)),u=>new THREE.Vector3(-58+4*Math.sin(u*4),2.4,-124+248*u)];
+{const p=[],col=[];for(const f of railFns){let prev=null;for(let s=0;s<=90;s++){const q=f(s/90);if(q.z<-96&&Math.abs(q.x)<200&&f===railFns[1]&&q.z<-96){prev=q;continue;}if(prev){p.push(prev.x,prev.y,prev.z,q.x,q.y,q.z);const c=new THREE.Color(0x1E4A56);for(let e=0;e<2;e++)col.push(c.r,c.g,c.b);}prev=q;}}
+ world.add(lineSegs(p,col,0.5));}
+const TRN=7,trains=[{f:railFns[0],u:0.2},{f:railFns[1],u:0.7}],{a:trPos,g:trGeo}=dynBuf(TRN*2),trCol=new Float32Array(TRN*2*3);
+for(let i=0;i<TRN*2;i++){const c=new THREE.Color(PAL.rail);trCol[i*3]=c.r;trCol[i*3+1]=c.g;trCol[i*3+2]=c.b;}
+trGeo.setAttribute('color',new THREE.BufferAttribute(trCol,3));
+world.add(new THREE.Points(trGeo,new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* THE CANALS — the water layer of the board */
+const canals=[];
+{const p=[],col=[];for(const f of canalFns){for(let s=0;s<=90;s++){const u=s/90,q=f(u);if(q[1]<-98)continue;
+   for(const w of [-1.8,-0.6,0.6,1.8]){p.push(q[0],0.3,q[1]+w);const c=lerpC(PAL.water,PAL.waterHi,0.2+0.3*rng());col.push(c.r,c.g,c.b);}}}
+ world.add(glowPoints(p,col,1.1,0.5));}
+for(const f of canalFns){const S=80,pos=new Float32Array(S*3),cl=new Float32Array(S*3);
+ for(let k=0;k<S;k++){const c=lerpC(PAL.cur,PAL.bio,rng()*0.5);cl[k*3]=c.r;cl[k*3+1]=c.g;cl[k*3+2]=c.b;}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(cl,3));
+ world.add(new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+ canals.push({f,pos,geo:g,base:cl.slice(),phase:rand(0,6.28)});}
+
+/* banjir flood layer — the water that takes the board */
+const fpP=[],fpC=[],fpPh=[];for(let x=-124;x<=124;x+=7)for(let z=-96;z<=124;z+=7){fpP.push(x,0.3,z);fpPh.push(rand(0,6.28));const c=lerpC(PAL.water,PAL.waterHi,0.15+0.25*rng());fpC.push(c.r,c.g,c.b);}
+const fpGeo=mkGeo(fpP,fpC),flood=new THREE.Points(fpGeo,new THREE.PointsMaterial({size:1.4,vertexColors:true,map:GLOW,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(flood);
+const fpPos=fpGeo.attributes.position.array,fpN=fpPh.length;
+
+/* JAKARTA BAY + the Great Garuda seawall */
+const bayP=[],bayC=[],bayPh=[];for(let x=-124;x<=124;x+=5)for(let z=-128;z<=-100;z+=5){bayP.push(x,1.0,z);bayPh.push(rand(0,6.28));const c=lerpC(PAL.water,PAL.waterHi,0.2+0.3*rng());bayC.push(c.r,c.g,c.b);}
+const bayGeo=mkGeo(bayP,bayC),bay=new THREE.Points(bayGeo,new THREE.PointsMaterial({size:1.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(bay);
+const bayPos=bayGeo.attributes.position.array,bayN=bayPh.length;
+{const p=[],col=[];for(let s=0;s<=90;s++){const u=s/90,x=-118+236*u,z=-98-8*Math.sin(u*Math.PI);
+  for(let y=0.5;y<=3.2;y+=0.9){p.push(x,y,z);const c=lerpC(0x2E4A50,0x8FA6AE,0.3+0.4*rng());col.push(c.r,c.g,c.b);}
+  p.push(x,3.6,z);const c2=new THREE.Color(PAL.foam);col.push(c2.r,c2.g,c2.b);}
+ for(let y=0.5;y<10;y+=0.8){p.push(0,y,-106);const c=new THREE.Color(PAL.gold);col.push(c.r,c.g,c.b);}
+ for(const sgn of [-1,1])for(let k=0;k<10;k++){const a=k/10*1.1;p.push(sgn*(3+12*Math.sin(a)),9-5*(1-Math.cos(a)),-106);const c=lerpC(PAL.gold,0x8FA6AE,k/10);col.push(c.r,c.g,c.b);}
+ world.add(glowPoints(p,col,1.0,0.7));}
+
+/* rain */
+const raN=420,ra=[],{a:raPos,g:raGeo}=dynBuf(raN*2),raCol=new Float32Array(raN*2*3);
+for(let i=0;i<raN;i++){ra.push({x:rand(-140,140),y:rand(0,100),z:rand(-130,130),v:rand(1.6,2.6)});const c=new THREE.Color(PAL.rain);for(let e=0;e<2;e++){raCol[i*6+e*3]=c.r;raCol[i*6+e*3+1]=c.g;raCol[i*6+e*3+2]=c.b;}}
+raGeo.setAttribute('color',new THREE.BufferAttribute(raCol,3));const rainObj=new THREE.LineSegments(raGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(rainObj);
+
+/* sky — moon, sun, stars, clouds, drone lights */
+const MC=new THREE.Vector3(-64,92,-70);let moonMat,haloMat;
+{const R=10,p=[],col=[];for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(MC.x+x,MC.y+y,MC.z+z);col.push(c.r,c.g,c.b);}
+ const m=glowPoints(p,col,1.2,0.9);moonMat=m.material;world.add(m);const h=glowPoints([MC.x,MC.y,MC.z],[...new THREE.Color(0xC2CEC8).toArray()],42,0.24);haloMat=h.material;world.add(h);}
+let sunMat;{const s=glowPoints([80,30,-100],[...new THREE.Color(PAL.sun).toArray()],56,0);sunMat=s.material;world.add(s);}
+const cloudBands=[];function cloudBand(cx,cy,cz,w){const p=[],col=[];for(let i=0;i<56;i++){p.push(cx+rand(-w,w),cy+rand(-4,4),cz+rand(-8,8));const c=lerpC(0x1E2622,0x3A463E,rng());col.push(c.r,c.g,c.b);}const o=glowPoints(p,col,2.8,0.26);world.add(o);cloudBands.push({o,base:new Float32Array(o.geometry.attributes.position.array),w,cx});}
+for(let i=0;i<6;i++)cloudBand(rand(-140,140),rand(60,96),rand(-140,60),rand(24,42));
+let stars,starBase,starPh,starMat;{const p=[],col=[],ph=[];for(let i=0;i<720;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.05,1)),R=rand(160,270);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+44,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,0xFFFFFF,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,0.9,0);starMat=stars.material;world.add(stars);}
+const drN=16,dr=[],{a:drPos,g:drGeo}=dynBuf(drN),drCol=new Float32Array(drN*3);
+for(let i=0;i<drN;i++){dr.push({x:rand(-100,100),z:rand(-90,110),y:rand(16,30),ph:rand(0,6.28),dx:rand(-.06,.06),dz:rand(-.06,.06)});const c=new THREE.Color(0xCFEFE8);drCol[i*3]=c.r;drCol[i*3+1]=c.g;drCol[i*3+2]=c.b;}
+drGeo.setAttribute('color',new THREE.BufferAttribute(drCol,3));
+const drones=new THREE.Points(drGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(drones);
+
+/* mirage horizon — the Jabodetabek sprawl, faint and endless */
+const skyline=new THREE.Group();scene.add(skyline);let skyEdgeMat,skyDotMat;
+{const R0=300,N=48,linP=[],linC=[],dots=[],dotCol=[];
+ function prof(kind,hw,h){if(kind==='needle')return [[-hw*0.6,0],[-hw*0.6,h*0.4],[-hw*0.3,h*0.6],[-hw*0.3,h*0.84],[0,h]];
+  if(kind==='kamp')return [[-hw,0],[-hw,h*0.45],[-hw*0.78,h],[-hw*0.56,h*0.45],[-hw*0.38,h],[-hw*0.18,h*0.45],[0,h*0.92]];
+  return [[-hw,0],[-hw,h*0.88],[-hw*0.5,h*0.94],[0,h]];}
+ for(let i=0;i<N;i++){const a=i/N*Math.PI*2,bx=R0*Math.cos(a),bz=R0*Math.sin(a),tx=-Math.sin(a),tz=Math.cos(a);
+  const r=rng();let kind,h,hw;
+  if(r<0.3){kind='needle';h=rand(26,44);hw=rand(5,8);}else if(r<0.72){kind='kamp';h=rand(4,8);hw=rand(9,14);}else{kind='slab';h=rand(16,28);hw=rand(6,9);}
+  const half=prof(kind,hw,h),full=half.concat(half.slice(0,-1).reverse().map(q=>[-q[0],q[1]]));
+  for(const q of full){linP.push(bx+tx*q[0],q[1],bz+tz*q[0]);const c=lerpC(0x3A5A4E,0x5A7A96,MU.clamp(q[1]/44,0,1));linC.push(c.r,c.g,c.b);}
+  linP.push(R0*Math.cos(a+Math.PI/N),0,R0*Math.sin(a+Math.PI/N));linC.push(0.24,0.32,0.28);
+  for(let k=0;k<2;k++){dots.push(bx+tx*rand(-hw*0.6,hw*0.6),rand(h*0.2,h*0.8),bz+tz*rand(-hw*0.6,hw*0.6));const c=new THREE.Color(0x8FD8C8);dotCol.push(c.r,c.g,c.b);}}
+ const eo=new THREE.LineLoop(mkGeo(linP,linC),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.22,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));skyEdgeMat=eo.material;skyline.add(eo);
+ const do2=new THREE.Points(mkGeo(dots,dotCol),new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));skyDotMat=do2.material;skyline.add(do2);}
+
+/* climate cycle — Bahasa Indonesia */
+const CK=[
+ {p:0.00,sky:0x1E2620,moonO:0.35,veil:0.35,rain:0.0,wtr:0.1,star:0.2,win:0.5,sunO:0.6,pulse:0.7},
+ {p:0.25,sky:0x1C242A,moonO:0.12,veil:0.9,rain:1.0,wtr:0.45,star:0.0,win:0.65,sunO:0.1,pulse:0.85},
+ {p:0.50,sky:0x0E1C1E,moonO:0.5,veil:0.5,rain:0.45,wtr:1.0,star:0.35,win:0.8,sunO:0.0,pulse:1.0},
+ {p:0.75,sky:0x070C0A,moonO:1.0,veil:0.25,rain:0.0,wtr:0.35,star:1.0,win:1.0,sunO:0.0,pulse:1.0}];
+function cparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<CK.length;k++)if(CK[k].p<=p)i=k;const A=CK[i],B=CK[(i+1)%CK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);const o={};for(const k2 of ['moonO','veil','rain','wtr','star','win','sunO','pulse'])o[k2]=MU.lerp(A[k2],B[k2],f);o.sky=lerpC(A.sky,B.sky,f);return o;}
+let P=0.75,auto=true,targetP=0.75;const NAMES=['musim kemarau','musim hujan','banjir','malam'];
+document.querySelectorAll('[data-m]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-m]').forEach(x=>x.classList.remove('on'));b.classList.add('on');if(b.dataset.m==='auto')auto=true;else{auto=false;targetP=parseFloat(b.dataset.m);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+const target=new THREE.Vector3(0,0,0);let camA=Math.PI*0.5,camR=150,camY=76,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.5,18,160);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.06,70,240);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.traceHi,'the circuit','streets, carrying light'],[PAL.cur,'the canals','water traces, pulsing'],[PAL.tail,'the arteries','headlights, taillights'],[PAL.gold,'Monas','the golden pin at her heart']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0006;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  if(auto)P=(P+dt/108)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  const par=cparams(P);scene.background.copy(par.sky);scene.fog.color.copy(par.sky);
+  moonMat.opacity=0.9*par.moonO*(1-0.5*par.veil);haloMat.opacity=0.24*par.moonO*(1-0.4*par.veil);sunMat.opacity=0.75*par.sunO;starMat.opacity=0.85*par.star;
+  windows.material.opacity=0.2+0.75*par.win;traceMat.opacity=0.3+0.35*par.win;padMat.opacity=0.3+0.3*par.win;
+  tpulse.material.opacity=0.55*par.pulse+0.3*par.win;traffic.material.opacity=0.55+0.4*par.pulse;
+  rainObj.material.opacity=0.5*par.rain;fountMat.opacity=(0.5+0.4*Math.sin(t*1.2))*(0.4+0.6*par.win);
+  flameMat.opacity=0.7+0.25*Math.sin(t*0.9);drones.material.opacity=0.4+0.4*par.win;
+  const wtr=par.wtr;phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · air '+((wtr*100)|0)+'% —';
+  const sSc=MU.clamp(0.72*Math.pow(camR/150,1.5),0.32,2.0);skyline.position.set(camera.position.x,0,camera.position.z);skyline.scale.setScalar(sSc);skyEdgeMat.opacity=0.18+0.05*Math.sin(t*0.25);skyDotMat.opacity=0.26;
+  // banjir — the flood takes the board
+  const fY=0.25+wtr*2.0;flood.material.opacity=0.5*ss((wtr-0.28)/0.72);
+  for(let i=0;i<fpN;i++)fpPos[i*3+1]=fY+0.18*Math.sin(t*1.6+fpPh[i]);fpGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<bayN;i++)bayPos[i*3+1]=1.0+wtr*1.4+0.3*Math.sin(t*1.3+bayPh[i]);bayGeo.attributes.position.needsUpdate=true;
+  // canal pulses — the organism in the water layer
+  for(const C of canals){const arr=C.pos,ca=C.geo.attributes.color.array;for(let k=0;k<80;k++){const u=k/79,q=C.f(u);arr[k*3]=q[0];arr[k*3+1]=0.55+wtr*0.6;arr[k*3+2]=q[1];const pulse=0.35+0.65*Math.max(0,Math.sin(t*1.1-u*9+C.phase));const b=(0.7+0.5*wtr)*pulse;ca[k*3]=C.base[k*3]*b;ca[k*3+1]=C.base[k*3+1]*b;ca[k*3+2]=C.base[k*3+2]*b;}C.geo.attributes.position.needsUpdate=true;C.geo.attributes.color.needsUpdate=true;}
+  // trace packets
+  for(let i=0;i<TP;i++){const q=tps[i];q.s+=q.spd*(0.6+par.pulse*0.7);if(q.s>1)q.s-=1;if(q.s<0)q.s+=1;const c2=-96+ (124+96)*q.s;
+    if(q.axis===0){tpPos[i*3]=q.coord;tpPos[i*3+2]=c2;}else{tpPos[i*3]=-124+248*q.s;tpPos[i*3+2]=q.coord;}tpPos[i*3+1]=0.4;}
+  tpGeo.attributes.position.needsUpdate=true;
+  // traffic on the arteries
+  for(let i=0;i<TN;i++){const cr=cars[i];cr.u+=cr.spd*cr.dir*(0.7+par.pulse*0.5);if(cr.u>1)cr.u-=1;if(cr.u<0)cr.u+=1;
+    const q=cr.H.fn(cr.u),q2=cr.H.fn((cr.u+0.004)%1);let tx=q2.x-q.x,tz=q2.z-q.z;const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;
+    carPos[i*3]=q.x+(-tz)*0.8*cr.dir;carPos[i*3+1]=q.y+0.5;carPos[i*3+2]=q.z+(tx)*0.8*cr.dir;}
+  carGeo.attributes.position.needsUpdate=true;
+  // trains
+  {let i=0;for(const T of trains){T.u=(T.u+dt*0.02)%1;for(let k=0;k<TRN;k++){const q=T.f((T.u+k*0.006)%1);trPos[i*3]=q.x;trPos[i*3+1]=q.y+0.6;trPos[i*3+2]=q.z;i++;}}trGeo.attributes.position.needsUpdate=true;}
+  // beacons blink
+  {const arr=bcGeo.attributes.color ? bcGeo.attributes.color.array : null;if(arr)for(let i=0;i<bcN;i++){const bl=Math.pow(0.5+0.5*Math.sin(t*2.2+beacons[i][3]),6);arr[i*3]=1.0*bl;arr[i*3+1]=0.29*bl;arr[i*3+2]=0.23*bl;}bcGeo.attributes.color.needsUpdate=true;}
+  // drones wander
+  for(let i=0;i<drN;i++){const d=dr[i];d.x+=d.dx;d.z+=d.dz;if(Math.abs(d.x)>110)d.dx*=-1;if(d.z>115||d.z<-92)d.dz*=-1;drPos[i*3]=d.x;drPos[i*3+1]=d.y+1.5*Math.sin(t*0.6+d.ph);drPos[i*3+2]=d.z;}
+  drGeo.attributes.position.needsUpdate=true;
+  if(par.rain>0.02)for(let i=0;i<raN;i++){const p2=ra[i];p2.y-=p2.v*2.6;p2.x-=p2.v*0.5;if(p2.y<0.5){p2.y=100;p2.x=rand(-140,140);}raPos[i*6]=p2.x;raPos[i*6+1]=p2.y;raPos[i*6+2]=p2.z;raPos[i*6+3]=p2.x-1.2;raPos[i*6+4]=p2.y-4.5;raPos[i*6+5]=p2.z;}raGeo.attributes.position.needsUpdate=true;
+  for(const cb of cloudBands){const arr=cb.o.geometry.attributes.position.array,B=cb.base,off=(t*1.4)%(cb.w*4)-cb.w*2;for(let i=0;i<arr.length/3;i++)arr[i*3]=B[i*3]+off;cb.o.geometry.attributes.position.needsUpdate=true;}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

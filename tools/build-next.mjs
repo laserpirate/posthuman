@@ -21,12 +21,9 @@ for (const f of files) {
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   fs.writeFileSync(dst, git('show', REF + ':' + f));
 }
-let pack = 0;
-for (const f of fs.readdirSync(path.join(ROOT, 'kodamas'))) {
-  fs.mkdirSync(path.join(OUT, 'kodamas'), { recursive: true });
-  fs.copyFileSync(path.join(ROOT, 'kodamas', f), path.join(OUT, 'kodamas', f));
-  pack++;
-}
+// the public kodama pack (plain, with its thumbs/ folder), as the root carries it
+fs.cpSync(path.join(ROOT, 'kodamas'), path.join(OUT, 'kodamas'), { recursive: true });
+const pack = fs.readdirSync(path.join(OUT, 'kodamas'), { recursive: true }).filter(f => fs.statSync(path.join(OUT, 'kodamas', f)).isFile()).length;
 const sha = git('rev-parse', '--short', REF).toString().trim();
 fs.writeFileSync(path.join(OUT, 'BUILD.txt'), 'posthuman /next/ preview, built from ' + REF + ' ' + sha + ' on ' + new Date().toISOString() + '\n');
 console.log('next/: ' + files.length + ' app files from ' + REF + ' (' + sha + '), ' + pack + ' kodama pack files from kodamas/');

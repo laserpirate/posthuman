@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>storm runway (study)</title>
+<style>
+  :root{--cream:#E6ECF2;--gold:#F6C544;--pale:#9FB6CC;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0A121C;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px;text-shadow:0 1px 10px #000}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px;text-shadow:0 1px 10px #000}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(10,18,28,.55);border:1px solid rgba(159,182,204,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="32"><h1>storm runway</h1>
+  <div class="sub">phylla-kodama study · working title · draft</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill on" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill" data-t="0.75">night</button></span>
+  <span class="grp">flood <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name · © Marko Manriquez, all rights reserved</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* storm runway — airfield × drowned towers. A single runway runs out of the flood toward the
+   horizon; its approach lights march away over open water on pylons, into a channel between
+   sunken skyscrapers and a drowned control tower whose beacon still turns. Heavy rain, rain
+   rings, lanterns on the water and in the sky, and an occasional lightning stroke that lifts
+   the fog for a breath. Mirror reflections clipped at the waterline. Time + flood. r128. */
+const PAL={tLo:0x121A26,tHi:0x3A4A5E,fLo:0x18222E,fHi:0x404E60,rust:0x4E4246,rustHi:0x7E6460,
+  conc:0x7C838C,concLo:0x2E3540,frame:0x5E6A78,win:0xFFC98A,winC:0x9FE0F0,
+  tarLo:0x20252C,tarHi:0x4E5662,paint:0xD4D4CA,paintLo:0x6A6C68,crack:0x0C0F12,crackG:0x2E4430,weed:0x2A4A2E,weedHi:0x5E8A50,rub:0x1E242C,rubHi:0x4E5662,
+  edge:0xFFE2A8,amber:0xFFB040,thr:0x6CFF8A,endR:0xFF4A3A,appr:0xFFF2DC,strobe:0xDDEEFF,taxiB:0x3C6CFF,cl:0xEAF2FF,
+  bcnG:0x6CFF8A,bcnW:0xFFF6E0,obst:0xFF3A2A,lamp:0xFF5A44,
+  lant:0xFFC46A,flame:0xF6C544,petal:0x5A9A5E,petal2:0xE07AA8,rain:0xA8BED2,bolt:0xC4D2FF,flash:0x8E9EC6,ref:0xBFE0F0,wat:0x0C141E};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261032);
+const lrng=mulberry32(20261132),lr=(a,b)=>a+(b-a)*lrng();// lightning has its own seeded stream
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+const C=h=>new THREE.Color(h);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x13202E);scene.fog=new THREE.FogExp2(0x13202E,0.0046);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.3,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.localClippingEnabled=true;
+const world=new THREE.Group();scene.add(world);
+let waterY=0,mY=0.02;
+const FL=3.2;
+
+/* ---------- sky dome (flat single-hue storm gradient) ---------- */
+const skyU={top:{value:new THREE.Color(0x050A12)},bot:{value:new THREE.Color(0x13202E)}};
+const dome=new THREE.Mesh(new THREE.SphereGeometry(1600,24,12),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,fog:false,
+  vertexShader:'varying float vh;void main(){vh=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 top;uniform vec3 bot;varying float vh;void main(){gl_FragColor=vec4(mix(bot,top,smoothstep(0.0,0.5,vh)),1.0);}'}));
+dome.renderOrder=-10;scene.add(dome);
+
+/* ---------- accumulators ---------- */
+const acc=()=>({p:[],c:[]});
+const TM=acc(),MK=acc(),EB=acc(),RK=acc(),LG=acc(),LC=acc(),AP=acc(),WN=acc(),LS=acc(),winPh=[];
+function put(B,q,col){B.p.push(q[0],q[1],q[2]);B.c.push(col.r,col.g,col.b);}
+function seg(q1,q2,c1,c2){c2=c2||c1;LS.p.push(q1[0],q1[1],q1[2],q2[0],q2[1],q2[2]);LS.c.push(c1.r,c1.g,c1.b,c2.r,c2.g,c2.b);}
+
+/* ---------- tarmac causeway: runway, taxiway, connectors ---------- */
+const RWS=[];
+function slab(cx,cz,ang,s0,s1,hw,ds,dn){const dx=Math.cos(ang),dz=Math.sin(ang),W=(s,o,y)=>[cx+dx*s-dz*o,y,cz+dz*s+dx*o];RWS.push({cx,cz,dx,dz,s0,s1,hw,W});
+  for(let s=s0;s<=s1;s+=ds)for(let o=-hw;o<=hw+0.01;o+=dn){if(rng()<0.05)continue;const s2=s+rand(-.45,.45),o2=o+rand(-.5,.5),n=0.5+0.5*Math.sin(s2*0.043+o2*0.21)*Math.cos(s2*0.011-o2*0.05);
+    put(TM,W(s2,o2,0),lerpC(PAL.tarLo,PAL.tarHi,MU.clamp(0.12+0.6*n+rand(-.18,.18),0,1)));}
+  const nc=((s1-s0)*hw/70)|0;for(let i=0;i<nc;i++){let s=rand(s0,s1),o=rand(-hw,hw),a=rand(0,6.28);for(let k=0;k<7;k++){a+=rand(-.8,.8);const s2=s+Math.cos(a)*rand(.8,2.2),o2=MU.clamp(o+Math.sin(a)*rand(.8,2.2),-hw,hw);seg(W(s,o,0.06),W(s2,o2,0.06),lerpC(PAL.crack,PAL.crackG,rng()*0.7));if(rng()<0.35)put(EB,W(s2,o2,rand(0.05,0.6)),lerpC(PAL.weed,PAL.weedHi,rng()));s=s2;o=o2;}}
+  // embankment: broken rubble shoulders sloping down into the flood
+  for(let i=0;i<(s1-s0)*2.2;i++){const sd=rng()<0.5?-1:1,d=rng()*rng()*7,o=sd*(hw+0.6+d);put(EB,W(rand(s0,s1),o,-d*0.32+rand(-.15,.25)),rng()<0.18?lerpC(PAL.weed,PAL.weedHi,rng()):lerpC(PAL.rub,PAL.rubHi,rng()));}
+  return W;}
+function onRW(x,z,m){for(const r of RWS){const ox=x-r.cx,oz=z-r.cz,s=ox*r.dx+oz*r.dz,o=-ox*r.dz+oz*r.dx;if(s>r.s0-m&&s<r.s1+m&&Math.abs(o)<r.hw+m)return true;}return false;}
+
+const RL=420,HW=12;// runway: threshold at the origin, runs +x into the storm
+const RWW=slab(0,0,0,-4,RL,HW,1.25,1.5);
+{const paint=()=>lerpC(PAL.paint,PAL.paintLo,rng()*0.7);
+  for(let s=34;s<RL-34;s+=20)for(let u=0;u<11;u+=0.45)for(const o of [-0.45,0,0.45]){if(rng()<0.3)continue;put(MK,[s+u,0.04,o],paint());}
+  for(let s=0;s<=RL;s+=0.7)for(const sd of [-1,1]){if(rng()<0.4)continue;put(MK,[s,0.04,sd*(HW-0.9)],paint());}
+  for(const sb of [3,RL-15])for(let k=0;k<6;k++)for(const sd of [-1,1]){const o0=sd*(1.7+k*1.5);for(let u=0;u<12;u+=0.45)for(const oo of [-0.35,0.35]){if(rng()<0.22)continue;put(MK,[sb+u,0.04,o0+oo],paint());}}
+  for(const sa of [62,RL-82])for(const sd of [-1,1])for(let u=0;u<20;u+=0.5)for(let w=0;w<2.6;w+=0.65){if(rng()<0.25)continue;put(MK,[sa+u,0.04,sd*(4+w)],paint());}
+  for(const sa of [110,140,170])for(const sd of [-1,1])for(let u=0;u<10;u+=0.5)for(let w=0;w<1.6;w+=0.55){if(rng()<0.3)continue;put(MK,[sa+u,0.04,sd*(4+w)],paint());}}
+// runway lights on short posts (they outlast the flood), inset centreline + touchdown lights (they drown)
+for(let s=0;s<=RL+0.01;s+=7.5)for(const sd of [-1,1]){if(rng()<0.1)continue;const far=s>RL-120,q=[s,2.0,sd*(HW+0.9)];put(LG,q,C(far?PAL.amber:PAL.edge));seg([s,-1.2,q[2]],[s,1.8,q[2]],C(0x2A3038));}
+for(let o=-HW;o<=HW+0.01;o+=1.8){put(LG,[-0.6,1.9,o],C(PAL.thr));put(LG,[RL+0.6,1.9,o],C(PAL.endR));}
+for(let s=10;s<RL-5;s+=15)put(LC,[s,0.2,0],C(s>RL-90?(Math.round(s/15)%2?PAL.endR:PAL.cl):PAL.cl));
+for(let s=20;s<=150;s+=10)for(const sd of [-1,1])for(const o of [3.2,4.2,5.2])put(LC,[s,0.2,sd*o],C(PAL.cl));
+for(let j=0;j<4;j++){put(LG,[64,1.7,-(HW+5+j*1.6)],C(j<2?PAL.appr:PAL.endR));seg([64,-1,-(HW+5+j*1.6)],[64,1.5,-(HW+5+j*1.6)],C(0x2A3038));}
+// approach lighting system: 24 bars on pylons out over open water, rising slightly seaward
+const strobeQ=[];
+{const pyl=C(0x2E343C),pylHi=C(0x4A525C);
+  for(let k=1;k<=24;k++){const s=-k*6,y=2.4+k*0.075;for(let o=-2;o<=2;o+=1)put(AP,[s,y,o],C(PAL.appr));
+    seg([s,-4,0],[s,y,0],pyl,pylHi);seg([s,y-0.2,-2.3],[s,y-0.2,2.3],pyl);
+    if(k%4===0){seg([s,-4,-1.4],[s,y-0.4,0],pyl);seg([s,-4,1.4],[s,y-0.4,0],pyl);}
+    if(k===5||k===10||k===15){const ww=k===5?15:k===10?11:8;for(let o=-ww;o<=ww;o+=1.2){if(Math.abs(o)<2.6)continue;put(AP,[s,y,o],C(PAL.appr));}seg([s,y-0.2,-ww],[s,y-0.2,ww],pyl);
+      for(const sd of [-1,1])seg([s,-4,sd*ww*0.7],[s,y-0.2,sd*ww*0.7],pyl);}
+    if(k<=3)for(const sd of [-1,1])for(let o=5;o<=7.4;o+=1.2)put(AP,[s,y,sd*o],C(PAL.endR));
+    if(k>=3)strobeQ.push([s,y+0.6,0]);}
+  strobeQ.reverse();}
+// parallel taxiway + two connectors with blue edge lights
+slab(0,-40,0,20,330,5,1.3,1.5);
+for(let s=20;s<=330;s+=15)for(const sd of [-1,1]){if(rng()<0.12)continue;put(LG,[s,1.6,-40+sd*5.8],C(PAL.taxiB));seg([s,-1,-40+sd*5.8],[s,1.4,-40+sd*5.8],C(0x2A3038));}
+for(const tx of [60,210]){slab(tx,-23.5,Math.PI/2,-11.5,11.5,4,1.2,1.4);for(let z=-33;z<=-14;z+=4)for(const sd of [-1,1])put(LG,[tx+sd*4.8,1.6,z],C(PAL.taxiB));}
+
+/* ---------- drowned towers (mid ring + far ring), masts, girders ---------- */
+const TP={mid:{p:[],c:[]},far:{p:[],c:[]}};
+const towers=[];
+function tower(cx,cz,w,d,h,rot,tier,sink){
+  const far=tier==='far',S=far?1.75:1.0,slabEvery=far?2:1,colStep=far?8:4.4,vStep=far?2.4:S*1.15;
+  const ca=Math.cos(rot),sa=Math.sin(rot),P=2*(w+d);
+  const W=(lx,lz)=>[cx+lx*ca-lz*sa,cz+lx*sa+lz*ca];
+  const per=u=>{u=((u%P)+P)%P;if(u<w)return [u-w/2,-d/2,0,-1];u-=w;if(u<d)return [w/2,u-d/2,1,0];u-=d;if(u<w)return [w/2-u,d/2,0,1];u-=w;return [-w/2,d/2-u,-1,0];};
+  const at=(u,y,o)=>{o=o||0;const q=per(u),r=W(q[0]+q[2]*o,q[1]+q[3]*o);return [r[0],y-sink,r[1]];};
+  const brk=rng()<0.7,bA=rand(4,15),bF=rand(0.12,0.4),bPh=rand(0,6.28);
+  const top=u=>brk?h-bA*Math.max(0,Math.sin(u*bF+bPh))*(0.55+0.45*Math.sin(u*0.31+bPh*2)):h;
+  const minTop=brk?h-bA:h;
+  const holes=[];for(let k=0;k<(far?2:5);k++){const u0=rand(0,P),y0=rand(sink,h*0.85);holes.push([u0,u0+rand(3,8),y0,y0+rand(4,12)]);}
+  const hole=(u,y)=>{for(const H of holes)if(u>H[0]&&u<H[1]&&y>H[2]&&y<H[3])return true;return false;};
+  const dst=TP[tier],lo=far?PAL.fLo:PAL.tLo,hi=far?PAL.fHi:PAL.tHi;
+  const add=(u,y,c)=>{if(y-sink<-3)return;const q=at(u,y,0);dst.p.push(q[0]+rand(-.07,.07),q[1],q[2]+rand(-.07,.07));dst.c.push(c.r,c.g,c.b);};
+  for(let f=1;f*FL<h;f++){if(f%slabEvery)continue;const y=f*FL;if(y-sink<-3)continue;for(let u=0;u<P;u+=S){if(y>top(u)||hole(u,y))continue;
+    const c=rng()<0.08?lerpC(PAL.rust,PAL.rustHi,rng()*0.6):lerpC(lo,hi,0.15+0.7*rng()*(0.5+0.5*y/h));add(u,y,c);}}
+  const cols=[];for(let u=0;u<P;u+=colStep)cols.push(u);cols.push(w,w+d,2*w+d);
+  for(const u of cols){const tu=top(u),rs=rng()<0.25;for(let y=sink-3;y<tu;y+=vStep){if(hole(u,y))continue;const c=(rs&&rng()<0.6)?lerpC(PAL.rust,PAL.rustHi,rng()*0.5):lerpC(lo,hi,0.25+0.5*rng());add(u,y,c);}}
+  if(!brk){for(let i=0;i<w*d*(far?0.06:0.16);i++){const r=W(rand(-w/2,w/2),rand(-d/2,d/2));dst.p.push(r[0],h-sink,r[1]);const c=lerpC(lo,hi,0.4*rng());dst.c.push(c.r,c.g,c.b);}}
+  const lc=lerpC(lo,hi,0.45),cs=[0,w,w+d,2*w+d,P];
+  for(let k=0;k<4;k++)seg(at(cs[k],sink-3,0),at(cs[k],top(cs[k]),0),lc);
+  for(let f=Math.ceil(sink/FL)+1;f*FL<minTop;f+=far?4:3){const y=f*FL;for(let k=0;k<4;k++)seg(at(cs[k],y,0),at(cs[k+1],y,0),lc);}
+  return {cx,cz,w,d,h,rot,ca,sa,P,W,per,at,top,minTop,brk,tier,sink,rad:Math.hypot(w,d)/2,roofY:(brk?minTop+1:h)-sink};}
+const CT={x:188,z:-122};// drowned control tower
+const corridor=(x,z)=>(x>-20&&Math.abs(z)<62)||(x<=-20&&Math.abs(z)<44);// keep the runway line and the approach channel open
+function place(n,r0,r1,wr,hr,tier,gap,sk){let tries=0,k=0;while(k<n&&tries<900){tries++;const a=rand(0,6.28),r=r0+(r1-r0)*Math.sqrt(rng()),cx=r*Math.cos(a),cz=r*Math.sin(a),w=rand(wr[0],wr[1]),d=rand(wr[0],wr[1]),rad=Math.hypot(w,d)/2;
+  if(corridor(cx,cz)||Math.abs(cz)<rad+30)continue;if(Math.hypot(cx-CT.x,cz-CT.z)<rad+22)continue;
+  if(towers.some(T=>Math.hypot(T.cx-cx,T.cz-cz)<T.rad+rad+gap))continue;towers.push(tower(cx,cz,w,d,rand(hr[0],hr[1]),rand(0,3.14),tier,rand(sk[0],sk[1])));k++;}}
+place(7,218,262,[11,16],[44,86],'mid',10,[8,22]);place(13,290,370,[14,24],[64,140],'far',12,[10,30]);
+const lampP=[],lampPh=[];
+function mast(b,H,bend,lattice,broken){const dir=rand(0,6.28),dx=Math.cos(dir),dz=Math.sin(dir),bAt=rand(0.45,0.8),mc=lerpC(PAL.rust,PAL.tHi,0.55),gc=lerpC(PAL.tLo,PAL.tHi,0.6);
+  let p=b.slice(),ang=0;const pts=[p];
+  for(let s=1;s<=H;s++){const f=s/H;if(f>bAt)ang=Math.min(bend,ang+bend*0.25);const np=[p[0]+Math.sin(ang)*dx,p[1]+Math.cos(ang),p[2]+Math.sin(ang)*dz];seg(p,np,mc);
+    if(s%3===0&&rng()<0.8){const L=rand(0.8,2.2)*(1-f*0.6);seg([np[0]+dz*L,np[1],np[2]-dx*L],[np[0]-dz*L,np[1],np[2]+dx*L],mc);}
+    p=np;pts.push(p);}
+  if(lattice){const n=Math.floor(H*bAt),R=0.8;for(let k=0;k<3;k++){const a0=k*2.094,a1=a0+2.094;for(let s=0;s<n;s+=2){const y=b[1]+s;
+      seg([b[0]+R*Math.cos(a0),y,b[2]+R*Math.sin(a0)],[b[0]+R*Math.cos(a0),y+2,b[2]+R*Math.sin(a0)],mc);seg([b[0]+R*Math.cos(a0),y,b[2]+R*Math.sin(a0)],[b[0]+R*Math.cos(a1),y+2,b[2]+R*Math.sin(a1)],mc);}}}
+  const g=pts[Math.floor(pts.length*0.55)];for(let k=0;k<3;k++){const a=dir+k*2.1+0.5;seg(g,[b[0]+6*Math.cos(a),b[1],b[2]+6*Math.sin(a)],gc);}
+  if(broken){let q=p;for(let s=1;s<=8;s++){const nq=[p[0]+0.5*s*dx*0.4,p[1]-s*1.1,p[2]+0.5*s*dz*0.4];seg(q,nq,gc);q=nq;}}
+  else{lampP.push(p[0],p[1]+0.4,p[2]);lampPh.push(rng());}
+  if(H>18){const m=pts[Math.floor(pts.length*0.5)];lampP.push(m[0],m[1],m[2]);lampPh.push(rng());}
+  return p;}
+const rods=[];// antenna tips the lightning can find
+for(const T of towers){const far=T.tier==='far',n=far?(rng()<0.65?1:0):(rng()<0.7?1:0);
+  for(let i=0;i<n;i++){const r=T.W(rand(-T.w/3,T.w/3),rand(-T.d/3,T.d/3)),H=far?rand(22,48):rand(10,26);
+    rods.push(mast([r[0],T.roofY-1,r[1]],Math.round(H),rng()<0.4?rand(0.35,1.3):0,H>22&&rng()<0.6,rng()<0.15));}}
+// rusted girders between the closest mid towers
+{const mids=towers.filter(T=>T.tier==='mid'),pairs=[];for(let i=0;i<mids.length;i++)for(let j=i+1;j<mids.length;j++)pairs.push({A:mids[i],B:mids[j],dd:Math.hypot(mids[i].cx-mids[j].cx,mids[i].cz-mids[j].cz)});
+  pairs.sort((a,b)=>a.dd-b.dd);let made=0;
+  for(const pr of pairs){if(made>=4||pr.dd>70)break;const e=(A,B)=>{const dx=B.cx-A.cx,dz=B.cz-A.cz,L=Math.hypot(dx,dz);return [A.cx+dx/L*Math.min(A.w,A.d)*0.5,A.cz+dz/L*Math.min(A.w,A.d)*0.5];};
+    const y=rand(8,Math.max(10,Math.min(pr.A.minTop-pr.A.sink,pr.B.minTop-pr.B.sink)*0.8)),pa=e(pr.A,pr.B),pb=e(pr.B,pr.A),span=rng()<0.4?rand(0.35,0.7):1,rc=()=>lerpC(PAL.rust,PAL.rustHi,rng()*0.5);
+    const L=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]),n=Math.max(4,Math.round(L*span/2.6)),P=(s,dy)=>[pa[0]+(pb[0]-pa[0])*s*span,y+dy,pa[1]+(pb[1]-pa[1])*s*span];
+    for(let k=0;k<n;k++){const s0=k/n,s1=(k+1)/n,a1=P(s0,1.2),a2=P(s1,1.2),b1=P(s0,-1.2),b2=P(s1,-1.2);seg(a1,a2,rc());seg(b1,b2,rc());seg(k%2?a1:b1,k%2?b2:a2,rc());seg(a1,b1,rc());}made++;}}
+// surviving window lights in the towers
+for(let i=0;i<200;i++){const T=pick(towers),f=Math.floor(rand(Math.ceil(T.sink/FL)+1,T.h/FL-1)),y=f*FL+1.6,u=rand(0,T.P);if(y>T.top(u)-1.5)continue;const q=T.at(u,y,0.2);put(WN,q,lerpC(PAL.win,0xFFF0DC,rng()*0.6));winPh.push(rng()<0.3?rand(0,6.28):-1);}
+
+/* ---------- drowned control tower: shaft, flared glazed cab, beacon ---------- */
+const CS=10;// how deep it stands in the flood
+{const conc=()=>lerpC(PAL.concLo,PAL.conc,0.25+0.55*rng()),X=CT.x,Z=CT.z,Y=y=>y-CS,P3=(x,y,z,col)=>put(RK,[X+x,Y(y),Z+z],col);
+  for(let y=CS-3;y<50;y+=1.0){const n=24;for(let k=0;k<n;k++){const a=k/n*Math.PI*2+y*0.02,r=3.6;P3(r*Math.cos(a),y,r*Math.sin(a),k%6===0?lerpC(PAL.conc,0xC8CED6,0.4):conc());}}
+  for(let y=50;y<55;y+=0.5){const r=3.6+(y-50)/5*4.6,n=(2*Math.PI*r/0.7)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;P3(r*Math.cos(a),y,r*Math.sin(a),conc());}}
+  for(const y of [55,55.5]){const r=8.4,n=80;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;P3(r*Math.cos(a),y,r*Math.sin(a),lerpC(PAL.frame,0xC0C8D0,0.4));}}
+  const cabR=y=>8+(y-55.8)/6.4*1.7;
+  for(let m=0;m<16;m++){const a=m/16*Math.PI*2;for(let y=55.8;y<62.2;y+=0.3){const r=cabR(y);P3(r*Math.cos(a),y,r*Math.sin(a),C(PAL.frame));}}
+  for(let i=0;i<520;i++){const a=rand(0,6.28),y=rand(56.1,61.9),r=cabR(y)-0.1;if(rng()<0.35)continue;put(WN,[X+r*Math.cos(a),Y(y),Z+r*Math.sin(a)],rng()<0.7?lerpC(PAL.win,0xFFE8C0,rng()):lerpC(PAL.winC,0xE0F6FF,rng()));winPh.push(rand(0,6.28));}
+  for(let y=62.3;y<63.6;y+=0.35){const r=9.9-(y-62.3)*1.3,n=(2*Math.PI*r/0.55)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;P3(r*Math.cos(a),y,r*Math.sin(a),lerpC(PAL.frame,0xC0C8D0,0.4*rng()));}}
+  for(let i=0;i<160;i++){const a=rand(0,6.28),r=Math.sqrt(rng())*8.2;P3(r*Math.cos(a),63.6,r*Math.sin(a),conc());}
+  for(let y=63.6;y<80;y+=0.35)P3(-4,y,2.5,C(0xB8C0C8));
+  for(let y=64;y<78;y+=2){seg([X-4.8,Y(y),Z+2.5],[X-3.2,Y(y+2),Z+2.5],C(0x8A949E));seg([X-3.2,Y(y),Z+2.5],[X-4.8,Y(y+2),Z+2.5],C(0x8A949E));}
+  for(let y=63.6;y<66;y+=0.3)P3(0,y,0,C(0xB8C0C8));
+  rods.push([X-4,Y(80),Z+2.5]);}
+const BEACON=new THREE.Vector3(CT.x,66.4-CS,CT.z),beacon=new THREE.Group();beacon.position.copy(BEACON);world.add(beacon);
+{const p=[],col=[];for(const [sd,hx] of [[1,PAL.bcnG],[-1,PAL.bcnW]])for(let k=0;k<90;k++){const r=1+k*1.1,f=Math.pow(1-k/90,1.6)*0.7;for(let j=0;j<2;j++){p.push(sd*r,rand(-1,1)*r*0.025,rand(-1,1)*r*0.04);const cc=C(hx);col.push(cc.r*f,cc.g*f,cc.b*f);}}
+  beacon.add(glowPoints(p,col,2.4,0.8));}
+const bHead=glowPoints([BEACON.x,BEACON.y,BEACON.z],[1,1,0.95],7,0.6);world.add(bHead);
+const obst=glowPoints([CT.x-4,80.3-CS,CT.z+2.5],[...C(PAL.obst).toArray()],3.2,1);world.add(obst);
+
+/* ---------- build merged static objects ---------- */
+const tarObj=rockPoints(TM.p,TM.c,0.95);world.add(tarObj);
+const mkObj=rockPoints(MK.p,MK.c,0.85);world.add(mkObj);
+const ebObj=rockPoints(EB.p,EB.c,0.8);world.add(ebObj);
+const rkObj=rockPoints(RK.p,RK.c,0.75);world.add(rkObj);
+const towerObjs=[];for(const [k,sz] of [['mid',1.0],['far',1.9]]){const o=rockPoints(TP[k].p,TP[k].c,sz);world.add(o);towerObjs.push(o);}
+const structObj=new THREE.LineSegments(mkGeo(LS.p,LS.c),new THREE.LineBasicMaterial({vertexColors:true}));world.add(structObj);
+const lights=glowPoints(LG.p,LG.c,4.0,1);world.add(lights);
+const inset=glowPoints(LC.p,LC.c,2.2,1);world.add(inset);
+const apLights=glowPoints(AP.p,AP.c,4.5,1);world.add(apLights);
+const windows=glowPoints(WN.p,WN.c,2.6,0.9);world.add(windows);const winN=winPh.length,winBase=new Float32Array(WN.c);
+const lampN=lampPh.length,lampObj=glowPoints(lampP,new Array(lampN*3).fill(1),3.4,1);world.add(lampObj);const lampCol=C(PAL.lamp);
+// approach strobes (sequenced flash, sea → threshold)
+const SN=strobeQ.length,{a:sbPos,g:sbGeo}=dynBuf(SN),sbCol=new Float32Array(SN*3);
+for(let i=0;i<SN;i++){sbPos[i*3]=strobeQ[i][0];sbPos[i*3+1]=strobeQ[i][1];sbPos[i*3+2]=strobeQ[i][2];}
+sbGeo.setAttribute('color',new THREE.BufferAttribute(sbCol,3));
+const strobeObj=new THREE.Points(sbGeo,new THREE.PointsMaterial({size:10,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(strobeObj);
+
+// rain halos: light scattered by the downpour around the brightest light fields
+const halo=(()=>{const p=[],col=[],add=(q,h,b)=>{p.push(q[0],q[1],q[2]);const cc=C(h);col.push(cc.r*b,cc.g*b,cc.b*b);};
+  add([0,3,0],PAL.thr,0.8);add([RL,3,0],PAL.endR,0.6);for(let k=4;k<=24;k+=4)add([-k*6,4.5,0],PAL.appr,1);for(let s=60;s<RL;s+=90)for(const sd of [-1,1])add([s,3,sd*HW],PAL.edge,0.55);
+  add([CT.x,59-CS,CT.z],PAL.win,0.9);const o=glowPoints(p,col,34,0.12);o.renderOrder=3;world.add(o);return o;})();
+/* ---------- the flood: a dark sheet, a shimmer of points, puddles on the tarmac ---------- */
+const waterMat=new THREE.MeshBasicMaterial({color:PAL.wat,transparent:true,opacity:0.9,depthWrite:false});
+const waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400),waterMat);waterPlane.rotation.x=-Math.PI/2;waterPlane.renderOrder=-1;// drawn before every glow so lights just above the flood are not veiledworld.add(waterPlane);
+const wPts=[],wTh=[],wPh=[],wCol=[],wOn=[];
+for(let x=-240;x<=240;x+=4.6)for(let z=-240;z<=240;z+=4.6){const xx=x+rand(-2.3,2.3),zz=z+rand(-2.3,2.3);if(Math.hypot(xx,zz)>245)continue;const on=onRW(xx,zz,0.3),n=0.5+0.5*Math.sin(xx*0.021+1.3)*Math.cos(zz*0.026-0.4);
+  wPts.push(xx,0,zz);wTh.push(on?0.3+0.38*n+rand(-.08,.08):-1);wOn.push(on?1:0);wPh.push(rand(0,6.28));wCol.push(on?0.3+0.45*rng():0.25+0.4*rng());}
+for(let i=0;i<64;i++){const r=RWS[i%RWS.length],s=rand(r.s0,r.s1),o=rand(-r.hw,r.hw),q=r.W(s,o,0),rx=rand(3,10),rz=rand(2,5),pa=rand(0,3.14),n=(rx*rz*1.3)|0;
+  for(let k=0;k<n;k++){const a=rand(0,6.28),rr=Math.sqrt(rng()),lx=rx*rr*Math.cos(a),lz=rz*rr*Math.sin(a);wPts.push(q[0]+lx*Math.cos(pa)-lz*Math.sin(pa),0,q[2]+lx*Math.sin(pa)+lz*Math.cos(pa));wTh.push(-0.14+0.32*rr);wOn.push(1);wPh.push(rand(0,6.28));wCol.push(0.7+0.3*rng());}}
+const wN=wPh.length,wGeo=mkGeo(wPts,new Array(wN*3).fill(0)),water=new THREE.Points(wGeo,new THREE.PointsMaterial({size:1.4,vertexColors:true,map:GLOW,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));water.renderOrder=2;world.add(water);
+const wPos=wGeo.attributes.position.array,wCA=wGeo.attributes.color.array,wVis=new Float32Array(wN);
+// rain rings on the water around the camera
+const RRN=44,RRP=12,{a:ripPos,g:ripGeo}=dynBuf(RRN*RRP),ripState=[],ripCol=new Float32Array(RRN*RRP*3);
+for(let r=0;r<RRN;r++)ripState.push({x:rand(-80,80),z:rand(-80,80),rr:rand(0,3),spd:rand(2.2,4.2),max:rand(1.6,3.8),on:0});
+ripGeo.setAttribute('color',new THREE.BufferAttribute(ripCol,3));
+const ripples=new THREE.Points(ripGeo,new THREE.PointsMaterial({size:0.7,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));ripples.renderOrder=2;ripples.frustumCulled=false;world.add(ripples);
+
+/* ---------- lanterns: floating on the flood + sky lanterns climbing through the rain ---------- */
+const KN=30,kra=[],{a:kfPos,g:kfGeo}=dynBuf(KN),{a:krPos,g:krGeo}=dynBuf(KN),kpArr=new Float32Array(KN*6*3),kpGeo=new THREE.BufferGeometry();
+kpGeo.setAttribute('position',new THREE.BufferAttribute(kpArr,3));
+for(let i=0;i<KN;i++){let x,z;do{x=rand(-150,150);z=rand(-110,110);}while(onRW(x,z,4));kra.push({x,z,vx:rand(-.6,.6),vz:rand(-.6,.6),ph:rand(0,6.28)});}
+{const kfc=[],krc=[],kpc=[];for(let i=0;i<KN;i++){const cc=lerpC(PAL.flame,0xFFF0C0,rng());kfc.push(cc.r,cc.g,cc.b);krc.push(cc.r*0.6,cc.g*0.6,cc.b*0.6);for(let k=0;k<6;k++){const pc=lerpC(k%2?PAL.petal:PAL.petal2,0xFFFFFF,rng()*0.2);kpc.push(pc.r,pc.g,pc.b);}}
+  kfGeo.setAttribute('color',new THREE.Float32BufferAttribute(kfc,3));krGeo.setAttribute('color',new THREE.Float32BufferAttribute(krc,3));kpGeo.setAttribute('color',new THREE.Float32BufferAttribute(kpc,3));}
+const kFlame=new THREE.Points(kfGeo,new THREE.PointsMaterial({size:2.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(kFlame);
+const kRef=new THREE.Points(krGeo,new THREE.PointsMaterial({size:2.8,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));kRef.renderOrder=2;world.add(kRef);
+const kPetal=new THREE.Points(kpGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(kPetal);
+const LN=36,lan=[],{a:lanPos,g:lanGeo}=dynBuf(LN);
+for(let i=0;i<LN;i++)lan.push({x:rand(-130,130),z:rand(-130,130),y:rand(6,100),vy:rand(1.4,3.2),ph:rand(0,6.28)});
+{const lc=[];for(let i=0;i<LN;i++){const cc=lerpC(PAL.lant,0xFFE8B0,rng());lc.push(cc.r,cc.g,cc.b);}lanGeo.setAttribute('color',new THREE.Float32BufferAttribute(lc,3));}
+const lanterns=new THREE.Points(lanGeo,new THREE.PointsMaterial({size:2.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));lanterns.frustumCulled=false;world.add(lanterns);
+
+/* ---------- lightning: one jagged stroke of points + a glow inside the cloud ---------- */
+const BN=300,{a:boPos,g:boGeo}=dynBuf(BN),boCol=new Float32Array(BN*3);boGeo.setAttribute('color',new THREE.BufferAttribute(boCol,3));
+const bolt=new THREE.Points(boGeo,new THREE.PointsMaterial({size:2.4,vertexColors:true,map:GLOW,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));bolt.frustumCulled=false;world.add(bolt);
+const flashGlow=glowPoints([0,0,0],[...C(PAL.flash).toArray()],420,0);flashGlow.material.fog=false;flashGlow.frustumCulled=false;flashGlow.renderOrder=4;world.add(flashGlow);
+function jag(a,b,depth,disp,out){if(depth===0){out.push(b);return;}const m=[(a[0]+b[0])/2+lr(-disp,disp),(a[1]+b[1])/2+lr(-disp,disp)*0.35,(a[2]+b[2])/2+lr(-disp,disp)];jag(a,m,depth-1,disp*0.55,out);jag(m,b,depth-1,disp*0.55,out);}
+function lay(path,i0,n,bri){const cB=C(PAL.bolt),cW=C(0xF2F4FF);for(let k=0;k<n;k++){const u=k/(n-1)*(path.length-1),j=Math.min(path.length-2,Math.floor(u)),f=u-j,a=path[j],b=path[j+1],o=(i0+k)*3;
+  boPos[o]=a[0]+(b[0]-a[0])*f;boPos[o+1]=a[1]+(b[1]-a[1])*f;boPos[o+2]=a[2]+(b[2]-a[2])*f;const cc=cB.clone().lerp(cW,0.4*lrng()),g=bri*(0.65+0.35*lrng());boCol[o]=cc.r*g;boCol[o+1]=cc.g*g;boCol[o+2]=cc.b*g;}}
+function makeBolt(ax){// strike somewhere ahead of the camera, out over the drowned towers; sometimes a mast takes it
+  let bx,bz,by;const az=ax+Math.PI+lr(-0.9,0.9);
+  const cand=rods.filter(r=>{const a=Math.atan2(r[2],r[0]);let d=((a-az)%6.283+9.425)%6.283-3.1416;return Math.abs(d)<0.6;});
+  if(cand.length&&lrng()<0.45){const r=cand[(lrng()*cand.length)|0];bx=r[0];by=r[1];bz=r[2];}else{const R=lr(270,390);bx=Math.cos(az)*R;bz=Math.sin(az)*R;by=mY;}
+  const top=[bx+lr(-40,40),lr(150,175),bz+lr(-40,40)],main=[top];jag(top,[bx,by,bz],5,34,main);
+  lay(main,0,220,1);const st=main[6+((lrng()*8)|0)],end=[st[0]+lr(-45,45),st[1]-lr(40,70),st[2]+lr(-45,45)],br=[st];jag(st,end,4,16,br);lay(br,220,80,0.55);
+  boGeo.attributes.position.needsUpdate=true;boGeo.attributes.color.needsUpdate=true;flashGlow.position.set(top[0],top[1]-20,top[2]);}
+let nextStrike=lr(5,9),strike=null;
+const pulse=d=>d<0?0:d<0.035?d/0.035:Math.exp(-(d-0.035)/0.085);
+
+/* ---------- reflections: mirrored copies clipped at the waterline ---------- */
+const clipPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);
+const mirror=new THREE.Group();mirror.scale.y=-1;world.add(mirror);
+const mirrorMats=[],refLights=[];
+function mirrorOf(obj,op,dim,flat){const m=obj.material.clone();m.clippingPlanes=[clipPlane];m.transparent=true;m.opacity=op;m.depthWrite=false;if(flat){m.depthTest=false;m.size*=1.15;}
+  const o=new obj.constructor(obj.geometry,m);o.position.copy(obj.position);o.renderOrder=2;o.frustumCulled=false;mirror.add(o);if(dim)mirrorMats.push(m);if(flat)refLights.push({m,op});return o;}
+for(const o of towerObjs)mirrorOf(o,0.5,true);mirrorOf(structObj,0.4,true);mirrorOf(rkObj,0.5,true);
+mirrorOf(lights,0.45,false,true);mirrorOf(apLights,0.32,false,true);mirrorOf(strobeObj,0.5,false,true);mirrorOf(windows,0.4,false,true);mirrorOf(lampObj,0.5,false,true);mirrorOf(lanterns,0.4,false,true);
+const boltRef=mirrorOf(bolt,0.5,false);
+{const br=new THREE.Group();br.position.copy(beacon.position);const bc=beacon.children[0],m=bc.material.clone();m.clippingPlanes=[clipPlane];m.opacity=0.3;br.add(new THREE.Points(bc.geometry,m));mirror.add(br);var beaconRef=br;}
+
+/* ---------- layered fog banks + storm cloud deck ---------- */
+const fogLayers=[];
+function fogLayer(n,r0,r1,y0,y1,size,op,spd,follow,deck){const p=[],col=[];for(let i=0;i<n;i++){const a=rand(0,6.28),r=r0+(r1-r0)*Math.sqrt(rng());p.push(r*Math.cos(a),rand(y0,y1),r*Math.sin(a));const b=0.55+0.45*rng();col.push(b,b,b);}
+  const o=glowPoints(p,col,size,op);o.material.fog=false;o.renderOrder=3;world.add(o);fogLayers.push({o,op,spd,follow,deck,ph:rand(0,6.28)});}
+fogLayer(200,20,200,0.4,5,22,0.09,0.012,true,false);   // mist on the flood
+fogLayer(170,205,280,4,44,36,0.085,-0.005,false,false); // among the mid towers
+fogLayer(190,300,390,6,78,56,0.1,0.003,false,false);    // among the far towers
+fogLayer(170,420,520,0,100,80,0.13,-0.002,false,false); // the far wall
+fogLayer(300,0,460,104,132,85,0.075,0.004,false,true);  // storm deck
+// horizon glow band
+let horMat;{const p=[],col=[];for(let i=0;i<360;i++){const a=rand(0,6.28),R=rand(470,520),y=Math.pow(rng(),2.2)*55-4;p.push(R*Math.cos(a),y,R*Math.sin(a));const b=0.6+0.4*rng();col.push(b,b,b);}
+  const o=new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:46,vertexColors:true,map:GLOW,transparent:true,opacity:0.1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));horMat=o.material;scene.add(o);}
+
+/* ---------- heavy rain: one dynamic Points buffer, three beads per drop ---------- */
+const RN=900,RB=5,rd=[],{a:raPos,g:raGeo}=dynBuf(RN*RB),raCol=new Float32Array(RN*RB*3);
+for(let i=0;i<RN;i++){rd.push({x:rand(-60,60),y:rand(0,60),z:rand(-60,60),v:rand(44,62)});for(let k=0;k<RB;k++){const b=(1-k*0.17)*(0.55+0.45*rng()),cc=C(PAL.rain);raCol[(i*RB+k)*3]=cc.r*b;raCol[(i*RB+k)*3+1]=cc.g*b;raCol[(i*RB+k)*3+2]=cc.b*b;}}
+raGeo.setAttribute('color',new THREE.BufferAttribute(raCol,3));
+const rainObj=new THREE.Points(raGeo,new THREE.PointsMaterial({size:2.0,sizeAttenuation:false,vertexColors:true,map:GLOW,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false}));rainObj.frustumCulled=false;rainObj.renderOrder=3;world.add(rainObj);
+
+/* ---------- TIME + FLOOD cycles ---------- */
+const TK=[
+ {p:0.00,top:0x2A3450,bot:0x7C7488,hor:0xE8946A,horO:0.6, dens:0.0048,tw:1.0, mul:0.95,lgt:0.75,win:0.4, lant:0.4, wat:0.42,fogK:0.85,rain:0.5},
+ {p:0.25,top:0x5A6C80,bot:0x9EADBA,hor:0xD0DAE2,horO:0.25,dens:0.0043,tw:1.1, mul:1.2, lgt:0.4, win:0.1, lant:0.1, wat:0.5, fogK:0.95,rain:0.45},
+ {p:0.50,top:0x1C1A32,bot:0x5E4862,hor:0xFF7A48,horO:0.8, dens:0.0044,tw:1.15,mul:0.85,lgt:0.9, win:0.75,lant:0.7, wat:0.42,fogK:0.75,rain:0.6},
+ {p:0.75,top:0x04080F,bot:0x12202E,hor:0x2A4A6A,horO:0.5, dens:0.0036,tw:1.7, mul:0.62,lgt:1.0, win:1.0, lant:1.0, wat:0.55,fogK:0.62,rain:0.75}];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],B=TK[(i+1)%TK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of ['horO','dens','tw','mul','lgt','win','lant','wat','fogK','rain'])o[k2]=MU.lerp(A[k2],B[k2],f);
+  o.top=lerpC(A.top,B.top,f);o.bot=lerpC(A.bot,B.bot,f);o.hor=lerpC(A.hor,B.hor,f);return o;}
+let P=0.75,timeAuto=true,targetP=0.75,F=0.35,floodAuto=true,targetF=0.35;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')timeAuto=true;else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto')floodAuto=true;else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera — low over the threshold, the approach lights running out to sea */
+const target=new THREE.Vector3(0,10,0);
+let camA=1.0,camR=112,camY=22,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,6,64);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,72,170);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.appr,'approach','pylons out over the flood, sequenced strobes'],[PAL.edge,'runway','edge, threshold + end lights'],[PAL.lamp,'drowned towers','masts still blinking'],[PAL.lant,'lanterns','on the water + in the rain'],[PAL.bolt,'lightning','now and then']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${C(r[0]).getHexString()};box-shadow:0 0 10px #${C(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+/* ---------- animate ---------- */
+const clock=new THREE.Clock(),tmpC=new THREE.Color(),tarTint=new THREE.Color(),stCol=C(PAL.strobe),flTop=C(0x7E8EB2),flBot=C(0xA8B6D8),flCloud=C(0xB8C6E6);let last=0,frame=0;
+const twMats=[...towerObjs.map(o=>o.material),structObj.material,rkObj.material],dimMats=[ebObj.material];
+function animate(){requestAnimationFrame(animate);
+  if(turntable&&!drag)camA+=0.0007;
+  const t=clock.getElapsedTime(),dt=Math.min(0.05,Math.max(0,t-last));last=t;frame++;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);dome.position.copy(camera.position);
+  if(timeAuto)P=(P+dt/110)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto)F=0.5-0.5*Math.cos(t*0.045+1.27);else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);
+  waterY=-0.6+F*2.0;mY=Math.max(waterY,0.02);const sub=ss((waterY-0.05)/0.9);
+  // lightning: seeded schedule, at most two soft pulses per stroke, never a white frame
+  if(nextStrike-t>30)nextStrike=t+lr(8,25);
+  if(t>=nextStrike){nextStrike=t+lr(8,25);makeBolt(camA);strike={t0:t,p2:lrng()<0.6?lr(0.16,0.32):-1,a2:lr(0.45,0.7)};}
+  let L=0;if(strike){const d=t-strike.t0;L=Math.max(pulse(d),strike.p2>0?strike.a2*pulse(d-strike.p2):0);if(d>1.4||d<0)strike=null;}
+  const Ls=L*(0.4+0.6*par.lgt);// a flash reads less against a bright day sky, so it lifts it less
+  skyU.top.value.copy(par.top).lerp(flTop,0.5*Ls);skyU.bot.value.copy(par.bot).lerp(flBot,0.42*Ls);
+  scene.background.copy(skyU.bot.value);scene.fog.color.copy(skyU.bot.value);scene.fog.density=par.dens*(1+0.12*F)*(1-0.45*Ls);
+  horMat.color.copy(par.hor);horMat.opacity=0.12*par.horO;
+  const mul=par.mul*(1+1.5*L),tw=par.tw*(1+1.2*L);for(const m of dimMats)m.color.setScalar(mul);for(const m of twMats)m.color.setScalar(tw);for(const m of mirrorMats)m.color.setScalar(tw*0.7);
+  tarTint.setScalar(Math.min(1.3,par.mul*1.45)*(1+0.8*L)).lerp(tmpC.copy(par.bot),0.25+0.2*F).multiplyScalar(1-0.35*sub);tarObj.material.color.copy(tarTint);
+  mkObj.material.color.setScalar(Math.min(1.2,par.mul*1.5)*(1-0.6*sub)*(1+0.6*L));
+  waterMat.color.copy(par.bot).multiplyScalar(par.wat).lerp(tmpC.set(PAL.wat),0.35).lerp(flBot,0.12*Ls);
+  water.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.5).multiplyScalar(0.5+0.5*par.lgt);water.material.opacity=0.4+0.2*F+0.2*L;
+  lights.material.opacity=par.lgt;halo.material.opacity=0.16*par.lgt*(0.7+0.3*F);apLights.material.opacity=par.lgt;inset.material.opacity=par.lgt*(1-0.9*sub);
+  windows.material.opacity=0.12+0.85*par.win;
+  for(const r of refLights)r.m.opacity=r.op*(0.35+0.65*F)*(0.4+0.6*par.lgt);
+  clipPlane.constant=mY;mirror.position.set(0.2*Math.sin(t*1.1),2*mY,0);
+  bolt.material.opacity=L;boltRef.material.opacity=0.45*L;flashGlow.material.opacity=0.28*L;
+  rainObj.material.opacity=par.rain*(0.85+0.15*F)+0.25*L;
+  const kraO=0.25+0.75*par.lant;kFlame.material.opacity=0.95*kraO;kRef.material.opacity=0.4*kraO;kPetal.material.opacity=0.7*kraO;lanterns.material.opacity=0.15+0.8*par.lant;
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · flood '+((F*100)|0)+'% · '+(sub>0.5?'runway under water':'runway above water')+' —';
+  // flood shimmer: coverage every 3rd frame, swell every frame
+  if(frame%3===0){for(let i=0;i<wN;i++){const v=wOn[i]?ss((F-wTh[i])/0.12):1;wVis[i]=v;const b=wCol[i]*v;wCA[i*3]=b;wCA[i*3+1]=b;wCA[i*3+2]=b;}wGeo.attributes.color.needsUpdate=true;}
+  {const yr=Math.max(waterY,0.03);for(let i=0;i<wN;i++)wPos[i*3+1]=(wOn[i]?yr:waterY)+0.1*Math.sin(t*1.5+wPh[i]);wGeo.attributes.position.needsUpdate=true;}
+  // rain rings near the camera
+  {const gx=camera.position.x*0.55,gz=camera.position.z*0.55;let idx=0;for(const R of ripState){R.rr+=R.spd*dt;if(R.rr>R.max){R.rr=0;R.max=rand(1.6,3.8);R.x=gx+rand(-70,70);R.z=gz+rand(-70,70);R.on=onRW(R.x,R.z,0)?1:0;}
+    const y=(R.on?Math.max(waterY,0.03):waterY)+0.12,fade=(1-R.rr/R.max)*0.8;
+    for(let k=0;k<RRP;k++){const a=k/RRP*Math.PI*2;ripPos[idx*3]=R.x+R.rr*Math.cos(a);ripPos[idx*3+1]=y;ripPos[idx*3+2]=R.z+R.rr*Math.sin(a);ripCol[idx*3]=0.55*fade;ripCol[idx*3+1]=0.7*fade;ripCol[idx*3+2]=0.85*fade;idx++;}}
+    ripGeo.attributes.position.needsUpdate=true;ripGeo.attributes.color.needsUpdate=true;}
+  // heavy rain: drops live in a box that follows the camera, slanted by the wind
+  {const cx=camera.position.x,cz=camera.position.z,top=camY+38,wx=-0.24,wz=0.08;
+    for(let i=0;i<RN;i++){const d=rd[i];d.y-=d.v*dt;d.x+=wx*d.v*dt;d.z+=wz*d.v*dt;
+      if(d.x-cx>60)d.x-=120;else if(d.x-cx<-60)d.x+=120;if(d.z-cz>60)d.z-=120;else if(d.z-cz<-60)d.z+=120;
+      if(d.y<waterY){d.y=top-rand(0,10);}
+      const sp=MU.clamp(Math.hypot(d.x-cx,d.y-camY,d.z-cz)*0.011,0.05,1.2);for(let k=0;k<RB;k++){const o=(i*RB+k)*3,u=k*sp;raPos[o]=d.x-wx*u;raPos[o+1]=d.y+u;raPos[o+2]=d.z-wz*u;}}
+    raGeo.attributes.position.needsUpdate=true;}
+  // approach strobes: the rabbit runs toward the threshold twice a second
+  {const N=SN,head=((t*2)%1)*N*1.3,sb=0.35+0.65*par.lgt;for(let k=0;k<N;k++){const d=head-k,v=(d>=0&&d<1.6)?Math.pow(1-d/1.6,2)*sb:0;sbCol[k*3]=stCol.r*v;sbCol[k*3+1]=stCol.g*v;sbCol[k*3+2]=stCol.b*v;}sbGeo.attributes.color.needsUpdate=true;}
+  // beacon sweep + obstruction light
+  beacon.rotation.y=t*1.5;beaconRef.rotation.y=t*1.5;{const bx=camera.position.x-BEACON.x,bz=camera.position.z-BEACON.z,fl=Math.pow(Math.abs(Math.cos(t*1.5+Math.atan2(bz,bx))),24);bHead.material.opacity=(0.25+0.75*fl)*(0.4+0.6*par.lgt);bHead.material.size=5+9*fl;}
+  beacon.children[0].material.opacity=0.25+0.6*par.lgt;obst.material.opacity=((t%1.6)<0.5?1:0.12)*(0.5+0.5*par.lgt);
+  // mast lamps blink
+  {const arr=lampObj.geometry.attributes.color.array;for(let i=0;i<lampN;i++){const ph=(t*0.55+lampPh[i])%1,k=(ph<0.16?1:0.06)*(0.4+0.6*par.lgt);arr[i*3]=lampCol.r*k;arr[i*3+1]=lampCol.g*k;arr[i*3+2]=lampCol.b*k;}lampObj.geometry.attributes.color.needsUpdate=true;}
+  // windows flicker (some stutter)
+  {const arr=windows.geometry.attributes.color.array;for(let i=0;i<winN;i++){const ph=winPh[i],fl=ph>=0?(0.6+0.4*Math.sin(t*1.4+ph))*(Math.sin(t*17+ph*3)>0.92?0.25:1):1;arr[i*3]=winBase[i*3]*fl;arr[i*3+1]=winBase[i*3+1]*fl;arr[i*3+2]=winBase[i*3+2]*fl;}windows.geometry.attributes.color.needsUpdate=true;}
+  // floating lanterns drift; they keep off the tarmac until the flood covers it
+  for(let i=0;i<KN;i++){const k2=kra[i],nx=k2.x+k2.vx*dt,nz=k2.z+k2.vz*dt;if(sub<0.5&&onRW(nx,nz,3)){k2.vx*=-1;k2.vz*=-1;}else{k2.x=nx;k2.z=nz;}
+    if(Math.abs(k2.x)>160)k2.vx=-Math.sign(k2.x)*Math.abs(k2.vx);if(Math.abs(k2.z)>120)k2.vz=-Math.sign(k2.z)*Math.abs(k2.vz);
+    const base=Math.max(waterY,onRW(k2.x,k2.z,0)?0.03:waterY),y=base+0.4+0.15*Math.sin(t*2+k2.ph);
+    kfPos[i*3]=k2.x;kfPos[i*3+1]=y+0.35;kfPos[i*3+2]=k2.z;krPos[i*3]=k2.x;krPos[i*3+1]=base-0.6;krPos[i*3+2]=k2.z;
+    for(let j=0;j<6;j++){const a=j/6*Math.PI*2+k2.ph;kpArr[(i*6+j)*3]=k2.x+0.8*Math.cos(a);kpArr[(i*6+j)*3+1]=y;kpArr[(i*6+j)*3+2]=k2.z+0.8*Math.sin(a);}}
+  kfGeo.attributes.position.needsUpdate=true;krGeo.attributes.position.needsUpdate=true;kpGeo.attributes.position.needsUpdate=true;
+  // sky lanterns climb through the rain, buffeted
+  for(let i=0;i<LN;i++){const l=lan[i];l.y+=l.vy*dt;l.x+=(-0.9+0.8*Math.sin(t*0.9+l.ph))*dt;l.z+=0.5*Math.cos(t*0.7+l.ph)*dt;if(l.y>112){l.y=rand(3,12);l.x=rand(-120,120);l.z=rand(-120,120);}lanPos[i*3]=l.x;lanPos[i*3+1]=l.y+0.4*Math.sin(t*3.1+l.ph);lanPos[i*3+2]=l.z;}lanGeo.attributes.position.needsUpdate=true;
+  // fog banks drift; the storm deck lights from inside when lightning strikes
+  for(const Lr of fogLayers){Lr.o.rotation.y+=Lr.spd*dt;if(Lr.follow)Lr.o.position.y=waterY;
+    const k=Lr.deck?(1+3*L):(1+1.2*L);Lr.o.material.opacity=Math.min(0.6,Lr.op*(0.85+0.15*Math.sin(t*0.2+Lr.ph))*k);
+    Lr.o.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.18).multiplyScalar(par.fogK).lerp(flCloud,(Lr.deck?0.6:0.3)*L);}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

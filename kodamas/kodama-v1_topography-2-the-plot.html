@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA·NA · the Plot — forest / river / cascade (study)</title>
+<style>
+  :root{
+    --bg:#070C0A; --teal:#74D6AE; --gold:#C9A86A; --cream:#ECEAE0; --coral:#E8845A;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;
+    --serif:Cambria,Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:62vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:clamp(19px,2.4vw,30px);line-height:1.15;margin:0;text-shadow:0 2px 30px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--teal);opacity:.82;margin-top:10px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  #legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;
+    letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>she keeps the water moving so the whole slope stays alive.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the Plot — a forest that drains itself</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to orbit · scroll to breathe closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   VA·NA — the Plot : forest valley, flowing river, cascade, mist.
+   Series companion to kodama-v1_topography-1. Glow-sprite fidelity pass.
+   Pure Three.js r128, additive glow on near-black (no post-processing dependency).
+   ============================================================================= */
+const PAL={bg:0x070C0A,teal:0x74D6AE,gold:0xC9A86A,cream:0xECEAE0,coral:0xE8845A,
+  leaf:0x6FB25A,leafHi:0xBFE07A,soilT:0x9C7E63,soilM:0x7A5F4C,soilL:0x54413A,
+  water:0x2E8BE0,waterHi:0x8FD8FF,mist:0xCFE9FF,rock:0x8A8478};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(19850420);
+const rand=(a=0,b=1)=>a+(b-a)*rng();
+const pick=a=>a[(rng()*a.length)|0];
+const lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t);
+const MU=THREE.MathUtils;
+
+/* soft radial glow sprite -> the "bloom" read without a post pipeline */
+function glowSprite(){
+  const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;
+  const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);
+  return new THREE.CanvasTexture(cv);
+}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({
+    size,vertexColors:true,map:GLOW,transparent:true,opacity:op,
+    blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));
+}
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(PAL.bg);
+scene.fog=new THREE.FogExp2(PAL.bg,0.0052);
+const camera=new THREE.PerspectiveCamera(46,innerWidth/innerHeight,0.1,2000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();world.rotation.x=-0.09;scene.add(world);
+
+/* ---------- terrain: a draining valley -------------------------------------- */
+function riverX(z){return 9*Math.sin(z*0.05)+4*Math.sin(z*0.13);}
+function h2(x,z){
+  let b=26-z*0.30;                                        // downhill along +z
+  b+=11*Math.exp(-((Math.abs(x)-26)**2)/(2*9*9));         // two side ridges
+  const d=Math.abs(x-riverX(z));
+  b-=8*Math.exp(-(d*d)/(2*5.5*5.5));                      // carved channel
+  b-=12*MU.smoothstep(z,7,11);                            // ledge -> cascade
+  b+=1.3*Math.sin(x*0.28)*Math.cos(z*0.22);              // texture
+  return b;
+}
+function mask2(x,z){
+  const d=Math.sqrt((x/38)**2+(z/60)**2);
+  const edge=1+0.06*Math.sin(Math.atan2(z,x)*7);
+  return MU.clamp((edge-d)/0.22,0,1);
+}
+const tPos=[],tCol=[],surf=[];let maxH=1,minH=99;
+for(let x=-42;x<=42;x+=1.05)for(let z=-62;z<=62;z+=1.05){
+  const m=mask2(x,z);if(m<=0.02)continue;
+  const jx=x+rand(-.35,.35),jz=z+rand(-.35,.35);
+  const y=h2(jx,jz);maxH=Math.max(maxH,y);minH=Math.min(minH,y);
+  const layers=1+(m>0.5?2:0);
+  for(let L=0;L<layers;L++){tPos.push(jx,y-L*rand(1.2,2.6),jz);tCol.push(0,0,0);
+    if(L===0&&m>0.4&&rng()<0.5)surf.push([jx,y,jz,m]);}
+}
+for(let i=0;i<tPos.length/3;i++){
+  const y=tPos[i*3+1],t=MU.clamp((y-minH)/(maxH-minH),0,1);
+  const c=t>0.5?lerpC(PAL.soilM,PAL.soilT,(t-0.5)/0.5):lerpC(PAL.soilL,PAL.soilM,t/0.5);
+  tCol[i*3]=c.r;tCol[i*3+1]=c.g;tCol[i*3+2]=c.b;
+}
+const tg=new THREE.BufferGeometry();
+tg.setAttribute('position',new THREE.Float32BufferAttribute(tPos,3));
+tg.setAttribute('color',new THREE.Float32BufferAttribute(tCol,3));
+world.add(new THREE.Points(tg,new THREE.PointsMaterial({size:0.62,vertexColors:true,
+  transparent:true,opacity:0.95})));
+
+/* ---------- river: flowing glow particles down the channel ------------------ */
+const RN=1400,riv=[],rivPos=new Float32Array(RN*3),rivCol=new Float32Array(RN*3);
+for(let i=0;i<RN;i++){
+  const z=rand(-60,60),jit=rand(-3.5,3.5);
+  riv.push({z,jit,spd:rand(0.10,0.22)});
+  const c=lerpC(PAL.water,PAL.waterHi,rng());
+  rivCol[i*3]=c.r;rivCol[i*3+1]=c.g;rivCol[i*3+2]=c.b;
+}
+const rivGeo=new THREE.BufferGeometry();
+rivGeo.setAttribute('position',new THREE.BufferAttribute(rivPos,3));
+rivGeo.setAttribute('color',new THREE.BufferAttribute(rivCol,3));
+const river=new THREE.Points(rivGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,
+  map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));
+world.add(river);
+function stepRiver(){
+  for(let i=0;i<RN;i++){const r=riv[i];r.z+=r.spd;if(r.z>62)r.z-=124;
+    const x=riverX(r.z)+r.jit,y=h2(x,r.z)+0.6;
+    rivPos[i*3]=x;rivPos[i*3+1]=y;rivPos[i*3+2]=r.z;}
+  rivGeo.attributes.position.needsUpdate=true;
+}
+
+/* ---------- cascade: vertical fall at the ledge + mist pool ------------------ */
+const ledgeZ=9, topY=h2(riverX(7),7)+1, poolY=h2(riverX(14),14)+0.5;
+const CN=600,cas=[],casPos=new Float32Array(CN*3),casCol=new Float32Array(CN*3);
+for(let i=0;i<CN;i++){
+  cas.push({x:riverX(ledgeZ)+rand(-5,5),z:ledgeZ+rand(-1.5,2.5),y:rand(poolY,topY),vy:rand(0.35,0.7)});
+  const c=lerpC(PAL.waterHi,PAL.cream,rng());casCol[i*3]=c.r;casCol[i*3+1]=c.g;casCol[i*3+2]=c.b;
+}
+const casGeo=new THREE.BufferGeometry();
+casGeo.setAttribute('position',new THREE.BufferAttribute(casPos,3));
+casGeo.setAttribute('color',new THREE.BufferAttribute(casCol,3));
+world.add(new THREE.Points(casGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,
+  map:GLOW,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false})));
+function stepCascade(){
+  for(let i=0;i<CN;i++){const p=cas[i];p.y-=p.vy;if(p.y<poolY){p.y=topY;p.x=riverX(ledgeZ)+rand(-5,5);}
+    casPos[i*3]=p.x;casPos[i*3+1]=p.y;casPos[i*3+2]=p.z;}
+  casGeo.attributes.position.needsUpdate=true;
+}
+// static mist cloud hovering over the pool
+const mPos=[],mCol=[];
+for(let i=0;i<260;i++){mPos.push(riverX(14)+rand(-8,8),poolY+rand(0,7),14+rand(-4,6));
+  const c=lerpC(PAL.mist,PAL.teal,rng());mCol.push(c.r,c.g,c.b);}
+const mist=glowPoints(mPos,mCol,2.6,0.28);world.add(mist);
+
+/* ---------- forest: canopy L-systems on the ridges -------------------------- */
+const stemP=[],stemC=[],leafP=[],leafC=[];
+function grow(o,dir,len,depth,hue){
+  if(depth<=0||len<0.5){leafP.push(o.x,o.y,o.z);const c=new THREE.Color(hue);leafC.push(c.r,c.g,c.b);return;}
+  const e=o.clone().addScaledVector(dir,len);
+  const c0=lerpC(PAL.soilM,PAL.cream,.25),c1=lerpC(PAL.cream,PAL.gold,.4);
+  stemP.push(o.x,o.y,o.z,e.x,e.y,e.z);stemC.push(c0.r,c0.g,c0.b,c1.r,c1.g,c1.b);
+  const n=depth>3?1:(rng()<.7?2:3);
+  for(let b=0;b<n;b++){
+    const roll=rand(0,Math.PI*2),axis=new THREE.Vector3(Math.cos(roll),0,Math.sin(roll));
+    const nd=dir.clone().applyAxisAngle(axis,MU.degToRad(rand(16,34)));nd.y+=rand(.08,.3);nd.normalize();
+    grow(e,nd,len*rand(.68,.8),depth-1,hue);
+  }
+}
+const LEAF=[PAL.leaf,PAL.leafHi,PAL.gold,PAL.teal];
+let planted=0;
+for(const s of surf){
+  if(planted>70)break;
+  const [x,y,z,m]=s;
+  const ridge=Math.abs(x)>16;                          // taller on ridges
+  if(rng()> (ridge?0.5:0.16))continue;
+  const scale=ridge?rand(1.2,2.1):rand(0.6,1.1);
+  grow(new THREE.Vector3(x,y,z),new THREE.Vector3(rand(-.12,.12),1,rand(-.12,.12)).normalize(),
+       rand(4,6.5)*scale,ridge?5:4,pick(LEAF));
+  planted++;
+}
+const sg=new THREE.BufferGeometry();
+sg.setAttribute('position',new THREE.Float32BufferAttribute(stemP,3));
+sg.setAttribute('color',new THREE.Float32BufferAttribute(stemC,3));
+world.add(new THREE.LineSegments(sg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.9})));
+const leaves=glowPoints(leafP,leafC,1.8,0.95);world.add(leaves);
+
+/* ---------- a few point-cloud boulders -------------------------------------- */
+for(let r=0;r<5;r++){
+  const bx=rand(-30,30),bz=rand(-40,40),by=h2(bx,bz),R=rand(3,6),bp=[],bc=[];
+  for(let i=0;i<400;i++){const u=rand(0,Math.PI*2),v=Math.acos(rand(-1,1)),rr=R*(0.7+rand(0,0.3));
+    bp.push(bx+rr*Math.sin(v)*Math.cos(u),by+rr*0.6*Math.cos(v)+R*0.4,bz+rr*Math.sin(v)*Math.sin(u));
+    const c=lerpC(PAL.rock,PAL.soilT,rng());bc.push(c.r,c.g,c.b);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(bp,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(bc,3));
+  world.add(new THREE.Points(g,new THREE.PointsMaterial({size:0.55,vertexColors:true,transparent:true,opacity:0.9})));
+}
+
+/* ---------- service-node agents (wireframe, tethered) ----------------------- */
+const agents=[];const AG=[()=>new THREE.BoxGeometry(2,2,2),()=>new THREE.ConeGeometry(1.4,2.6,4),
+  ()=>new THREE.IcosahedronGeometry(1.5,0),()=>new THREE.OctahedronGeometry(1.6,0),()=>new THREE.TorusGeometry(1.3,.28,6,10)];
+const AGC=[PAL.teal,PAL.gold,PAL.coral,PAL.cream];
+for(let i=0;i<14;i++){
+  const x=rand(-30,30),z=rand(-45,45),gy=h2(x,z),y=gy+rand(5,15);
+  const w=new THREE.LineSegments(new THREE.WireframeGeometry(pick(AG)()),
+    new THREE.LineBasicMaterial({color:pick(AGC),transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+  w.position.set(x,y,z);w.userData={spin:rand(-.5,.5),bob:rand(0,6.28),baseY:y,amp:rand(.6,1.8)};
+  world.add(w);agents.push(w);
+  const tp=[x,y,z,x,gy,z],tgg=new THREE.BufferGeometry();
+  tgg.setAttribute('position',new THREE.Float32BufferAttribute(tp,3));
+  world.add(new THREE.LineSegments(tgg,new THREE.LineBasicMaterial({color:PAL.teal,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false})));
+}
+
+/* ---------- ambient spores -------------------------------------------------- */
+const dN=700,dPos=new Float32Array(dN*3),dCol=[];
+for(let i=0;i<dN;i++){dPos[i*3]=rand(-70,70);dPos[i*3+1]=rand(-6,60);dPos[i*3+2]=rand(-75,75);
+  const c=lerpC(PAL.teal,PAL.cream,rng());dCol.push(c.r,c.g,c.b);}
+const dGeo=new THREE.BufferGeometry();
+dGeo.setAttribute('position',new THREE.BufferAttribute(dPos,3));
+dGeo.setAttribute('color',new THREE.Float32BufferAttribute(dCol,3));
+const dust=new THREE.Points(dGeo,new THREE.PointsMaterial({size:0.55,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));
+scene.add(dust);
+
+/* ---------- camera / input -------------------------------------------------- */
+const target=new THREE.Vector3(0,9,0);
+let camA=0.9,camR=118,camY=48,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;
+  camY=MU.clamp(camY-(e.clientY-py)*.35,6,100);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,60,210);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+/* ---------- legend + hint --------------------------------------------------- */
+document.getElementById('legend').innerHTML=[
+  [PAL.soilT,'VVIM ground','xēn-gis terrain'],[PAL.leafHi,'canopy L-systems','vana-core'],
+  [PAL.water,'flowing water','the drainage'],[PAL.teal,'service nodes','Band-3 · sensors'],
+].map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,3600);
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(autoSpin)camA+=0.0015;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  stepRiver();stepCascade();
+  mist.material.opacity=0.2+0.12*Math.sin(t*0.9);
+  leaves.material.opacity=0.78+0.2*Math.sin(t*1.5);
+  for(const a of agents){a.rotation.y+=a.userData.spin*0.01;a.rotation.x+=a.userData.spin*0.006;
+    a.position.y=a.userData.baseY+Math.sin(t*0.8+a.userData.bob)*a.userData.amp;}
+  const dp=dust.geometry.attributes.position;
+  for(let i=0;i<dN;i++){let y=dp.getY(i)+0.03;if(y>60)y=-6;dp.setY(i,y);}dp.needsUpdate=true;
+  world.rotation.z=Math.sin(t*0.25)*0.008;
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whisper Well — mycelium underworld (study v3)</title>
+<style>
+  :root{--bg:#04060A;--silver:#D8DEE6;--moon:#F4F6F8;--pale:#AEC2D6;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(174,194,214,.25)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pale);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);
+    background:rgba(20,26,34,.5);border:1px solid rgba(174,194,214,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5;border-color:rgba(174,194,214,.18)}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>Whisper Well — when moon spirits descend into the mycelium underworld.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; roots grow from the trees, drink from the well, and go back down</div>
+</div>
+<div class="ui" id="legend"></div>
+<div id="hint">drag to look · scroll closer · the near wall opens for you</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   Whisper Well v3 — reframed with a night sky + starfield; a ring of trees the
+   roots grow FROM; roots reach the pool and take a drink, then recede; one master
+   loop: grow -> drink -> recede -> fade fully to black (only the well + water glow)
+   -> ~5s pause -> resume to monochrome home. Turntable button. Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x04060A,rockLit:0xC4CCD6,rockShadow:0x121820,moon:0xF4F6F8,moonLo:0x8A96A2,
+  silver:0xD8DEE6,pale:0xAEC2D6,water:0x1A2430,waterHi:0xCFE0F0,rootLit:0xB6BEC8,rootDk:0x28303A,
+  myco:0xB8C6D2,spirit:0xE6ECF2,leaf:0x9AA6B2,trunk:0xB0B8C2,star:0xEAF0F6,wellGlow:0x8FD8E8};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260713);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x05080E,0.0034);
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,5000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+const GROUND_Y=50,WATER_Y=3,R_RIM=46,R_POOL=24,R_SURF=88,MOON_Y=76,MOON_R=16;
+function radiusAt(y){const p=MU.clamp((y-WATER_Y)/(GROUND_Y-WATER_Y),0,1);return R_POOL+(R_RIM-R_POOL)*Math.sqrt(p);}
+function lit(x,y,z){const ax=Math.hypot(x,z);const top=MU.clamp((y-WATER_Y)/(GROUND_Y-WATER_Y),0,1);const pool=MU.clamp(1-ax/22,0,1)*MU.clamp(1-(y-WATER_Y)/28,0,1);return MU.clamp(0.16+0.5*top+0.4*pool,0,1);}
+function rockColor(x,y,z){return lerpC(PAL.rockShadow,PAL.rockLit,lit(x,y,z));}
+
+const SECTORS=22,SA=Math.PI*2/SECTORS,CUT=1.0;
+function secOf(x,z){let a=Math.atan2(z,x);if(a<0)a+=Math.PI*2;return Math.floor(a/SA)%SECTORS;}
+function angDiff(a,b){let d=Math.abs(a-b)%(Math.PI*2);return d>Math.PI?Math.PI*2-d:d;}
+const cull=[],growers=[];
+
+/* ---- STARFIELD firmament (upper sky) -------------------------------------- */
+let stars,starBase,starPh;
+{const p=[],col=[],ph=[];const N=760;for(let i=0;i<N;i++){const u=rand(0,Math.PI*2),v=Math.acos(rand(-0.15,1)),R=rand(150,260);
+  const x=R*Math.sin(v)*Math.cos(u),y=Math.abs(R*Math.cos(v))*0.85+18,z=R*Math.sin(v)*Math.sin(u);
+  const b=0.4+0.6*rng(),c=lerpC(PAL.pale,PAL.star,rng());p.push(x,y,z);col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}
+  starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,1.0,0.85);world.add(stars);}
+
+/* ---- shell: walls + surface ----------------------------------------------- */
+{const rp=[],rc=[];for(let i=0;i<SECTORS;i++){rp.push([]);rc.push([]);}
+ for(let y=WATER_Y+1;y<GROUND_Y;y+=1.3){const R=radiusAt(y),n=Math.max(18,(2*Math.PI*R/1.8)|0);
+   for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=R+2*Math.sin(a*6+y*0.25)+rand(-1,1),x=rr*Math.cos(a),z=rr*Math.sin(a),i=secOf(x,z),c=rockColor(x,y,z);rp[i].push(x,y+rand(-.4,.4),z);rc[i].push(c.r,c.g,c.b);}}
+ for(let r=R_RIM;r<R_SURF;r+=1.7){const n=Math.max(22,(2*Math.PI*r/2.2)|0);
+   for(let k=0;k<n;k++){const a=k/n*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a),y=GROUND_Y+1.2*Math.sin(x*0.05)*Math.cos(z*0.05)+rand(-.5,.5),i=secOf(x,z),c=lerpC(0x262D36,PAL.silver,0.22+0.3*rng());rp[i].push(x,y,z);rc[i].push(c.r,c.g,c.b);}}
+ for(let i=0;i<SECTORS;i++){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(rp[i],3));g.setAttribute('color',new THREE.Float32BufferAttribute(rc[i],3));
+   const o=new THREE.Points(g,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.95}));o.userData.center=(i+0.5)*SA;world.add(o);cull.push(o);}}
+
+/* ---- ROOTS (gravitropic axis) — reach the water, converge inward at bottom - */
+const allSeg=[],nodeBySec=[];for(let i=0;i<SECTORS;i++)nodeBySec.push([]);
+function pushSeg(i,ax,ay,az,bx,by,bz,ca,cb){allSeg.push({i,ax,ay,az,bx,by,bz,ca,cb,my:(ay+by)/2});}
+function growRoot(a0){const i=secOf(R_RIM*Math.cos(a0),R_RIM*Math.sin(a0));let y=GROUND_Y-1,a=a0,prev=null,step=(GROUND_Y-WATER_Y)/16,guard=0;
+  function radAt(yy){let R=radiusAt(yy)+rand(-1.5,0.3);const df=1-(yy-WATER_Y)/(GROUND_Y-WATER_Y);if(df>0.72){const q=(df-0.72)/0.28;R=MU.lerp(R,R_POOL*0.32,ss(q));}return R;}
+  while(y>WATER_Y&&guard++<30){const R=radAt(y),x=R*Math.cos(a),z=R*Math.sin(a),L=lit(x,y,z),c=lerpC(PAL.rootDk,PAL.rootLit,0.3+0.6*L);
+    if(prev)pushSeg(i,prev[0],prev[1],prev[2],x,y,z,prev[3],c);
+    if(guard%2===0)nodeBySec[i].push([x,y,z]);prev=[x,y,z,c];y-=step*rand(0.7,1.05);a+=rand(-0.05,0.05);
+    if(guard===7&&rng()<0.5){let by=y,ba=a+rand(-0.2,0.2),bp=prev,bg=0;while(by>WATER_Y&&bg++<16){const BR=radAt(by),bx=BR*Math.cos(ba),bz=BR*Math.sin(ba),bl=lit(bx,by,bz),bc=lerpC(PAL.rootDk,PAL.rootLit,0.3+0.6*bl);pushSeg(i,bp[0],bp[1],bp[2],bx,by,bz,bp[3],bc);nodeBySec[i].push([bx,by,bz]);bp=[bx,by,bz,bc];by-=step*rand(0.7,1.05);ba+=rand(-0.06,0.06);}}
+  }
+  if(prev){const R=R_POOL*0.3,x=R*Math.cos(a),z=R*Math.sin(a),c=new THREE.Color(PAL.waterHi);pushSeg(i,prev[0],prev[1],prev[2],x,WATER_Y+0.4,z,prev[3],c);} // tip touches water
+}
+/* ---- rim TREES (a ring) the roots grow FROM ------------------------------- */
+const props=[];
+function treeAt(x,y,z){const sp=[],sc=[],lp=[],lc=[];
+  (function grow(o,dir,len,depth){const e=o.clone().addScaledVector(dir,len);const c=lerpC(0x424D58,PAL.trunk,.5);sp.push(o.x,o.y,o.z,e.x,e.y,e.z);sc.push(c.r,c.g,c.b,c.r,c.g,c.b);
+    if(depth<=0||len<0.7){lp.push(e.x,e.y,e.z);const l0=lerpC(PAL.leaf,PAL.silver,rng());lc.push(l0.r,l0.g,l0.b);return;}
+    const nb=depth>3?1:(rng()<.7?2:3);for(let b=0;b<nb;b++){const roll=rand(0,6.28),ax=new THREE.Vector3(Math.cos(roll),0,Math.sin(roll)),nd=dir.clone().applyAxisAngle(ax,MU.degToRad(rand(16,32)));nd.y+=rand(.1,.3);nd.normalize();grow(e,nd,len*rand(.72,.82),depth-1);}})
+    (new THREE.Vector3(x,y,z),new THREE.Vector3(rand(-.08,.08),1,rand(-.08,.08)).normalize(),rand(6,8.5),5);
+  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sg.setAttribute('color',new THREE.Float32BufferAttribute(sc,3));
+  const so=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.9}));world.add(so);props.push({obj:so,center:(secOf(x,z)+0.5)*SA});growers.push({o:so,total:sp.length/3,delay:0});
+  const lo=glowPoints(lp,lc,1.7,0.85);world.add(lo);props.push({obj:lo,center:(secOf(x,z)+0.5)*SA});growers.push({o:lo,total:lp.length/3,delay:0.55});}
+const NTREE=16;
+for(let ti=0;ti<NTREE;ti++){const ta=ti/NTREE*Math.PI*2+rand(-0.04,0.04),tx=R_RIM*Math.cos(ta),tz=R_RIM*Math.sin(ta);
+  treeAt(tx,GROUND_Y,tz);
+  const nr=8+(rand(0,5)|0);for(let r=0;r<nr;r++)growRoot(ta+rand(-0.12,0.12));}
+// build root sector lines (depth-sorted -> grows downward)
+{const bySec=[];for(let i=0;i<SECTORS;i++)bySec.push([]);for(const s of allSeg)bySec[s.i].push(s);
+ for(let i=0;i<SECTORS;i++){bySec[i].sort((a,b)=>b.my-a.my);const p=[],col=[];
+   for(const s of bySec[i]){p.push(s.ax,s.ay,s.az,s.bx,s.by,s.bz);col.push(s.ca.r,s.ca.g,s.ca.b,s.cb.r,s.cb.g,s.cb.b);}
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+   const o=new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.8}));o.userData.center=(i+0.5)*SA;world.add(o);cull.push(o);growers.push({o,total:p.length/3,delay:0});}}
+
+/* ---- MYCELIUM network (grows after roots, pulses) ------------------------- */
+const mycoFil=[];
+for(let i=0;i<SECTORS;i++){const nodes=nodeBySec[i];if(nodes.length<4){mycoFil.push(null);continue;}
+  const tp=[],tc=[],fp=[],fbase=[],fy=[];const links=Math.min(70,(nodes.length*1.1)|0);
+  for(let k=0;k<links;k++){const n1=pick(nodes);let n2=null,bd=1e9;for(let tries=0;tries<5;tries++){const cand=pick(nodes),d=Math.hypot(cand[0]-n1[0],cand[1]-n1[1],cand[2]-n1[2]);if(d>2.5&&d<16&&d<bd){bd=d;n2=cand;}}
+    if(!n2)continue;const c=lerpC(PAL.rootDk,PAL.myco,0.5);tp.push(n1[0],n1[1],n1[2],n2[0],n2[1],n2[2]);tc.push(c.r,c.g,c.b,c.r,c.g,c.b);
+    for(let f=0;f<3;f++){const u=rand(0,1),x=MU.lerp(n1[0],n2[0],u)+rand(-.6,.6),y=MU.lerp(n1[1],n2[1],u)+rand(-.6,.6),z=MU.lerp(n1[2],n2[2],u)+rand(-.6,.6);fp.push(x,y,z);const bc=new THREE.Color(PAL.myco);fbase.push(bc.r,bc.g,bc.b);fy.push(y);}}
+  const idx=[...Array(tp.length/6).keys()].sort((A,B)=>((tp[B*6+1]+tp[B*6+4])/2)-((tp[A*6+1]+tp[A*6+4])/2));
+  const tp2=[],tc2=[];for(const ii of idx){for(let j=0;j<6;j++)tp2.push(tp[ii*6+j]);for(let j=0;j<6;j++)tc2.push(tc[ii*6+j]);}
+  const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(tp2,3));tg.setAttribute('color',new THREE.Float32BufferAttribute(tc2,3));
+  const to=new THREE.LineSegments(tg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));to.userData.center=(i+0.5)*SA;world.add(to);cull.push(to);growers.push({o:to,total:tp2.length/3,delay:0.2});
+  const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fg.setAttribute('color',new THREE.Float32BufferAttribute(fbase.slice(),3));
+  const fo=new THREE.Points(fg,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));fo.userData.center=(i+0.5)*SA;world.add(fo);cull.push(fo);growers.push({o:fo,total:fp.length/3,delay:0.28});
+  mycoFil.push({geom:fg,base:new Float32Array(fbase),y:new Float32Array(fy),n:fy.length});}
+
+/* ---- MOON + halo ---------------------------------------------------------- */
+(function(){const p=[],col=[],N=(MOON_R*MOON_R*7)|0;for(let i=0;i<N;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=MOON_R*Math.sin(v)*Math.cos(u),y=MOON_R*Math.cos(v),z=MOON_R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4)*Math.sin(z*0.35),c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.35,1));p.push(x,MOON_Y+y,-8+z);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.5,0.96));world.add(glowPoints([0,MOON_Y,-8],[...new THREE.Color(0xE8EEF4).toArray()],MOON_R*2.7,0.28));})();
+
+/* ---- WELL: pool + reflection + ripples + rim glow (stay lit through black) - */
+const wellSet=[];function tagWell(o){o.userData.well=true;wellSet.push(o);}
+const poolP=[],poolC=[];for(let r=0;r<R_POOL;r+=1.05){const n=Math.max(6,(2*Math.PI*r/1.5)|0);for(let k=0;k<Math.max(1,n);k++){const a=k/Math.max(1,n)*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a);poolP.push(x,WATER_Y,z);const c=lerpC(PAL.water,PAL.pale,0.15+0.25*rng());poolC.push(c.r,c.g,c.b);}}
+const poolGeo=new THREE.BufferGeometry();poolGeo.setAttribute('position',new THREE.Float32BufferAttribute(poolP,3));poolGeo.setAttribute('color',new THREE.Float32BufferAttribute(poolC,3));
+const pool=new THREE.Points(poolGeo,new THREE.PointsMaterial({size:1.4,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(pool);tagWell(pool);
+const pg=glowPoints([0,WATER_Y+0.5,0],[...new THREE.Color(PAL.wellGlow).toArray()],66,0.4);world.add(pg);tagWell(pg);
+// rim glow ring
+{const rp=[],rc=[];for(let k=0;k<160;k++){const a=k/160*Math.PI*2;rp.push(R_POOL*Math.cos(a),WATER_Y+0.3,R_POOL*Math.sin(a));const c=new THREE.Color(PAL.wellGlow);rc.push(c.r,c.g,c.b);}const rim=glowPoints(rp,rc,1.3,0.55);world.add(rim);tagWell(rim);}
+const rfN=440,rf=[],rfPos=new Float32Array(rfN*3),rfCol=new Float32Array(rfN*3);
+for(let i=0;i<rfN;i++){const colc=i<200;if(colc)rf.push({x0:rand(-2.5,2.5),y:WATER_Y-rand(0,20),z0:rand(-2.5,2.5)});else{const a=rand(0,6.28),r=MOON_R*0.4*Math.sqrt(rng());rf.push({x0:r*Math.cos(a),y:WATER_Y-0.3-r*0.15,z0:r*Math.sin(a)});}const c=lerpC(PAL.waterHi,PAL.moon,rng());rfCol[i*3]=c.r;rfCol[i*3+1]=c.g;rfCol[i*3+2]=c.b;}
+const rfGeo=new THREE.BufferGeometry();rfGeo.setAttribute('position',new THREE.BufferAttribute(rfPos,3));rfGeo.setAttribute('color',new THREE.BufferAttribute(rfCol,3));
+const refl=new THREE.Points(rfGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(refl);tagWell(refl);
+const RINGS=6,RPP=52,rgPos=new Float32Array(RINGS*RPP*3),rgCol=new Float32Array(RINGS*RPP*3),rings=[];for(let i=0;i<RINGS;i++)rings.push({r:rand(0,R_POOL),spd:rand(0.06,0.13)});
+const rgGeo=new THREE.BufferGeometry();rgGeo.setAttribute('position',new THREE.BufferAttribute(rgPos,3));rgGeo.setAttribute('color',new THREE.BufferAttribute(rgCol,3));
+const ripObj=new THREE.Points(rgGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(ripObj);tagWell(ripObj);
+
+/* ---- KODAMA spirits that descend ------------------------------------------ */
+const spirits=[];
+function makeSpirit(){const g=new THREE.Group();
+  const hp=[],hc=[];for(let i=0;i<78;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=2.1*(0.9+rand(0,0.1));hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v)+2.2,r*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.spirit);hc.push(c.r,c.g,c.b);}
+  const head=glowPoints(hp,hc,1.4,0);g.add(head);
+  const bp=[],bc=[];for(let i=0;i<20;i++){const y=rand(-2,2),rr=0.85*(1-Math.abs(y)/3),a=rand(0,6.28);bp.push(rr*Math.cos(a),y,rr*Math.sin(a));const c=new THREE.Color(PAL.spirit);bc.push(c.r,c.g,c.b);}
+  const body=glowPoints(bp,bc,1.1,0);g.add(body);
+  const fp=[-0.55,2.5,1.9,0.55,2.5,1.9,0,1.8,2.0],fc=[0.02,0.02,0.04,0.02,0.02,0.04,0.02,0.02,0.04];const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fg.setAttribute('color',new THREE.Float32BufferAttribute(fc,3));
+  const face=new THREE.Points(fg,new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0}));g.add(face);
+  g.visible=false;world.add(g);const sp={g,head,body,face,state:'wait',timer:rand(0,5),op:0,center:0,vy:0};spirits.push(sp);reposition(sp);return sp;}
+function reposition(sp){const a=rand(0,Math.PI*2),y=GROUND_Y-rand(2,10),R=radiusAt(y)*0.82;sp.g.position.set(R*Math.cos(a),y,R*Math.sin(a));sp.center=(secOf(sp.g.position.x,sp.g.position.z)+0.5)*SA;sp.vy=rand(0.02,0.05);}
+for(let i=0;i<5;i++)makeSpirit();
+function updateSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.4;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.4,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(3,6);}}
+  else if(sp.state==='hold'){sp.g.position.y-=sp.vy;if(sp.timer<=0){sp.state='out';sp.timer=1.6;}}
+  else if(sp.state==='out'){sp.op=MU.clamp(sp.op-dt/1.6,0,1);sp.g.position.y-=sp.vy*1.6;if(sp.timer<=0){sp.state='wait';sp.timer=rand(2,6);sp.g.visible=false;reposition(sp);}}
+  const o=sp.op;sp.head.material.opacity=0.85*o;sp.body.material.opacity=0.5*o;sp.face.material.opacity=0.9*o;sp.g.rotation.z=Math.sin(t*0.8+sp.center)*0.06;}}
+
+/* ---- ambient motes -------------------------------------------------------- */
+const mN=260,mPos=new Float32Array(mN*3),mCol=[];for(let i=0;i<mN;i++){mPos[i*3]=rand(-60,60);mPos[i*3+1]=rand(4,GROUND_Y+30);mPos[i*3+2]=rand(-60,60);const c=lerpC(PAL.pale,PAL.silver,rng());mCol.push(c.r,c.g,c.b);}
+const mGeo=new THREE.BufferGeometry();mGeo.setAttribute('position',new THREE.BufferAttribute(mPos,3));mGeo.setAttribute('color',new THREE.Float32BufferAttribute(mCol,3));
+const motes=new THREE.Points(mGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(motes);
+
+/* ---- MASTER CYCLE: grow -> drink -> recede -> to black (well glows) -> pause -> home */
+const MP=50;
+function cycle(t){const mp=(t%MP)/MP;
+  let g;if(mp<0.30)g=ss(mp/0.30);else if(mp<0.40)g=1;else if(mp<0.58)g=ss(1-(mp-0.40)/0.18);else g=0;
+  let drink=0;if(mp>=0.28&&mp<0.42)drink=Math.sin((mp-0.28)/0.14*Math.PI);
+  let s,l;
+  if(mp<0.34){s=0;l=0.82;}
+  else if(mp<0.46){const k=ss((mp-0.34)/0.12);s=k;l=MU.lerp(0.82,0.6,k);}
+  else if(mp<0.58){s=1;l=0.6;}
+  else if(mp<0.72){const k=ss((mp-0.58)/0.14);s=1-0.4*k;l=MU.lerp(0.6,0.0,k);}
+  else if(mp<0.82){s=0;l=0.0;}                                    // BLACK HOLD (~5s)
+  else{const k=ss((mp-0.82)/0.18);s=0;l=MU.lerp(0.0,0.82,k);}      // recover home
+  const hue=(0.5+mp*0.9+t*0.008)%1;
+  let wg=0;if(mp>=0.66&&mp<0.72)wg=ss((mp-0.66)/0.06);else if(mp>=0.72&&mp<0.82)wg=1;else if(mp>=0.82&&mp<0.88)wg=1-ss((mp-0.82)/0.06);
+  return {g,drink,s,l,hue,wg};}
+const mainTint=new THREE.Color(),wellTint=new THREE.Color();
+let turntable=true;const ttBtn=document.getElementById('tt');
+ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+
+/* ---- camera (reframed: more sky, scene dropped) --------------------------- */
+const target=new THREE.Vector3(0,30,0);let camA=Math.PI*0.5,camR=118,camY=44,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,20,104);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,84,200);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.moon,'the moon','and its reflection'],[PAL.rootLit,'roots grow from trees','vana-roots'],[PAL.myco,'mycelium web','pulsing, alive'],[PAL.wellGlow,'the well drinks','then all goes dark']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4400);
+
+/* ---- animate -------------------------------------------------------------- */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0010;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  const camAz=(Math.atan2(camera.position.z,camera.position.x)+Math.PI*2)%(Math.PI*2);
+  for(const o of cull)o.visible=angDiff(o.userData.center,camAz)>CUT;
+  for(const p of props)p.obj.visible=angDiff(p.center,camAz)>CUT*0.85;
+  for(const sp of spirits)if(sp.g.visible)sp.g.visible=angDiff(sp.center,camAz)>0.7;
+
+  const C=cycle(t);
+  for(const gr of growers){let e=MU.clamp((C.g-gr.delay)/(1-gr.delay),0,1);let cnt=Math.floor(gr.total*e);if(gr.o.isLineSegments)cnt-=cnt%2;gr.o.geometry.setDrawRange(0,cnt);}
+  // mycelium pulse
+  for(let i=0;i<SECTORS;i++){const M=mycoFil[i];if(!M)continue;const arr=M.geom.attributes.color.array;for(let k=0;k<M.n;k++){const pul=0.4+0.6*Math.max(0,Math.sin(t*1.8-M.y[k]*0.25));arr[k*3]=M.base[k*3]*pul;arr[k*3+1]=M.base[k*3+1]*pul;arr[k*3+2]=M.base[k*3+2]*pul;}M.geom.attributes.color.needsUpdate=true;}
+  // star twinkle
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.55+0.45*Math.sin(t*1.3+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  updateSpirits(t,dt);
+  // water — drink glimmer boosts pool/reflection/ripples
+  pool.material.opacity=0.44+0.1*Math.sin(t*1.1)+C.drink*0.4;
+  for(let i=0;i<rfN;i++){const p=rf[i],rip=Math.sin(t*2.4+p.y*0.6+p.x0)*1.1+Math.sin(t*1.3+p.z0)*0.6;rfPos[i*3]=p.x0+rip;rfPos[i*3+1]=p.y;rfPos[i*3+2]=p.z0+rip*0.5;}
+  rfGeo.attributes.position.needsUpdate=true;refl.material.opacity=0.6+0.18*Math.sin(t*1.8)+C.drink*0.25;
+  let idx=0;for(let ri=0;ri<RINGS;ri++){const R=rings[ri];R.r+=R.spd*(1+C.drink*1.5);if(R.r>R_POOL)R.r=rand(0,3);const fade=(1-R.r/R_POOL)*(1+C.drink*0.6);for(let k=0;k<RPP;k++){const a=k/RPP*Math.PI*2;rgPos[idx*3]=R.r*Math.cos(a);rgPos[idx*3+1]=WATER_Y+0.2;rgPos[idx*3+2]=R.r*Math.sin(a);const c=new THREE.Color(PAL.waterHi);rgCol[idx*3]=c.r*fade;rgCol[idx*3+1]=c.g*fade;rgCol[idx*3+2]=c.b*fade;idx++;}}
+  rgGeo.attributes.position.needsUpdate=true;rgGeo.attributes.color.needsUpdate=true;
+  const mp2=motes.geometry.attributes.position;for(let i=0;i<mN;i++){let y=mp2.getY(i)+0.015;if(y>GROUND_Y+30)y=4;mp2.setY(i,y);}mp2.needsUpdate=true;
+  // apply tints: everything -> mainTint; the well + water -> wellTint (glows through black)
+  mainTint.setHSL(C.hue,C.s,C.l);
+  wellTint.setHSL(MU.lerp(C.hue,0.52,C.wg),MU.lerp(C.s,0.22,C.wg),MU.lerp(C.l,0.64,C.wg));
+  scene.traverse(o=>{if(o.material&&o.material.color)o.material.color.copy(o.userData&&o.userData.well?wellTint:mainTint);});
+  renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

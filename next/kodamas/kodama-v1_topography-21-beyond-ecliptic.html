@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond the Ecliptic (study)</title>
+<style>
+  :root{--bg:#0B0F16;--cream:#ECEAE0;--pale:#AEBCCA;--silver:#D8DEE6;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--silver);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(18,22,30,.5);border:1px solid rgba(216,222,230,.3);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Beyond the Ecliptic.</h1><div class="sub">vana-kodama study · moons on tilted rings, and one far shore still green</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const PAL={bg:0x0B0F16,pale:0xAEBCCA,silver:0xD8DEE6,white:0xF0F4F8,moon:0xF4F6F8,moonLo:0x8A96A2,dim:0x4A5563,
+  bloomA:0x74D6AE,bloomB:0x9A6CE8,bloomC:0xF07AB8,bloomD:0xF6C544};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260722);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x8894A2,0.0040);
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,5000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* luminous horizon */
+{const p=[],col=[];for(let i=0;i<1400;i++){const x=rand(-220,220),z=-185+rand(-8,8),y=rand(2,26);p.push(x,y,z);const c=lerpC(PAL.silver,PAL.white,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.2,0.4));}
+
+/* delicate wavy contour horizon (set 2) */
+function hf(x,z,t){return 5*Math.sin(x*0.02+z*0.015)+3*Math.sin(x*0.013-z*0.025+0.8)+1.5*Math.sin(x*0.04+t*0.18);}
+const dP=[],dC=[],dXY=[];for(let x=-150;x<=150;x+=3.4)for(let z=-180;z<=8;z+=3.8){dP.push(x,0,z);dXY.push(x,z);const near=MU.clamp(1-(-z)/185,0,1);const c=lerpC(PAL.dim,PAL.silver,0.3+0.3*rng()).lerp(new THREE.Color(PAL.white),(1-near)*0.55);dC.push(c.r,c.g,c.b);}
+const dGeo=new THREE.BufferGeometry();dGeo.setAttribute('position',new THREE.Float32BufferAttribute(dP,3));dGeo.setAttribute('color',new THREE.Float32BufferAttribute(dC,3));
+const dune=new THREE.Points(dGeo,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.7}));dune.userData.noTint=true;world.add(dune);
+const dPos=dGeo.attributes.position.array,dN=dXY.length/2;
+const clines=[];{let zi=0;for(let z=-150;z<=0;z+=15){const P=150,pos=new Float32Array(P*3),col=new Float32Array(P*3),depth=MU.clamp(1-(-z)/180,0,1);for(let i=0;i<P;i++){const f=i/(P-1),hue=(0.5+0.45*f+zi*0.07)%1,c=new THREE.Color().setHSL(hue,0.44,MU.lerp(0.5,0.8,depth));col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));const o=new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6}));o.userData.noTint=true;world.add(o);clines.push({z,pos,geo:g,P});zi++;}}
+
+/* the distant whisper of colourful forest (only colour) */
+{const p=[],col=[];for(let i=0;i<520;i++){const x=rand(-70,70),z=-175+rand(-6,6),y=rand(6,26);p.push(x,y,z);const c=lerpC(pick([PAL.bloomA,PAL.bloomB,PAL.bloomC,PAL.bloomD]),0xFFFFFF,rng()*0.3);col.push(c.r*0.8,c.g*0.8,c.b*0.8);}const bloom=glowPoints(p,col,1.5,0.55);bloom.userData.noTint=true;world.add(bloom);}
+
+/* ORBITAL MOON SYSTEM — tilted rings, riding moons */
+const MC=new THREE.Vector3(8,58,-96),U=new THREE.Vector3(1,0.28,0.1).normalize(),V=new THREE.Vector3(-0.15,0.7,0.7).normalize();
+(function(){const R=12,p=[],col=[];for(let i=0;i<(R*R*7|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(MC.x+x,MC.y+y,MC.z+z);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.4,0.9));})();
+for(let ri=0;ri<5;ri++){const RR=18+ri*8,p=[],col=[];for(let k=0;k<200;k++){const a=k/200*Math.PI*2;const v=U.clone().multiplyScalar(RR*Math.cos(a)).add(V.clone().multiplyScalar(RR*Math.sin(a)));p.push(MC.x+v.x,MC.y+v.y,MC.z+v.z);const c=lerpC(PAL.pale,PAL.white,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,0.7,0.38-ri*0.045));}
+const moons=[];for(let i=0;i<5;i++){const RR=18+((rng()*5)|0)*8,R=rand(1.4,3.4),p=[],col=[];for(let k=0;k<(R*R*8|0);k++){const u=rand(0,6.28),v=Math.acos(rand(-1,1));p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const c=lerpC(PAL.moonLo,PAL.moon,0.5+0.4*rng());col.push(c.r,c.g,c.b);}const g=glowPoints(p,col,1.1,0.85);world.add(g);moons.push({g,RR,a:rand(0,6.28),spd:rand(0.08,0.2)});}
+
+/* constellations: more clusters, bright twinkling nodes + pulsing joining lines */
+let stars,starBase,starPh,cnodes,cnodeBase,cnodePh,clineMat;
+{const bp=[],bc=[],bph=[],np=[],nc=[],nph=[],linP=[],linC=[];
+  for(let cst=0;cst<16;cst++){const cu=rand(0,6.28),cv=Math.acos(rand(-0.05,0.95)),CR=rand(150,255);const cx=CR*Math.sin(cv)*Math.cos(cu),cy=Math.abs(CR*Math.cos(cv))*0.85+48,cz=CR*Math.sin(cv)*Math.sin(cu);const n=4+((rng()*4)|0),nodes=[];
+    for(let k=0;k<n;k++){const nx=cx+rand(-32,32),ny=cy+rand(-26,26),nz=cz+rand(-32,32);nodes.push([nx,ny,nz]);np.push(nx,ny,nz);const c=lerpC(PAL.silver,PAL.white,0.5+0.5*rng());nc.push(c.r,c.g,c.b);nph.push(rand(0,6.28));}
+    for(let k=0;k<n-1;k++){const A=nodes[k],B=nodes[k+1];linP.push(A[0],A[1],A[2],B[0],B[1],B[2]);const c=new THREE.Color(PAL.pale);for(let e=0;e<2;e++){linC.push(c.r,c.g,c.b);}}}
+  for(let i=0;i<650;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.05,1)),R=rand(150,280);bp.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+40,R*Math.sin(v)*Math.sin(u));const b=0.3+0.45*rng(),c=lerpC(PAL.pale,PAL.white,rng());bc.push(c.r*b,c.g*b,c.b*b);bph.push(rand(0,6.28));}
+  starBase=new Float32Array(bc);starPh=bph;stars=glowPoints(bp,bc,0.9,0.8);world.add(stars);
+  cnodeBase=new Float32Array(nc);cnodePh=nph;cnodes=glowPoints(np,nc,2.0,0.95);cnodes.userData.noTint=true;world.add(cnodes);
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(linP,3));lg.setAttribute('color',new THREE.Float32BufferAttribute(linC,3));const lo=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.22,blending:THREE.AdditiveBlending,depthWrite:false}));lo.userData.noTint=true;clineMat=lo.material;world.add(lo);}
+
+/* motes */
+const mtN=200,mtPos=new Float32Array(mtN*3),mtCol=[];for(let i=0;i<mtN;i++){mtPos[i*3]=rand(-120,120);mtPos[i*3+1]=rand(4,70);mtPos[i*3+2]=rand(-160,8);const c=lerpC(PAL.pale,PAL.silver,rng());mtCol.push(c.r,c.g,c.b);}
+const mtGeo=new THREE.BufferGeometry();mtGeo.setAttribute('position',new THREE.BufferAttribute(mtPos,3));mtGeo.setAttribute('color',new THREE.Float32BufferAttribute(mtCol,3));
+const motes=new THREE.Points(mtGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(motes);
+
+/* subtle color-breath + turntable */
+const tint=new THREE.Color(),CYC=48;
+function updTint(t){const p=(t%CYC)/CYC;let s,l;if(p<0.55){s=0;l=0.85;}else if(p<0.7){const k=ss((p-0.55)/0.15);s=k*0.5;l=0.85-0.12*k;}else if(p<0.84){s=0.5;l=0.73;}else{const k=ss((p-0.84)/0.16);s=0.5*(1-k);l=0.73+0.12*k;}tint.setHSL((0.55+p*0.4)%1,s,l);scene.traverse(o=>{if(o.material&&o.material.color&&!o.userData.noTint)o.material.color.copy(tint);});}
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+const target=new THREE.Vector3(4,26,-70);let camA=Math.PI*0.5,camR=118,camY=44,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.004;camY=MU.clamp(camY-(e.clientY-py)*.35,16,96);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,64,210);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.moon,'the moon-system','rings, tilted off-plane'],[PAL.silver,'constellations','joined by faint light'],[PAL.dim,'the contour horizon','pale, receding'],[PAL.bloomA,'one far shore','still green']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4400);
+
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+  if(turntable&&!drag)camA+=0.0006;camera.position.set(4+Math.cos(camA)*camR,camY,-70+Math.sin(camA)*camR);camera.lookAt(target);
+  for(let i=0;i<dN;i++){const x=dXY[i*2],z=dXY[i*2+1];dPos[i*3+1]=hf(x,z,t);}dGeo.attributes.position.needsUpdate=true;
+  for(const ln of clines){for(let i=0;i<ln.P;i++){const x=-140+(i/(ln.P-1))*280;ln.pos[i*3]=x;ln.pos[i*3+1]=hf(x,ln.z,t)+0.5;ln.pos[i*3+2]=ln.z;}ln.geo.attributes.position.needsUpdate=true;}
+  for(const m of moons){m.a+=m.spd*0.01;const v=U.clone().multiplyScalar(m.RR*Math.cos(m.a)).add(V.clone().multiplyScalar(m.RR*Math.sin(m.a)));m.g.position.set(MC.x+v.x,MC.y+v.y,MC.z+v.z);}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.1+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  {const arr=cnodes.geometry.attributes.color.array;for(let i=0;i<cnodePh.length;i++){const tw=0.4+0.6*Math.pow(0.5+0.5*Math.sin(t*1.7+cnodePh[i]),2);arr[i*3]=cnodeBase[i*3]*tw;arr[i*3+1]=cnodeBase[i*3+1]*tw;arr[i*3+2]=cnodeBase[i*3+2]*tw;}cnodes.geometry.attributes.color.needsUpdate=true;}
+  clineMat.opacity=0.15+0.12*Math.abs(Math.sin(t*0.6));
+  const mp=motes.geometry.attributes.position;for(let i=0;i<mtN;i++){let x=mp.getX(i)+0.02;if(x>120)x=-120;mp.setX(i,x);}mp.needsUpdate=true;
+  updTint(t);renderer.render(scene,camera);}
+animate();
+</script></body></html>

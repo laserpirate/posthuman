@@ -1,8 +1,7 @@
 // Kodama mode end-to-end tests on the real GPU (the Hydra suite, tools/e2e.mjs, stays unchanged).
 //   node serve.mjs --port 8091 &   then   node tools/e2e-kodama.mjs [--headed] [base url]
-// Locally the plain pack (local/kodamas/) and the encrypted copy (?kpack=enc, password from
-// local/kodama-pass.txt) are both tested. Against Pages without KODAMA_PASS set, the test checks
-// that the pack reads "locked" and nothing breaks.
+// Locally the plain pack (local/kodamas/) and the public copy (kodamas/, ?kpack=pub) are both tested;
+// against Pages, the public copy. No password anywhere.
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -11,9 +10,6 @@ import { PNG } from 'pngjs';
 const BASE = process.argv.slice(2).find(a => a.startsWith('http')) || 'http://localhost:8091/';
 const HEADED = process.argv.includes('--headed');
 const LOCAL = BASE.startsWith('http://localhost');
-const PASSFILE = path.join('local', 'kodama-pass.txt');
-// KODAMA_PASS=none tests the locked pack (no password at all)
-const PASS = process.env.KODAMA_PASS === 'none' ? '' : process.env.KODAMA_PASS || (fs.existsSync(PASSFILE) ? fs.readFileSync(PASSFILE, 'utf8').trim() : '');
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const offsite = [], consoleProblems = [], results = [];
 const KSCENES = 44; // pk17-pk24, kv01-kv25 (no kv22), pk26-pk37
@@ -81,53 +77,40 @@ function diff(a, b) {
 const gpu = await (async () => { const c = await ctx(); const p = await open(c); const g = await p.textContent('#gpu'); await c.close(); return g; })();
 console.log('Kodama e2e against ' + BASE + '\n   ' + gpu);
 
+// no password box, locked message or password field anywhere
+const noLock = async p => {
+  assert(!(await p.$('#k-unlock')) && !(await p.$('#k-pass')) && !(await p.$('input[type=password]')), 'no unlock box or password field');
+  assert(!/locked|password/i.test(await p.textContent('#k-pack-st')), 'no locked message');
+};
 if (LOCAL) {
-  await test('pack: local folder opens; the encrypted copy unlocks with the password, refuses a wrong one, remembers the key', async () => {
-    const c = await ctx(); let p = await open(c, '?i=kp');
+  await test('pack: local folder opens; the public copy (kodamas/) opens with no password and plays', async () => {
+    const c = await ctx(); const p = await open(c, '?i=kp');
     await p.waitForFunction(() => PHVJ.state.kpack !== 'none' && PHVJ.state.kscenes > 0, null, { timeout: 15000 });
-    let s = await st(p);
+    const s = await st(p);
     assert(s.kpack === 'local' && s.kscenes === KSCENES, 'local pack ' + s.kpack + ' ' + s.kscenes);
-    const p2 = await open(c, '?i=kenc&kpack=enc');
-    await p2.evaluate(() => localStorage.removeItem('phvj:kodama-key'));
-    await p2.reload(); await p2.waitForFunction(() => window.PHVJ && PHVJ.state.kpack === 'locked', null, { timeout: 15000 });
-    await p2.click('#b-mk');
-    assert((await st(p2)).mode === 'hydra' && await p2.isVisible('#k-unlock'), 'locked pack: stays in Hydras, password form shown');
-    await p2.fill('#k-pass', 'not-the-password');
-    await p2.click('#k-go');
-    await p2.waitForFunction(() => /Wrong password/.test(document.getElementById('k-pack-st').textContent), null, { timeout: 15000 });
-    assert(PASS, 'password file present');
-    await p2.fill('#k-pass', PASS);
-    await p2.click('#k-go');
-    await p2.waitForFunction(n => PHVJ.state.kpack === 'encrypted' && PHVJ.state.kscenes === n, KSCENES, { timeout: 20000 });
+    const p2 = await open(c, '?i=kpub&kpack=pub');
+    await p2.waitForFunction(n => PHVJ.state.kpack === 'public' && PHVJ.state.kscenes === n, KSCENES, { timeout: 20000 });
+    await noLock(p2);
     await kodama(p2);
-    assert((await st(p2)).kready, 'encrypted scene plays');
-    await p2.reload(); await p2.waitForFunction(() => window.PHVJ && PHVJ.state.kpack === 'encrypted', null, { timeout: 20000 });
-    await p2.waitForFunction(() => PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 15000 });
+    assert((await st(p2)).kready, 'public scene plays');
     await c.close();
   });
 } else {
-  await test('pack on Pages: encrypted, locked without the password, Hydras unaffected', async () => {
+  await test('pack on Pages: public, opens with no password and plays', async () => {
     const c = await ctx(); const p = await open(c, '?i=kpages');
-    await p.waitForFunction(() => PHVJ.state.kpack === 'locked' || PHVJ.state.kpack === 'encrypted', null, { timeout: 15000 });
-    if (PASS) {
-      await p.click('[data-tab=gallery]');
-      await p.fill('#k-pass', PASS); await p.click('#k-go');
-      await p.waitForFunction(() => PHVJ.state.kpack === 'encrypted', null, { timeout: 30000 });
-      await kodama(p);
-    } else {
-      await p.click('#b-mk');
-      assert((await st(p)).mode === 'hydra' && /locked/.test(await p.textContent('#k-pack-st')), 'locked message, Hydras keep playing');
-    }
+    await p.waitForFunction(n => PHVJ.state.kpack === 'public' && PHVJ.state.kscenes === n, KSCENES, { timeout: 30000 });
+    await noLock(p);
+    await kodama(p);
+    assert((await st(p)).kready, 'scene plays');
     await c.close();
   });
 }
 
-const PLAYABLE = LOCAL || PASS;
+const PLAYABLE = true;
 if (PLAYABLE) {
   const Q = LOCAL ? '' : '';
   await test('visuals only: no text or UI from the scene reaches the output', async () => {
     const c = await ctx(); const p = await open(c, '?i=ktext' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await kodama(p);
     for (const id of ['pk17', 'pk18', 'kv03', 'kv16', 'pk26', 'pk29', 'pk37']) {
       await p.evaluate(id => PHVJ.show(id, { cut: true }), id);
@@ -155,7 +138,6 @@ if (PLAYABLE) {
 
   await test('mirrored controls: listed per scene, clicks change the scene and the pressed state', async () => {
     const c = await ctx(); const p = await open(c, '?i=kctl' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await kodama(p);
     await p.evaluate(() => PHVJ.show('pk17', { cut: true }));
     await p.waitForFunction(() => PHVJ.state.cur === 'pk17' && PHVJ.state.kready);
@@ -183,7 +165,6 @@ if (PLAYABLE) {
 
   await test('speed slider halves and doubles the scene clock; turntable 0 stops, 2x doubles, reverse turns back', async () => {
     const c = await ctx(); const p = await open(c, '?i=kspd' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await kodama(p);
     await p.evaluate(() => PHVJ.show('pk18', { cut: true }));
     await p.waitForFunction(() => PHVJ.state.cur === 'pk18' && PHVJ.state.kready && PHVJ.state.kframes === 1);
@@ -214,7 +195,6 @@ if (PLAYABLE) {
 
   await test('palettes change the pixels as expected (grayscale has no chroma, B/W has two values)', async () => {
     const c = await ctx(); const p = await open(c, '?i=kpal' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await kodama(p);
     await p.evaluate(() => PHVJ.show('pk17', { cut: true }));
     await p.waitForFunction(() => PHVJ.state.cur === 'pk17' && PHVJ.state.kready && PHVJ.state.kframes === 1);
@@ -261,7 +241,6 @@ if (PLAYABLE) {
 
   await test('autoplay, crossfade, cut, mode switch through black; iframes torn down after each fade', async () => {
     const c = await ctx(); const p = await open(c, '?i=kauto' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await p.waitForFunction(() => PHVJ.state.kscenes > 0, null, { timeout: 15000 });
     // the switch fades through black
     await p.click('#b-mk');
@@ -320,7 +299,6 @@ if (PLAYABLE) {
 
   await test('output window follows mode, scene, controls, speed, turntable and palette', async () => {
     const c = await ctx(); const p = await open(c, '?i=kout' + Q);
-    if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); }
     await kodama(p);
     await p.evaluate(() => PHVJ.show('pk17', { cut: true }));
     await p.waitForFunction(() => PHVJ.state.cur === 'pk17' && PHVJ.state.kready);
@@ -342,7 +320,6 @@ if (PLAYABLE) {
   });
 
   // ---- handoff-6: view (orbit, pan, zoom), View override, palette UI ----
-  const unlock = async p => { if (!LOCAL) { await p.click('[data-tab=gallery]'); await p.fill('#k-pass', PASS); await p.click('#k-go'); } };
   const onScene = async (p, id) => {
     await p.evaluate(id => { PHVJ.setPlaying(false); PHVJ.show(id, { cut: true }); }, id);
     await p.waitForFunction(id => PHVJ.state.cur === id && PHVJ.state.kready && PHVJ.state.kframes === 1 && PHVJ.view(), id, { timeout: 15000 });
@@ -361,7 +338,7 @@ if (PLAYABLE) {
 
   await test('view: drag orbits, shift-drag and right-drag pan, wheel zooms, inside the scene limits; the pad; Reset view', async () => {
     const c = await ctx(); const p = await open(c, '?i=kcam' + Q);
-    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await kodama(p); await onScene(p, 'pk17');
     const cfg = await p.evaluate(() => PHVJ.camCfg());
     assert(cfg.r && cfg.y && cfg.pan > 0, 'registry camera entry for pk17: ' + JSON.stringify(cfg));
     const v0 = await p.evaluate(() => PHVJ.view());
@@ -409,7 +386,7 @@ if (PLAYABLE) {
 
   await test('turntable rests while steering and resumes 2 s after from the new angle', async () => {
     const c = await ctx(); const p = await open(c, '?i=ktt' + Q);
-    await unlock(p); await kodama(p); await onScene(p, 'pk18');
+    await kodama(p); await onScene(p, 'pk18');
     const a0 = await p.evaluate(() => PHVJ.angle());
     await wait(600);
     assert((await p.evaluate(() => PHVJ.angle())) - a0 > 0.005, 'turning before the drag');
@@ -426,7 +403,7 @@ if (PLAYABLE) {
 
   await test('output window follows the view, and steering in the output reports back', async () => {
     const c = await ctx(); const p = await open(c, '?i=kvout' + Q);
-    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await kodama(p); await onScene(p, 'pk17');
     await p.evaluate(() => { const el = document.getElementById('k-tt'); el.value = '0'; el.dispatchEvent(new Event('input')); });
     const [out] = await Promise.all([c.waitForEvent('page'), p.click('[data-tab=live]').then(() => p.click('#out-open'))]);
     out.on('pageerror', e => consoleProblems.push('out pageerror: ' + e.message));
@@ -456,7 +433,7 @@ if (PLAYABLE) {
 
   await test('View override per playlist item: saved from the scene, applied when it plays again, kept on reload', async () => {
     const c = await ctx(); const p = await open(c, '?i=kview' + Q);
-    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await kodama(p); await onScene(p, 'pk17');
     await dragOn(p, '#stage', 200, -40);
     await p.mouse.move(400, 300);
     await p.mouse.wheel(0, 250); await wait(200);
@@ -476,7 +453,7 @@ if (PLAYABLE) {
 
   await test('palette UI: menu bar dropdown and P in Kodama mode, kept across scenes and mode switches, item override shown and edited', async () => {
     const c = await ctx(); const p = await open(c, '?i=kpui' + Q);
-    await unlock(p); await kodama(p); await onScene(p, 'pk17');
+    await kodama(p); await onScene(p, 'pk17');
     assert(await p.isVisible('#b-pal'), 'palette dropdown in the menu bar');
     await p.selectOption('#b-pal', 'grayscale');
     await wait(300);

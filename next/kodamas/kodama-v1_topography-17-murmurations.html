@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Murmurations and Incantations (study)</title>
+<style>
+  :root{--bg:#0A0D12;--silver:#E2E8EE;--pale:#AEBCCA;--moon:#F0F4F8;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(174,188,202,.2)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pale);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(20,26,34,.5);border:1px solid rgba(174,188,202,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5;border-color:rgba(174,188,202,.18)}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Murmurations and Incantations.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the wind writes over the hills what the water is about to say</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Murmurations and Incantations — a flow-field over wavy contour hills. White
+   streamlines advect across a point-cloud terrain; water runs downhill into the
+   troughs; a cascade falls; rain sweeps through; the land slowly subsides. r128. */
+const PAL={bg:0x0A0D12,silver:0xE2E8EE,pale:0xAEBCCA,dim:0x4A5563,moss:0x3E5240,mossLo:0x1A241C,
+  moon:0xF0F4F8,moonLo:0x9AA6B2,water:0x2E8BE0,waterHi:0x9FE0F0,rain:0xAEC8E0,fire:0xF6E06A};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260718);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x9DAAB8,0.0050);
+const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,0.1,5000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* wavy height field + subsidence */
+const SUBP=44,SUBAMP=10;let SUB=0;
+function subsidence(t){const tp=(t%SUBP)/SUBP;let s;if(tp<0.38)s=ss(tp/0.38);else if(tp<0.62)s=1;else s=ss(1-(tp-0.62)/0.38);return -SUBAMP*s;}
+function hf(x,z,t){let h=10*Math.sin(x*0.024+z*0.018)+6*Math.sin(x*0.014-z*0.028+1.1)+4*Math.sin(x*0.045+0.6);h+=2.6*Math.sin(x*0.035+t*0.4+z*0.01)+1.6*Math.cos(z*0.05-t*0.25);return h+SUB;}
+function flowAng(x,z,t){return 2.2*Math.sin(x*0.02+t*0.06)+2.0*Math.cos(z*0.022-t*0.05)+1.4*Math.sin((x+z)*0.013);}
+
+/* bright horizon */
+{const p=[],col=[];for(let i=0;i<1600;i++){const x=rand(-210,210),z=-172+rand(-8,8),y=rand(2,22);p.push(x,y,z);const c=lerpC(PAL.pale,PAL.moon,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.2,0.4));}
+
+/* point-cloud terrain (dense, mossy) */
+const terrP=[],terrC=[],terrXY=[];
+for(let x=-140;x<=140;x+=3.2)for(let z=-165;z<=8;z+=3.4){terrP.push(x,0,z);terrXY.push(x,z);const near=MU.clamp(1-(-z)/172,0,1);const c=lerpC(PAL.mossLo,PAL.moss,0.25+0.4*rng()).lerp(new THREE.Color(PAL.pale),(1-near)*0.4);terrC.push(c.r,c.g,c.b);}
+const terrGeo=new THREE.BufferGeometry();terrGeo.setAttribute('position',new THREE.Float32BufferAttribute(terrP,3));terrGeo.setAttribute('color',new THREE.Float32BufferAttribute(terrC,3));
+const terrain=new THREE.Points(terrGeo,new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.8}));world.add(terrain);
+const terrN=terrXY.length/2,terrPos=terrGeo.attributes.position.array;
+
+/* a few contour lines (animated) */
+const P=140,XW=140,clines=[];
+for(let z=-150;z<=0;z+=12){const pos=new Float32Array(P*3),col=new Float32Array(P*3);const base=lerpC(PAL.dim,PAL.silver,MU.clamp(1-(-z)/165,0,1));for(let i=0;i<P;i++){col[i*3]=base.r;col[i*3+1]=base.g;col[i*3+2]=base.b;}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));world.add(new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5})));clines.push({z,pos,geo:g});}
+
+/* FLOW-FIELD streamlines (murmuration) */
+const M=210,L=20,STEP=2.4,streams=[];
+for(let m=0;m<M;m++){const sx=rand(-135,135),sz=rand(-160,5),xs=[],zs=[];for(let i=0;i<L;i++){xs.push(sx);zs.push(sz);}streams.push({xs,zs});}
+const sVerts=M*(L-1)*2,sPos=new Float32Array(sVerts*3),sCol=new Float32Array(sVerts*3);
+{let v=0;for(let m=0;m<M;m++)for(let i=0;i<L-1;i++){const b0=1-i/(L-1)*0.85,b1=1-(i+1)/(L-1)*0.85;const c=new THREE.Color(PAL.silver);sCol[v*3]=c.r*b0;sCol[v*3+1]=c.g*b0;sCol[v*3+2]=c.b*b0;v++;sCol[v*3]=c.r*b1;sCol[v*3+1]=c.g*b1;sCol[v*3+2]=c.b*b1;v++;}}
+const sGeo=new THREE.BufferGeometry();sGeo.setAttribute('position',new THREE.BufferAttribute(sPos,3));sGeo.setAttribute('color',new THREE.BufferAttribute(sCol,3));
+world.add(new THREE.LineSegments(sGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* WATER — gradient-descent particles pooling into troughs */
+const waN=420,wa=[],waPos=new Float32Array(waN*3),waCol=new Float32Array(waN*3);
+for(let i=0;i<waN;i++){wa.push({x:rand(-135,135),z:rand(-160,5),life:rand(0,200)});const c=lerpC(PAL.water,PAL.waterHi,rng());waCol[i*3]=c.r;waCol[i*3+1]=c.g;waCol[i*3+2]=c.b;}
+const waGeo=new THREE.BufferGeometry();waGeo.setAttribute('position',new THREE.BufferAttribute(waPos,3));waGeo.setAttribute('color',new THREE.BufferAttribute(waCol,3));
+world.add(new THREE.Points(waGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false})));
+/* cascade at a ridge edge */
+const cx0=40,cz0=-40,CN=240,cas=[],casPos=new Float32Array(CN*3),casCol=new Float32Array(CN*3);
+for(let i=0;i<CN;i++){cas.push({x:cx0+rand(-6,6),z:cz0+rand(-3,3),y:rand(-30,20),vy:rand(0.5,0.9)});const c=lerpC(PAL.waterHi,PAL.pale,rng());casCol[i*3]=c.r;casCol[i*3+1]=c.g;casCol[i*3+2]=c.b;}
+const casGeo=new THREE.BufferGeometry();casGeo.setAttribute('position',new THREE.BufferAttribute(casPos,3));casGeo.setAttribute('color',new THREE.BufferAttribute(casCol,3));
+world.add(new THREE.Points(casGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* RAIN */
+const raN=460,ra=[],raPos=new Float32Array(raN*2*3),raCol=new Float32Array(raN*2*3);
+for(let i=0;i<raN;i++){ra.push({x:rand(-150,150),y:rand(0,90),z:rand(-160,10),v:rand(1.4,2.2)});const c=new THREE.Color(PAL.rain);for(let e=0;e<2;e++){raCol[i*6+e*3]=c.r;raCol[i*6+e*3+1]=c.g;raCol[i*6+e*3+2]=c.b;}}
+const raGeo=new THREE.BufferGeometry();raGeo.setAttribute('position',new THREE.BufferAttribute(raPos,3));raGeo.setAttribute('color',new THREE.BufferAttribute(raCol,3));
+const rainObj=new THREE.LineSegments(raGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(rainObj);
+
+/* void-moon + rings */
+(function(){const cx=34,cy=66,cz=-120,R=15;const p=[],col=[],N=(R*R*6)|0;for(let i=0;i<N;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);const cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.5+0.5*cr,0.35,1));p.push(cx+x,cy+y,cz+z);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.4,0.9));
+  for(let ring=0;ring<3;ring++){const rp=[],rc=[],RR=R*(1.4+ring*0.5);for(let k=0;k<120;k++){const a=k/120*Math.PI*2;rp.push(cx+RR*Math.cos(a),cy+RR*Math.sin(a),cz);const c=new THREE.Color(PAL.pale);rc.push(c.r,c.g,c.b);}world.add(glowPoints(rp,rc,0.8,0.26-ring*0.06));}})();
+
+/* stars + fireflies + motes */
+{const p=[],col=[];for(let i=0;i<900;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.1,1)),R=rand(150,260);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+30,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,PAL.moon,rng());col.push(c.r*b,c.g*b,c.b*b);}world.add(glowPoints(p,col,0.9,0.7));}
+const fiN=40,fi=[],fiPos=new Float32Array(fiN*3),fiCol=new Float32Array(fiN*3),fiBase=[];
+for(let i=0;i<fiN;i++){fi.push({x:rand(-120,120),z:rand(-150,0),ph:rand(0,6.28),freq:rand(1.5,3),dx:rand(-.06,.06),dz:rand(-.06,.06)});fiBase.push(new THREE.Color(PAL.fire));}
+const fiGeo=new THREE.BufferGeometry();fiGeo.setAttribute('position',new THREE.BufferAttribute(fiPos,3));fiGeo.setAttribute('color',new THREE.BufferAttribute(fiCol,3));
+world.add(new THREE.Points(fiGeo,new THREE.PointsMaterial({size:1.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+const mtN=300,mtPos=new Float32Array(mtN*3),mtCol=[];for(let i=0;i<mtN;i++){mtPos[i*3]=rand(-140,140);mtPos[i*3+1]=rand(2,60);mtPos[i*3+2]=rand(-160,10);const c=lerpC(PAL.pale,PAL.silver,rng());mtCol.push(c.r,c.g,c.b);}
+const mtGeo=new THREE.BufferGeometry();mtGeo.setAttribute('position',new THREE.BufferAttribute(mtPos,3));mtGeo.setAttribute('color',new THREE.Float32BufferAttribute(mtCol,3));
+const motes=new THREE.Points(mtGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(motes);
+
+/* rain cycle (comes and goes) + color-breath + turntable */
+function rainAmt(t){return MU.clamp(0.5+0.7*Math.sin(t*0.05),0,1)*MU.clamp(Math.sin(t*0.05)>0?1:0.15,0,1);}
+const tint=new THREE.Color(),CYC=40;
+function updTint(t){const p=(t%CYC)/CYC;let s,l;if(p<0.4){s=0;l=0.82;}else if(p<0.58){const k=ss((p-0.4)/0.18);s=k*0.85;l=MU.lerp(0.82,0.62,k);}else if(p<0.72){s=0.85;l=0.62;}else if(p<0.85){const k=ss((p-0.72)/0.13);s=0.85;l=MU.lerp(0.62,0.1,k);}else{const k=ss((p-0.85)/0.15);s=(1-k)*0.85;l=MU.lerp(0.1,0.82,k);}tint.setHSL((0.55+p*0.8+t*0.006)%1,s,l);scene.traverse(o=>{if(o.material&&o.material.color)o.material.color.copy(tint);});}
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+
+/* camera */
+const target=new THREE.Vector3(0,10,-48);let camA=Math.PI*0.5,camR=110,camY=50,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.004;camY=MU.clamp(camY-(e.clientY-py)*.35,18,96);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,60,210);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.silver,'the murmuration','streamlines over hills'],[PAL.waterHi,'the incantation','water finds the troughs'],[PAL.moss,'point-cloud terrain','wavy & subsiding'],[PAL.moon,'the void-moon','ringed above']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4400);
+
+/* animate */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0006;camera.position.set(Math.cos(camA)*camR,camY,-48+Math.sin(camA)*camR);camera.lookAt(target);
+  SUB=subsidence(t);
+  // terrain heights
+  for(let i=0;i<terrN;i++){const x=terrXY[i*2],z=terrXY[i*2+1];terrPos[i*3+1]=hf(x,z,t);}terrGeo.attributes.position.needsUpdate=true;
+  // contour lines
+  for(const ln of clines){const pos=ln.pos;for(let i=0;i<P;i++){const x=-XW+(i/(P-1))*2*XW;pos[i*3]=x;pos[i*3+1]=hf(x,ln.z,t)+0.6;pos[i*3+2]=ln.z;}ln.geo.attributes.position.needsUpdate=true;}
+  // streamlines advect
+  {let v=0;for(let m=0;m<M;m++){const S=streams[m];const hx=S.xs[0],hz=S.zs[0],ang=flowAng(hx,hz,t);let nx=hx+Math.cos(ang)*STEP,nz=hz+Math.sin(ang)*STEP;
+    if(nx<-140||nx>140||nz<-165||nz>8){nx=rand(-135,135);nz=rand(-160,5);for(let i=0;i<L;i++){S.xs[i]=nx;S.zs[i]=nz;}}
+    else{S.xs.unshift(nx);S.xs.pop();S.zs.unshift(nz);S.zs.pop();}
+    for(let i=0;i<L-1;i++){const ax=S.xs[i],az=S.zs[i],bx=S.xs[i+1],bz=S.zs[i+1];sPos[v*3]=ax;sPos[v*3+1]=hf(ax,az,t)+1.2;sPos[v*3+2]=az;v++;sPos[v*3]=bx;sPos[v*3+1]=hf(bx,bz,t)+1.2;sPos[v*3+2]=bz;v++;}}
+   sGeo.attributes.position.needsUpdate=true;}
+  // water gradient descent
+  for(let i=0;i<waN;i++){const w=wa[i];const gx=(hf(w.x+1.5,w.z,t)-hf(w.x-1.5,w.z,t))/3,gz=(hf(w.x,w.z+1.5,t)-hf(w.x,w.z-1.5,t))/3;w.x-=gx*3.2;w.z-=gz*3.2;w.life-=1;if(w.life<0||w.x<-140||w.x>140||w.z<-165||w.z>8){w.x=rand(-135,135);w.z=rand(-160,-40);w.life=rand(120,260);}waPos[i*3]=w.x;waPos[i*3+1]=hf(w.x,w.z,t)+0.5;waPos[i*3+2]=w.z;}waGeo.attributes.position.needsUpdate=true;
+  // cascade
+  const casTop=hf(cx0,cz0,t)+2;for(let i=0;i<CN;i++){const p=cas[i];p.y-=p.vy;if(p.y<hf(p.x,p.z+8,t)-6){p.y=casTop;p.x=cx0+rand(-6,6);}casPos[i*3]=p.x;casPos[i*3+1]=p.y;casPos[i*3+2]=p.z+ (casTop-p.y)*0.12;}casGeo.attributes.position.needsUpdate=true;
+  // rain
+  const rAmt=rainAmt(t);rainObj.material.opacity=0.5*rAmt;
+  if(rAmt>0.02)for(let i=0;i<raN;i++){const p=ra[i];p.y-=p.v*2.6;p.x-=p.v*0.6;if(p.y<0){p.y=90;p.x=rand(-150,150);}raPos[i*6]=p.x;raPos[i*6+1]=p.y;raPos[i*6+2]=p.z;raPos[i*6+3]=p.x-1.6;raPos[i*6+4]=p.y-5;raPos[i*6+5]=p.z;}
+  raGeo.attributes.position.needsUpdate=true;
+  // fireflies
+  for(let i=0;i<fiN;i++){const f=fi[i];f.x+=f.dx*Math.sin(t*0.4+f.ph);f.z+=f.dz*Math.cos(t*0.4+f.ph);const y=hf(f.x,f.z,t)+3+2*Math.sin(t*0.5+f.ph);fiPos[i*3]=f.x;fiPos[i*3+1]=y;fiPos[i*3+2]=f.z;const pulse=Math.pow(0.5+0.5*Math.sin(t*f.freq+f.ph),3);const b=fiBase[i];fiCol[i*3]=b.r*pulse;fiCol[i*3+1]=b.g*pulse;fiCol[i*3+2]=b.b*pulse;}fiGeo.attributes.position.needsUpdate=true;fiGeo.attributes.color.needsUpdate=true;
+  const mp=motes.geometry.attributes.position;for(let i=0;i<mtN;i++){let x=mp.getX(i)+0.03;if(x>140)x=-140;mp.setX(i,x);}mp.needsUpdate=true;
+  updTint(t);renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

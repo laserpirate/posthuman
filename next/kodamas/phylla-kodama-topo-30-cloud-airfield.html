@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cloud airfield (study)</title>
+<style>
+  :root{--cream:#ECE8F2;--gold:#F2C26A;--pale:#B4B8D8;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0A0B18;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(14,14,30,.55);border:1px solid rgba(180,184,216,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="30"><h1>cloud airfield</h1>
+  <div class="sub">phylla-kodama study · working title · draft</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill on" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill" data-t="0.75">night</button></span>
+  <span class="grp">flood <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+</div>
+<div class="ui" id="foot">study, provisional name · © Marko Manriquez</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* cloud airfield — two runways laid on girder decks across a lilac cloud deck, held up
+   on lattice pylons that vanish into the haze. Approach lights step down off the
+   thresholds and run out into the cloud, a sequenced strobe chasing toward the deck.
+   The control tower is a ribbed spire with a glazed cab and rotating beacon; a derelict
+   airliner sits on the long runway; one runway is broken through. Giant moons sunk in
+   the cloud horizon, stars, shooting stars, sky lanterns. TIME: dawn/day/dusk/night.
+   FLOOD: the cloud deck rises until it rolls over the runways.
+   Original artwork © Marko Manriquez, all rights reserved. r128. */
+const PAL={tarLo:0x26283A,tarHi:0x62667E,paint:0xE6E2D8,paintLo:0x7C7C8A,crack:0x0E0E16,moss:0x3C5A52,mossHi:0x86A898,
+  rustLo:0x1A1724,rust:0x433A52,rustHi:0x887A98,girder:0x5A5470,conc:0x8A8EA2,concLo:0x30324A,frame:0x6C7288,
+  win:0xFFC98A,winC:0x9FE0F0,edge:0xFFE2A8,amber:0xFFB040,thr:0x6CFF8A,endR:0xFF4A3A,appr:0xFFF2DC,strobe:0xDDEEFF,taxiB:0x3C6CFF,
+  bcnG:0x6CFF8A,bcnW:0xFFF6E0,obst:0xFF3A2A,tip:0xA8D8FF,tipWarm:0xFF9A50,plane:0xC4C6D2,planeLo:0x6A6C80,
+  sea:0xB2B2D8,cloudHi:0xF2EEFF,moonLo:0x585E86,cream:0xF2EEF6,halo:0xC4C8F0,lant:0xFFC46A,pale:0xB4B8D8};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261030);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);},C=h=>new THREE.Color(h);
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+/* additive glow fades INTO the fog instead of adding fog colour */
+const FOGFADE=THREE.ShaderChunk.fog_fragment.replace(/gl_FragColor\.rgb\s*=\s*mix\([^;]*\);/,'gl_FragColor.rgb *= (1.0-fogFactor);');
+function addFade(m){m.onBeforeCompile=sh=>{sh.fragmentShader=sh.fragmentShader.replace('#include <fog_fragment>',FOGFADE);};return m;}
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),addFade(new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true})));}
+function rockPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:op||0.92}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0A0B18);scene.fog=new THREE.FogExp2(0x0A0B18,0.0031);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+const RY=36;let seaY=20;
+/* lights caught in the cloud: below the deck top they bloom at the surface, dimmed by depth */
+const CU={uSea:{value:20}};
+function cloudLit(size,op){const m=new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false});
+  m.onBeforeCompile=sh=>{sh.uniforms.uSea=CU.uSea;sh.vertexShader='uniform float uSea;\n'+sh.vertexShader.replace('#include <begin_vertex>',['#include <begin_vertex>','float sub=uSea+0.6-position.y; transformed.y=max(position.y,uSea+0.6);','#ifdef USE_COLOR','vColor*=sub>0.0?exp(-sub*0.06):0.55;','#endif'].join('\n'));
+    sh.fragmentShader=sh.fragmentShader.replace('#include <fog_fragment>',FOGFADE);};return m;}
+
+/* ---------- accumulators ---------- */
+const acc=()=>({p:[],c:[]});
+const TM=acc(),MK=acc(),RK=acc(),DT=acc(),LG=acc(),AP=acc(),WN=acc(),L={p:[],c:[]},T={p:[],c:[],per:[],ph:[]},winPh=[],vines=[];
+function put(B,q,col){B.p.push(q[0],q[1],q[2]);B.c.push(col.r,col.g,col.b);}
+function seg(x1,y1,z1,x2,y2,z2,c1,c2){c2=c2||c1;L.p.push(x1,y1,z1,x2,y2,z2);L.c.push(c1.r,c1.g,c1.b,c2.r,c2.g,c2.b);}
+function sg(a,b,col){seg(a[0],a[1],a[2],b[0],b[1],b[2],col);}
+function tip(x,y,z,warm){const cc=C(warm?PAL.tipWarm:PAL.tip);T.p.push(x,y,z);T.c.push(cc.r,cc.g,cc.b);T.per.push(rand(1.4,3.2));T.ph.push(rand(0,1));}
+function vine(q,len){vines.push({ax:q[0],ay:q[1],az:q[2],len,ph:rand(0,6.28),sway:rand(0.5,1.5)});}
+function dangle(q,len){for(let s=0;s<len;s+=0.55)put(DT,[q[0],q[1]-s,q[2]],lerpC(PAL.rustLo,PAL.rustHi,(s/0.55|0)%2?0.7:0.35));}
+/* lattice mast (three legs, ring + zig-zag bracing) */
+function truss(x,z,y0,y1,r0,r1,step,c1,c2,dots){const rot=rand(0,6.28);let prev=null;
+  for(let y=y0;y<=y1+0.01;y+=step){const f=(y-y0)/(y1-y0),r=MU.lerp(r0,r1,f),cur=[0,1,2].map(k=>[x+r*Math.cos(rot+k*2.094),y,z+r*Math.sin(rot+k*2.094)]),cc=lerpC(c1,c2,f);
+    for(let k=0;k<3;k++)sg(cur[k],cur[(k+1)%3],cc);
+    if(prev)for(let k=0;k<3;k++){const A=prev[k],B=cur[k],E=cur[(k+1)%3];sg(A,B,cc);sg(A,E,cc);
+      if(dots)for(let s=0.34;s<1;s+=0.33)put(DT,[MU.lerp(A[0],B[0],s),MU.lerp(A[1],B[1],s),MU.lerp(A[2],B[2],s)],lerpC(PAL.rustLo,PAL.rust,0.5+0.5*rng()));}
+    prev=cur;}
+  const ap=[x,y1+step*0.8,z];for(const A of prev)sg(A,ap,lerpC(c1,c2,1));return ap;}
+
+/* ---------- runway decks on pylons ---------- */
+const RWS=[],strobes=[];
+function slab(cx,cz,ang,s0,s1,hw,ds,dn,gap){const dx=Math.cos(ang),dz=Math.sin(ang),W=(s,o,y)=>[cx+dx*s-dz*o,y,cz+dz*s+dx*o];
+  const inGap=(s,o)=>!!gap&&s>gap[0]+1.6*Math.sin(o*0.9)&&s<gap[1]+1.6*Math.cos(o*0.7);
+  const r={cx,cz,dx,dz,s0,s1,hw,W,gap,inGap};RWS.push(r);
+  for(let s=s0;s<=s1;s+=ds)for(let o=-hw;o<=hw+0.01;o+=dn){if(rng()<0.05)continue;const s2=s+rand(-.45,.45),o2=MU.clamp(o+rand(-.5,.5),-hw,hw);if(inGap(s2,o2))continue;
+    const n=0.5+0.5*Math.sin(s2*0.043+o2*0.21)*Math.cos(s2*0.011-o2*0.05);put(TM,W(s2,o2,RY),lerpC(PAL.tarLo,PAL.tarHi,MU.clamp(0.12+0.6*n+rand(-.18,.18),0,1)));}
+  // cracks with moss in them
+  const nc=((s1-s0)*hw/70)|0;for(let i=0;i<nc;i++){let s=rand(s0,s1),o=rand(-hw,hw),a=rand(0,6.28);for(let k=0;k<7;k++){a+=rand(-.8,.8);const s2=s+Math.cos(a)*rand(.8,2.2),o2=MU.clamp(o+Math.sin(a)*rand(.8,2.2),-hw,hw);if(inGap(s,o)||inGap(s2,o2))break;
+    sg(W(s,o,RY+0.06),W(s2,o2,RY+0.06),lerpC(PAL.crack,PAL.moss,rng()*0.6));if(rng()<0.5)put(DT,W(s2+rand(-.4,.4),o2+rand(-.4,.4),RY+rand(0.05,0.7)),lerpC(PAL.moss,PAL.mossHi,rng()));s=s2;o=o2;}}
+  // deck rim + underside framing
+  const gapS=s=>gap&&s>gap[0]-2&&s<gap[1]+2;
+  for(let s=s0;s<=s1;s+=0.6){if(gapS(s))continue;for(const sd of [-1,1]){put(RK,W(s,sd*hw,RY-0.3),lerpC(PAL.rust,PAL.rustHi,rng()*0.7));put(RK,W(s,sd*hw,RY-1.1),lerpC(PAL.rustLo,PAL.rust,rng()));}}
+  const gc=C(PAL.girder);let pv=null;
+  for(let s=s0;s<=s1+0.01;s+=8){const ok=!gapS(s);
+    if(ok){sg(W(s,-hw,RY-2.6),W(s,hw,RY-2.6),gc);sg(W(s,-hw,RY-0.3),W(s,-hw,RY-2.6),gc);sg(W(s,hw,RY-0.3),W(s,hw,RY-2.6),gc);}
+    if(pv!==null&&ok&&!gapS(pv))for(const sd of [-1,1]){sg(W(pv,sd*hw,RY-2.6),W(s,sd*hw,RY-2.6),gc);sg(W(pv,sd*hw,RY-0.3),W(s,sd*hw,RY-0.3),gc);sg(W(pv,sd*hw,RY-2.6),W(s,sd*hw,RY-0.3),gc);sg(W(pv,-hw,RY-2.6),W(s,hw,RY-2.6),gc);}
+    pv=s;
+    if(ok&&rng()<0.35){const sd=rng()<0.5?-1:1;rng()<0.55?vine(W(s+rand(-3,3),sd*hw,RY-0.6),rand(4,15)):dangle(W(s+rand(-3,3),sd*rand(0,hw),RY-2.6),rand(3,11));}}
+  // pylons down into the cloud
+  for(let s=s0+10;s<s1;s+=42){if(gapS(s))continue;for(const sd of [-1,1]){const q=W(s,sd*(hw-1.6),0);truss(q[0],q[2],-6,RY-2.8,1.9,1.4,3.2,C(PAL.rustLo),C(PAL.rust),false);}}
+  // broken ends at the gap: girders bent down, a few loose plates
+  if(gap)for(const e of [0,1]){const s=gap[e],dir=e?1:-1;for(let o=-hw;o<=hw;o+=2.2){const a=W(s-dir*2,o,RY-2.6),b=W(s+dir*rand(1,5),o+rand(-1,1),RY-2.6-rand(3,11));sg(a,b,gc);if(rng()<0.4)dangle(b,rand(2,7));}
+    for(let i=0;i<60;i++){const q=W(s+dir*rand(0,4),rand(-hw,hw),RY-rand(0.5,9));put(DT,q,lerpC(PAL.tarLo,PAL.rust,rng()));}}
+  return r;}
+function runway(cx,cz,ang,s0,s1,hw,apE,gap){const r=slab(cx,cz,ang,s0,s1,hw,1.25,1.5,gap),W=r.W,inG=(s,o)=>r.inGap(s,o)||(gap&&s>gap[0]-3&&s<gap[1]+3);
+  const paint=()=>lerpC(PAL.paint,PAL.paintLo,rng()*0.7);
+  for(let s=s0+30;s<s1-30;s+=20)for(let u=0;u<11;u+=0.45)for(const o of [-0.45,0,0.45]){if(rng()<0.28||inG(s+u,o))continue;put(MK,W(s+u,o,RY+0.04),paint());}
+  for(let s=s0;s<=s1;s+=0.7)for(const sd of [-1,1]){if(rng()<0.4||inG(s,sd*(hw-0.9)))continue;put(MK,W(s,sd*(hw-0.9),RY+0.04),paint());}
+  for(const e of [-1,1]){const sb=e<0?s0+3:s1-15;
+    for(let k=0;k<6;k++)for(const sd of [-1,1]){const o0=sd*(1.7+k*1.4);for(let u=0;u<12;u+=0.45)for(const oo of [-0.35,0.35]){if(rng()<0.2)continue;put(MK,W(sb+u,o0+oo,RY+0.04),paint());}}
+    const sa=e<0?s0+60:s1-80;for(const sd of [-1,1])for(let u=0;u<20;u+=0.5)for(let w=0;w<2.6;w+=0.65){if(rng()<0.25||inG(sa+u,sd*(4+w)))continue;put(MK,W(sa+u,sd*(4+w),RY+0.04),paint());}}
+  // edge lights (some dead), amber caution zone, threshold green / end red
+  const sTh=apE>0?s1:s0,sEnd=apE>0?s0:s1;
+  for(let s=s0;s<=s1+0.01;s+=7.5)for(const sd of [-1,1]){if(rng()<0.12||inG(s,sd*hw))continue;put(LG,W(s,sd*(hw+0.7),RY+0.55),C(Math.abs(s-sEnd)<60?PAL.amber:PAL.edge));}
+  for(let o=-hw;o<=hw+0.01;o+=1.8){put(LG,W(sTh,o,RY+0.5),C(PAL.thr));put(LG,W(sEnd,o,RY+0.5),C(PAL.endR));}
+  // approach lights: bars on stalks stepping down off the threshold, out into the cloud
+  const st=[],stalk=C(0x3A3848);for(let k=1;k<=17;k++){const s=sTh+apE*k*7,y=RY+0.8-k*1.05;for(let o=-2;o<=2;o+=1)put(AP,W(s,o,y),C(PAL.appr));
+    sg(W(s,0,-6),W(s,0,y),stalk);sg(W(s,-2.4,y-0.3),W(s,2.4,y-0.3),stalk);
+    if(k===5||k===10){const ww=k===5?13:9;sg(W(s,-ww,y-0.3),W(s,ww,y-0.3),stalk);for(let o=-ww;o<=ww;o+=1.2){if(Math.abs(o)<2.6)continue;put(AP,W(s,o,y),C(PAL.appr));}}
+    st.push(W(s,0,y+0.5));}
+  strobes.push(st.reverse());
+  for(let j=0;j<4;j++)put(LG,W(sTh-apE*24,-(hw+3+j*1.6),RY+0.7),C(j<2?PAL.appr:PAL.endR));
+  // localizer array past the stop end: a row of short masts with red tips
+  {const sL=sEnd-apE*14;sg(W(sL,-9,RY-2.6),W(sL,9,RY-2.6),C(PAL.girder));const q0=W(sL,0,0);truss(q0[0],q0[2],-6,RY-2.8,1.6,1.2,3.2,C(PAL.rustLo),C(PAL.rust),false);
+    for(let o=-8;o<=8.01;o+=2){const a=W(sL,o,RY-2.6),b=W(sL,o,RY+2.6);sg(a,b,C(PAL.girder));if(Math.abs(o)%4<0.1)tip(b[0],b[1]+0.3,b[2],true);}}
+  return r;}
+const RA=runway(0,-50,0,-170,200,10,1);
+const RB=runway(-30,45,0.55,-125,225,10,-1,[96,116]);
+// taxi bridges from the tower apron
+slab(0,-34,Math.PI/2,-6.5,6.5,5,1.25,1.4);
+const NB=[-Math.sin(0.55),Math.cos(0.55)];slab(NB[0]*36,NB[1]*36,Math.atan2(NB[1],NB[0]),-8.5,8.5,5,1.25,1.4);
+for(let k=-3;k<=3;k++){put(LG,[5.6,RY+0.45,-34+k*1.9],C(PAL.taxiB));put(LG,[-5.6,RY+0.45,-34+k*1.9],C(PAL.taxiB));const q=[NB[0]*(36+k*2.4),RY+0.45,NB[1]*(36+k*2.4)];put(LG,[q[0]+NB[1]*5.6,q[1],q[2]-NB[0]*5.6],C(PAL.taxiB));put(LG,[q[0]-NB[1]*5.6,q[1],q[2]+NB[0]*5.6],C(PAL.taxiB));}
+
+/* ---------- the tower apron: round deck around the spire ---------- */
+const APR=28;
+for(let i=0;i<APR*APR*1.9;i++){const r=APR*Math.sqrt(rng()),a=rand(0,6.28);if(r<6.8)continue;const n=0.5+0.5*Math.sin(a*5+r*0.3);put(TM,[r*Math.cos(a),RY,r*Math.sin(a)],lerpC(PAL.tarLo,PAL.tarHi,MU.clamp(0.15+0.5*n+rand(-.2,.2),0,1)));}
+{const n=(2*Math.PI*APR/0.55)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;put(RK,[APR*Math.cos(a),RY-0.4,APR*Math.sin(a)],lerpC(PAL.rust,PAL.rustHi,0.3+0.5*rng()));if(k%2===0)put(DT,[APR*Math.cos(a),RY+1.4,APR*Math.sin(a)],C(PAL.rustHi));}
+  const np=48;for(let k=0;k<np;k++){const a=k/np*Math.PI*2,a2=(k+1)/np*Math.PI*2;const bridge=(Math.abs(Math.sin(a)+1)<0.2)||Math.hypot(Math.cos(a)-NB[0],Math.sin(a)-NB[1])<0.2;if(bridge)continue;
+    seg(APR*Math.cos(a),RY,APR*Math.sin(a),APR*Math.cos(a),RY+1.4,APR*Math.sin(a),C(PAL.girder));seg(APR*Math.cos(a),RY+1.4,APR*Math.sin(a),APR*Math.cos(a2),RY+1.4,APR*Math.sin(a2),C(PAL.girder));}
+  for(let k=0;k<10;k++){const a=k/10*Math.PI*2;seg(6.6*Math.cos(a),RY-12,6.6*Math.sin(a),APR*0.96*Math.cos(a),RY-0.4,APR*0.96*Math.sin(a),C(PAL.girder));}
+  for(let k=0;k<6;k++){const a=k/6*Math.PI*2+0.3;truss(20*Math.cos(a),20*Math.sin(a),-6,RY-1,1.8,1.4,3.2,C(PAL.rustLo),C(PAL.rust),false);}
+  // ring of apron lights
+  for(let k=0;k<24;k++){const a=k/24*Math.PI*2;put(LG,[(APR-1.2)*Math.cos(a),RY+0.45,(APR-1.2)*Math.sin(a)],C(PAL.taxiB));}
+  for(let k=0;k<18;k++){const a=rand(0,6.28);vine([APR*Math.cos(a),RY-0.5,APR*Math.sin(a)],rand(5,16));}}
+
+/* ---------- control tower as spire: ribbed shaft, corbel, glazed cab, beacon ---------- */
+const shR=y=>6.4-2.6*MU.clamp(y/96,0,1);
+for(let y=-4;y<96;y+=1.1){const band=(y%12)<1.1,r=shR(y),n=Math.max(16,(2*Math.PI*r/(band?0.7:1.15))|0);
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r*(1+0.08*Math.cos(6*a))+rand(-.06,.06);let col;
+    if(band)col=lerpC(PAL.rust,PAL.rustHi,0.3+0.4*rng());else if(Math.sin(a*8+y*0.03)>0.93)col=lerpC(PAL.rustLo,0x000000,0.4);else if(rng()<0.06)col=lerpC(PAL.moss,PAL.mossHi,rng()*0.6);else col=lerpC(PAL.concLo,PAL.conc,0.2+0.5*rng());
+    put(RK,[rr*Math.cos(a),y,rr*Math.sin(a)],col);}}
+for(let k=0;k<4;k++){const a=k*Math.PI/2+0.4;let pv=null;for(let y=-4;y<=96;y+=6){const r=shR(y)*1.12,q=[r*Math.cos(a),y,r*Math.sin(a)];if(pv)sg(pv,q,C(PAL.girder));pv=q;}}
+for(let y=RY+6;y<92;y+=4.4){const a=1.1+(y%3);put(WN,[(shR(y)+0.2)*Math.cos(a),y,(shR(y)+0.2)*Math.sin(a)],lerpC(PAL.win,0xFFE8C0,0.3));winPh.push(rand(0,6.28));}
+// mid-height gallery ring
+{const yg=74,rg=7.4,n=90;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;put(RK,[rg*Math.cos(a),yg,rg*Math.sin(a)],lerpC(PAL.rust,PAL.rustHi,0.5*rng()));if(k%3===0)seg(rg*Math.cos(a),yg,rg*Math.sin(a),rg*Math.cos(a),yg+1.3,rg*Math.sin(a),C(PAL.girder));}
+  for(let k=0;k<8;k++){const a=k/8*Math.PI*2;seg(shR(yg-6)*Math.cos(a),yg-6,shR(yg-6)*Math.sin(a),rg*Math.cos(a),yg,rg*Math.sin(a),C(PAL.girder));}
+  for(let k=0;k<6;k++){const a=rand(0,6.28);vine([rg*Math.cos(a),yg-0.3,rg*Math.sin(a)],rand(6,18));}}
+const CY=96;
+{const conc=()=>lerpC(PAL.concLo,PAL.conc,0.25+0.55*rng());
+  for(let y=CY;y<CY+5;y+=0.5){const r=shR(CY)+(y-CY)/5*4.8,n=(2*Math.PI*r/0.7)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;put(RK,[r*Math.cos(a),y,r*Math.sin(a)],conc());}}
+  for(const y of [CY+5,CY+5.5]){const r=8.6,n=80;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;put(RK,[r*Math.cos(a),y,r*Math.sin(a)],lerpC(PAL.frame,0xC4C8D8,0.4));}}
+  const cabR=y=>8.2+(y-(CY+5.8))/6.4*1.7;
+  for(let m=0;m<16;m++){const a=m/16*Math.PI*2;for(let y=CY+5.8;y<CY+12.2;y+=0.3){const r=cabR(y);put(RK,[r*Math.cos(a),y,r*Math.sin(a)],C(PAL.frame));}}
+  for(let i=0;i<700;i++){const a=rand(0,6.28),y=rand(CY+6.1,CY+11.9),r=cabR(y)-0.1;put(WN,[r*Math.cos(a),y,r*Math.sin(a)],rng()<0.7?lerpC(PAL.win,0xFFE8C0,rng()):lerpC(PAL.winC,0xE0F6FF,rng()));winPh.push(rand(0,6.28));}
+  for(let y=CY+12.3;y<CY+13.6;y+=0.35){const r=10.1-(y-CY-12.3)*1.3,n=(2*Math.PI*r/0.55)|0;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;put(RK,[r*Math.cos(a),y,r*Math.sin(a)],lerpC(PAL.frame,0xC4C8D8,0.4*rng()));}}
+  for(let i=0;i<160;i++){const a=rand(0,6.28),r=Math.sqrt(rng())*8.4;put(RK,[r*Math.cos(a),CY+13.6,r*Math.sin(a)],conc());}
+  for(let y=CY+13.6;y<CY+16;y+=0.3)put(RK,[0,y,0],C(0xB8BCC8));}
+// spire mast above the cab, with yard arms and lights
+const MT=truss(-3.6,2.2,CY+13.6,CY+38,1.3,0.25,2.4,C(PAL.rust),C(PAL.rustHi),false);
+{const ya=CY+24;seg(-8.6,ya,2.2,1.4,ya,2.2,C(PAL.girder));tip(-8.6,ya,2.2,true);tip(1.4,ya,2.2,true);}
+// beacon on the cab roof
+const BEACON=new THREE.Vector3(0,CY+16.4,0),beacon=new THREE.Group();beacon.position.copy(BEACON);world.add(beacon);
+{const p=[],col=[];for(const [sd,hx] of [[1,PAL.bcnG],[-1,PAL.bcnW]])for(let k=0;k<110;k++){const r=1+k*1.15,f=Math.pow(1-k/110,1.6)*0.7;for(let j=0;j<2;j++){p.push(sd*r,-r*0.06+rand(-1,1)*r*0.025,rand(-1,1)*r*0.04);const cc=C(hx);col.push(cc.r*f,cc.g*f,cc.b*f);}}
+  beacon.add(glowPoints(p,col,2.4,0.8));}
+const bHead=glowPoints([BEACON.x,BEACON.y,BEACON.z],[1,1,0.95],7,0.6);world.add(bHead);
+const obst=glowPoints([MT[0],MT[1]+0.4,MT[2]],[...C(PAL.obst).toArray()],3.4,1);world.add(obst);
+
+/* ---------- derelict airliner on the long runway, wingtips over the cloud ---------- */
+{const ox=64,oy=RY+4.2,oz=-50,pc=()=>rng()<0.12?lerpC(PAL.plane,0x7A4E3A,0.4+0.4*rng()):lerpC(PAL.planeLo,PAL.plane,0.35+0.65*rng());
+  for(let x=-20;x<=20;x+=0.55){const nose=x>15?Math.sqrt(Math.max(0,1-((x-15)/5.3)**2)):1,tail=x<-12?1-(-12-x)/9*0.7:1,r=2.5*nose*tail,yc=x<-12?(-12-x)*0.18:0;const n=Math.max(6,(2*Math.PI*r/0.85)|0);
+    for(let k=0;k<n;k++){if(rng()<0.1)continue;const a=k/n*Math.PI*2;put(RK,[ox+x,oy+yc+r*Math.sin(a),oz+r*Math.cos(a)],pc());}}
+  for(const sd of [-1,1])for(let zz=2.5;zz<19;zz+=0.8){const le=3-(zz-2.5)*0.48,ch=8-(zz-2.5)*0.32,droop=(sd>0&&zz>13)?-(zz-13)*0.35:0;for(let u=0;u<ch;u+=0.8){if(rng()<0.08)continue;put(RK,[ox+le-u,oy-0.8+zz*0.05+droop,oz+sd*zz],pc());}}
+  for(let y=2;y<9;y+=0.6)for(let u=0;u<5-y*0.3;u+=0.6)put(RK,[ox-14-y*0.55-u,oy+y,oz],pc());
+  for(const sd of [-1,1])for(let zz=0.5;zz<7;zz+=0.7)for(let u=0;u<3-zz*0.25;u+=0.6)put(RK,[ox-16-zz*0.4-u,oy+2,oz+sd*zz],pc());
+  for(const sd of [-1,1])for(let x=-1;x<4;x+=0.5)for(let k=0;k<9;k++){const a=k/9*Math.PI*2;put(RK,[ox+x,oy-2.1+1.05*Math.sin(a),oz+sd*7+1.05*Math.cos(a)],lerpC(0x3A3A48,0x8A8C9E,rng()));}
+  for(let x=-8;x<12;x+=1.6)if(rng()<0.5){put(WN,[ox+x,oy+0.9,oz+2.55],lerpC(PAL.win,0xFFE0B0,rng()));winPh.push(rand(0,6.28));}
+  tip(ox+0.4,oy-0.4,oz+19,false);tip(ox+0.4,oy-0.4,oz-19,true);}
+
+/* ---------- antennas and old spires out of the far cloud ---------- */
+for(let m=0;m<12;m++){const a=m/12*Math.PI*2+rand(-.18,.18),R=rand(340,470),x=R*Math.cos(a),z=R*Math.sin(a),top=rand(80,190);
+  const ap=truss(x,z,0,top,3.6,0.5,6,C(PAL.rustLo),C(PAL.rust),true);tip(ap[0],ap[1]+0.5,ap[2],false);
+  for(let y=50;y<top-12;y+=rand(28,44))tip(x,y,z,true);
+  if(rng()<0.6){const ya=top*0.84,w2=rand(5,10),an=rand(0,3.14);seg(x-w2*Math.cos(an),ya,z-w2*Math.sin(an),x+w2*Math.cos(an),ya,z+w2*Math.sin(an),C(PAL.rust));dangle([x+w2*Math.cos(an),ya,z+w2*Math.sin(an)],rand(3,8));}}
+for(let m=0;m<5;m++){const a=rand(0,6.28),R=rand(380,500),x=R*Math.cos(a),z=R*Math.sin(a),top=rand(90,150),rb=rand(4,7);
+  for(let y=0;y<top;y+=1.8){const r=rb*(1-0.4*y/top),n=Math.max(10,(2*Math.PI*r/1.8)|0);for(let k=0;k<n;k++){const u=k/n*Math.PI*2;put(RK,[x+r*Math.cos(u),y,z+r*Math.sin(u)],(y%14)<1.8?lerpC(PAL.rust,PAL.rustHi,rng()):lerpC(PAL.rustLo,PAL.rust,0.3+0.6*rng()));}}
+  const rd=rb*2.2;for(let k=0;k<70;k++){const u=k/70*Math.PI*2;put(RK,[x+rd*Math.cos(u),top,z+rd*Math.sin(u)],lerpC(PAL.rust,PAL.rustHi,rng()));}
+  const ap=truss(x,z,top,top+rand(16,34),1.6,0.3,3,C(PAL.rust),C(PAL.rustHi),false);tip(ap[0],ap[1]+0.4,ap[2],false);
+  for(let w=0;w<6;w++){const y=rand(top*0.4,top-2),u=rand(0,6.28),r=rb*(1-0.4*y/top)+0.3;put(WN,[x+r*Math.cos(u),y,z+r*Math.sin(u)],lerpC(PAL.win,0xFFF0D0,rng()*0.5));winPh.push(rand(0,6.28));}}
+
+/* ---------- build merged static objects ---------- */
+const tarObj=rockPoints(TM.p,TM.c,0.95,0.95);world.add(tarObj);
+const mkObj=rockPoints(MK.p,MK.c,0.85,0.9);world.add(mkObj);
+const rkObj=rockPoints(RK.p,RK.c,0.85,0.94);world.add(rkObj);
+const dtObj=rockPoints(DT.p,DT.c,0.75,0.92);world.add(dtObj);
+const lineObj=new THREE.LineSegments(mkGeo(L.p,L.c),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.8}));world.add(lineObj);
+const lights=glowPoints(LG.p,LG.c,3.2,1);world.add(lights);
+const apLights=glowPoints(AP.p,AP.c,5.5,1);world.add(apLights);
+// halos where the lights touch the cloud (bloom at the surface once submerged)
+const lightsCl=new THREE.Points(lights.geometry,cloudLit(10,0.22));lightsCl.frustumCulled=false;world.add(lightsCl);
+const apCl=new THREE.Points(apLights.geometry,cloudLit(16,0.3));apCl.frustumCulled=false;world.add(apCl);
+const windows=glowPoints(WN.p,WN.c,2.1,0.9);world.add(windows);const winN=winPh.length,winBase=new Float32Array(WN.c);
+const tips=glowPoints(T.p,T.c,2.8,1.0);world.add(tips);const tipBase=new Float32Array(T.c),tipN=T.per.length;
+const tipHalo=glowPoints(T.p,T.c,8,0.0);world.add(tipHalo);
+// strobes (sequenced flash, far → threshold); they bloom in the cloud when submerged
+const SN=strobes.reduce((n,s)=>n+s.length,0),{a:sbPos,g:sbGeo}=dynBuf(SN),sbCol=new Float32Array(SN*3);
+{let i=0;for(const st of strobes)for(const q of st){sbPos[i*3]=q[0];sbPos[i*3+1]=q[1];sbPos[i*3+2]=q[2];i++;}}
+sbGeo.setAttribute('color',new THREE.BufferAttribute(sbCol,3));
+const strobeObj=new THREE.Points(sbGeo,cloudLit(13,1));strobeObj.frustumCulled=false;world.add(strobeObj);
+// hanging vines (animated)
+const VS=8,vP=new Float32Array(vines.length*VS*2*3),vGeo=new THREE.BufferGeometry();vGeo.setAttribute('position',new THREE.BufferAttribute(vP,3));
+{const col=[];for(const v of vines)for(let s=0;s<VS;s++){const cc=lerpC(PAL.mossHi,PAL.moss,s/(VS-1));for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}vGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const vineObj=new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.7}));vineObj.frustumCulled=false;world.add(vineObj);
+
+/* ---------- the cloud deck: rolling point field displaced on the GPU ---------- */
+const SEAU={uT:{value:0},uSea:CU.uSea,uDrift:{value:0},uB:{value:1},uTint:{value:new THREE.Color(1,1,1)}};
+function seaMat(size,op,k,dm){const m=new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false});const u={uK:{value:k},uDM:{value:dm}};
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,SEAU,u);
+    sh.vertexShader='uniform float uT;uniform float uSea;uniform float uDrift;uniform float uB;uniform vec3 uTint;uniform float uK;uniform float uDM;\n'+sh.vertexShader.replace('#include <begin_vertex>',[
+      '#include <begin_vertex>',
+      'vec2 q=position.xz; q.x=mod(q.x+uDrift*uDM+300.0,600.0)-300.0; vec2 s2=q+vec2(uK*37.0,uK*11.0);',
+      'float w=3.4*sin(s2.x*0.024+uT*0.18)+2.4*sin(s2.y*0.031-uT*0.15+s2.x*0.012)+1.4*sin((s2.x+s2.y)*0.066+uT*0.38)+0.8*sin(s2.x*0.14-s2.y*0.12+uT*0.7);',
+      'transformed.x=q.x; transformed.y=uSea+w+position.y;',
+      '#ifdef USE_COLOR','vColor*=uTint*uB*(0.22+1.0*clamp(w/8.0+0.5,0.0,1.0));','#endif'].join('\n'));
+    sh.fragmentShader=sh.fragmentShader.replace('#include <fog_fragment>',FOGFADE);};
+  return m;}
+{const p=[],col=[];for(let x=-300;x<300;x+=4.8)for(let z=-300;z<300;z+=4.8){p.push(x+rand(-1.9,1.9),rand(-0.8,0.8),z+rand(-1.9,1.9));const cc=lerpC(PAL.sea,PAL.cloudHi,rng()*0.5);col.push(cc.r,cc.g,cc.b);}
+  const o=new THREE.Points(mkGeo(p,col),seaMat(4.0,0.58,0,1));o.frustumCulled=false;world.add(o);}
+{const p=[],col=[];for(let i=0;i<3400;i++){p.push(rand(-300,300),rand(2,6),rand(-300,300));const cc=lerpC(PAL.sea,0xFFF8FF,rng()*0.6);col.push(cc.r,cc.g,cc.b);}
+  const o=new THREE.Points(mkGeo(p,col),seaMat(8.5,0.22,1.7,1.6));o.frustumCulled=false;world.add(o);}
+// cloud body: opaque floor under the crests (kept below the decks so the runways stay readable at high)
+const seaFloor=new THREE.Mesh(new THREE.CircleGeometry(1400,64),new THREE.MeshBasicMaterial({color:0x1C1A30}));seaFloor.rotation.x=-Math.PI/2;world.add(seaFloor);
+// wisps drifting across the runways
+const WSP=[],WPN=100;for(let i=0;i<11;i++)WSP.push({x:rand(-200,200),z:rand(-110,110),dy:rand(3,46),v:rand(1.4,3.4),sx:rand(18,40),sy:rand(1.5,3.5),sz:rand(5,11)});
+const wOff=[];for(let i=0;i<WSP.length*WPN;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=Math.cbrt(rng());wOff.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v),r*Math.sin(v)*Math.sin(u));}
+const {a:wsP,g:wsGeo}=dynBuf(WSP.length*WPN);{const col=[];for(let i=0;i<WSP.length*WPN;i++){const cc=lerpC(PAL.sea,0xF8F4FF,rng()*0.6);col.push(cc.r,cc.g,cc.b);}wsGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const wisps=new THREE.Points(wsGeo,addFade(new THREE.PointsMaterial({size:8,vertexColors:true,map:GLOW,transparent:true,opacity:0.12,blending:THREE.AdditiveBlending,depthWrite:false})));wisps.frustumCulled=false;world.add(wisps);
+// sky lanterns rising out of the cloud
+const LN=44,lan=[],{a:lanPos,g:lanGeo}=dynBuf(LN);
+for(let i=0;i<LN;i++)lan.push({x:rand(-160,160),z:rand(-160,160),y:rand(20,150),vy:rand(0.03,0.07),dx:rand(-.02,.02),ph:rand(0,6.28)});
+{const lc=[];for(let i=0;i<LN;i++){const cc=lerpC(PAL.lant,0xFFE8B0,rng());lc.push(cc.r,cc.g,cc.b);}lanGeo.setAttribute('color',new THREE.Float32BufferAttribute(lc,3));}
+const lanterns=new THREE.Points(lanGeo,addFade(new THREE.PointsMaterial({size:2.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})));lanterns.frustumCulled=false;world.add(lanterns);
+
+/* ---------- sky: giant moons sunk in the cloud horizon, veils, stars. follows the camera ---------- */
+const sky=new THREE.Group();scene.add(sky);
+const moonPts=[],moonBody=[],moonHalo=[],moonG=[],_q=new THREE.Quaternion();
+function moonAlb(x,y,seed,cr){let alb=0.8-0.34*ss((Math.sin(x*3.1+seed)*Math.cos(y*2.4+seed*1.7)+0.45*Math.sin(x*7+y*5+seed))*0.8+0.3);
+  alb+=0.05*Math.sin(x*13+seed)*Math.sin(y*11-seed)+0.035*(rng()-0.5);
+  for(const k of cr){const dd=Math.hypot(x-k[0],y-k[1])/k[2];if(dd<0.82)alb*=0.8+0.1*dd;else if(dd<1.12)alb+=0.13*(1-Math.abs(dd-0.97)/0.15);}
+  return MU.clamp(alb,0,1);}
+function moon(R,Dd,th,y,Lx,Ly,Lz,seed){const g=new THREE.Group();g.position.set(Math.cos(th)*Dd,y,Math.sin(th)*Dd);sky.add(g);moonG.push(g);
+  const Lv=new THREE.Vector3(Lx,Ly,Lz).normalize(),cr=[],lo=C(PAL.moonLo),hi=C(PAL.cream);
+  for(let i=0;i<24;i++){const a=rand(0,6.28),r=Math.sqrt(rng())*0.93;cr.push([r*Math.cos(a),r*Math.sin(a),rand(0.025,0.13)]);}
+  const shade=(x,yy)=>{const d2=x*x+yy*yy,nz=Math.sqrt(Math.max(0,1-d2)),lam=Math.max(0,x*Lv.x+yy*Lv.y+nz*Lv.z);return (0.07+0.93*Math.pow(lam,0.7))*(0.7+0.3*nz);};
+  const N=R>150?512:256,cv=document.createElement('canvas');cv.width=cv.height=N;const g2=cv.getContext('2d'),im=g2.createImageData(N,N),dd=im.data;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=(i+0.5)/N*2-1,yy=1-(j+0.5)/N*2,d2=x*x+yy*yy,k=(j*N+i)*4;if(d2>1){dd[k+3]=0;continue;}
+    const al=moonAlb(x,yy,seed,cr),sh=shade(x,yy);dd[k]=255*Math.min(1,(lo.r+(hi.r-lo.r)*al)*sh);dd[k+1]=255*Math.min(1,(lo.g+(hi.g-lo.g)*al)*sh);dd[k+2]=255*Math.min(1,(lo.b+(hi.b-lo.b)*al)*sh);dd[k+3]=255*MU.clamp((1-Math.sqrt(d2))*N*0.5,0,1);}
+  g2.putImageData(im,0,0);
+  const body=new THREE.Mesh(new THREE.CircleGeometry(R,72),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),transparent:true,opacity:1,fog:false,depthWrite:false}));body.renderOrder=-3;g.add(body);moonBody.push(body.material);
+  const hs=new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW,color:PAL.halo,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));hs.scale.set(R*3.4,R*3.4,1);hs.position.z=-4;hs.renderOrder=-4;g.add(hs);moonHalo.push(hs.material);
+  const p=[],col=[],n=(R>150?2400:R>90?1000:380);
+  for(let i=0;i<n;i++){const r=Math.sqrt(rng())*0.98,a=rand(0,6.28),x=r*Math.cos(a),yy=r*Math.sin(a),sh=shade(x,yy);if(sh<0.12&&rng()<0.7)continue;const cc=lerpC(PAL.moonLo,PAL.cream,moonAlb(x,yy,seed,cr)).multiplyScalar(sh*0.36);p.push(x*R,yy*R,0.6);col.push(cc.r,cc.g,cc.b);}
+  const m=new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:R/30,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));m.renderOrder=-2;g.add(m);moonPts.push(m.material);}
+moon(300,820,0.22,70,0.55,0.35,0.45,3.7);
+moon(96,760,-0.52,262,0.6,0.25,0.3,1.9);
+moon(44,700,0.66,210,0.5,0.4,0.5,5.3);
+const banks=[],bankMats=[];
+function bank(th0,th1,y,ys,n,size,Dd,op){const p=[],col=[];for(let i=0;i<n;i++){const a=rand(th0,th1),r=Dd+rand(-20,20),yy=y+ys*(rng()+rng()+rng()-1.5)*0.8*(1-0.5*Math.abs((a-(th0+th1)/2)/((th1-th0)/2)));p.push(Math.cos(a)*r,yy,Math.sin(a)*r);const b=0.7+0.3*rng();col.push(b,b,b);}
+  const o=new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,depthWrite:false,fog:false,color:0x2A2840}));o.renderOrder=-1;sky.add(o);banks.push({o,ph:rand(0,6.28),amp:rand(0.04,0.09),sp:rand(0.012,0.03)});bankMats.push({m:o.material,op});}
+bank(-0.6,1.0,150,14,520,44,660,0.5);
+bank(-0.8,-0.25,250,9,200,30,640,0.42);
+bank(-1.4,1.4,44,16,620,54,670,0.6);
+let stars,starBase,starPh;
+{const p=[],col=[],ph=[];for(let i=0;i<560;i++){const u=rand(-1.7,1.7),v=rand(0.04,1.15),R=950;p.push(R*Math.cos(v)*Math.cos(u),R*Math.sin(v),R*Math.cos(v)*Math.sin(u));const b=0.4+0.6*rng(),cc=lerpC(PAL.pale,0xFFF6E8,rng());col.push(cc.r*b,cc.g*b,cc.b*b);ph.push(rand(0,6.28));}
+  starBase=new Float32Array(col);starPh=ph;stars=new THREE.Points(mkGeo(p,col),new THREE.PointsMaterial({size:2.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));stars.renderOrder=-5;sky.add(stars);}
+// shooting stars
+const SM=3,STS=12,{a:mlPos,g:mlGeo}=dynBuf(SM*STS*2),mlCol=new Float32Array(SM*STS*2*3);mlGeo.setAttribute('color',new THREE.BufferAttribute(mlCol,3));
+const meteorLines=new THREE.LineSegments(mlGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));meteorLines.frustumCulled=false;world.add(meteorLines);
+const {a:mhPos,g:mhGeo}=dynBuf(SM),mhCol=new Float32Array(SM*3);mhGeo.setAttribute('color',new THREE.BufferAttribute(mhCol,3));
+const meteorHeads=new THREE.Points(mhGeo,new THREE.PointsMaterial({size:3.6,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));meteorHeads.frustumCulled=false;world.add(meteorHeads);
+const mets=[];for(let i=0;i<SM;i++)mets.push({on:false,x:0,y:0,z:0,dx:0,dy:0,dz:0,v:0,life:1,age:0});
+let nextMet=rand(2,6);
+
+/* ---------- TIME + FLOOD (cloud-deck level) ---------- */
+const TK=[
+ {p:0.00,sky:0x4A3E62,floor:0x3A3252,bank:0x7A6688,tint:0xFFD0C0,cl:0xFFD8D0,gain:1.0, moonO:0.7, halo:0.26,star:0.25,lit:0.8, lights:0.55,sea:0.85,wisp:0.14,lant:0.4},
+ {p:0.25,sky:0x98A2C4,floor:0x6E7496,bank:0xC8CCE4,tint:0xFFFFFF,cl:0xF4F4FF,gain:1.1, moonO:0.42,halo:0.1, star:0.0, lit:1.12,lights:0.16,sea:1.0, wisp:0.11,lant:0.06},
+ {p:0.50,sky:0x3A2244,floor:0x2C1A36,bank:0x6A3A5A,tint:0xFFB8A0,cl:0xFFB4C4,gain:1.05,moonO:0.88,halo:0.36,star:0.35,lit:0.75,lights:0.85,sea:0.8, wisp:0.13,lant:0.7},
+ {p:0.75,sky:0x0A0B18,floor:0x121226,bank:0x16162A,tint:0xE8ECFF,cl:0xC8D0FF,gain:1.12,moonO:1.0, halo:0.3, star:1.0, lit:0.55,lights:1.0, sea:0.74,wisp:0.1, lant:1.0}];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],B=TK[(i+1)%TK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of ['gain','moonO','halo','star','lit','lights','sea','wisp','lant'])o[k2]=MU.lerp(A[k2],B[k2],f);for(const k2 of ['sky','floor','bank','tint','cl'])o[k2]=lerpC(A[k2],B[k2],f);return o;}
+let P=0.74,timeAuto=true,targetP=0.74,F=0.35,floodAuto=true,targetF=0.35,boost=0,fPh=-0.3;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto'){timeAuto=true;boost=2;}else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto'){floodAuto=true;fPh=F>0.5?-Math.PI/2:Math.PI/2;}else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera — above the cloud deck, the tower spire against the moons */
+const target=new THREE.Vector3(0,58,-6);
+let camA=0.95,camR=178,camY=88,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,60,190);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,110,270);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.edge,'runways','laid across the cloud deck'],[PAL.strobe,'approach','steps down into the cloud'],[PAL.win,'tower spire','cab + beacon'],[PAL.sea,'cloud deck','rises over the runways'],[PAL.cream,'giant moons','stars, shooting stars']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${C(r[0]).getHexString()};box-shadow:0 0 10px #${C(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+/* ---------- animate ---------- */
+const clock=new THREE.Clock(),stCol=C(PAL.strobe),tarTint=new THREE.Color();let last=0,frame=0;
+function animate(){requestAnimationFrame(animate);
+  if(turntable&&!drag)camA+=0.0007;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;frame++;
+  if(timeAuto){P=(P+dt/120+boost*dt*0.08)%1;boost=Math.max(0,boost-dt);}else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto){fPh+=dt*0.05;F+=((0.5+0.5*Math.sin(fPh))-F)*Math.min(1,dt*0.8);}else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);seaY=12+F*26;
+  scene.background.copy(par.sky);scene.fog.color.copy(par.sky);
+  // sky follows the camera; moons hold behind the field with a slow sway
+  sky.position.set(camera.position.x,0,camera.position.z);sky.rotation.y=-(camA+Math.PI)+0.1*Math.sin(t*0.019);sky.updateMatrixWorld();
+  _q.copy(sky.quaternion).invert().multiply(camera.quaternion);for(const g of moonG)g.quaternion.copy(_q);
+  for(const m of moonPts){m.opacity=0.3+0.7*par.moonO;m.color.copy(par.tint).multiplyScalar(par.gain);}
+  for(const m of moonBody){m.opacity=0.45+0.55*par.moonO;m.color.copy(par.tint).multiplyScalar(par.gain);}
+  for(const m of moonHalo){m.opacity=par.halo;m.color.copy(par.tint);}
+  for(const b of bankMats)b.m.color.copy(par.bank);
+  for(const b of banks)b.o.rotation.y=b.amp*Math.sin(t*b.sp+b.ph);
+  stars.material.opacity=0.9*par.star;
+  // structures + cloud: the deck washes the tarmac as it rises
+  const wash=ss((seaY-24)/14);
+  tarTint.setScalar(par.lit).lerp(par.cl,0.25*wash);tarObj.material.color.copy(tarTint);mkObj.material.color.setScalar(Math.min(1.2,par.lit*1.12));mkObj.material.opacity=0.9-0.4*wash;
+  rkObj.material.color.setScalar(Math.min(1.25,par.lit*1.15));dtObj.material.color.setScalar(par.lit);lineObj.material.color.setScalar(0.6+0.5*par.lit);vineObj.material.color.setScalar(0.6+0.5*par.lit);
+  seaFloor.material.color.copy(par.floor);seaFloor.position.y=seaY-3.5;
+  SEAU.uT.value=t;CU.uSea.value=seaY;SEAU.uDrift.value=t*1.5;SEAU.uB.value=par.sea;SEAU.uTint.value.copy(par.cl);
+  wisps.material.opacity=par.wisp;
+  lights.material.opacity=par.lights*(1-0.3*wash)+0.15;apLights.material.opacity=0.2+0.8*par.lights;
+  lightsCl.material.opacity=0.22*(0.3+0.7*par.lights);apCl.material.opacity=(0.18+0.25*F)*(0.3+0.7*par.lights);
+  lanterns.material.opacity=0.1+0.85*par.lant;
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · cloud deck '+((F*100)|0)+'% —';
+  // window flicker
+  {const arr=windows.geometry.attributes.color.array,g=0.15+0.85*par.lights;for(let i=0;i<winN;i++){const fl=g*(0.65+0.35*Math.sin(t*1.4+winPh[i]))*(Math.sin(t*7.1+winPh[i]*13)>0.985?0.3:1);arr[i*3]=winBase[i*3]*fl;arr[i*3+1]=winBase[i*3+1]*fl;arr[i*3+2]=winBase[i*3+2]*fl;}windows.geometry.attributes.color.needsUpdate=true;}
+  // tip lights blink
+  {const arr=tips.geometry.attributes.color.array,g=0.35+0.65*par.lights;for(let i=0;i<tipN;i++){const ph=(t/T.per[i]+T.ph[i])%1,on=ph<0.14?1:0.12;arr[i*3]=tipBase[i*3]*on*g;arr[i*3+1]=tipBase[i*3+1]*on*g;arr[i*3+2]=tipBase[i*3+2]*on*g;}tips.geometry.attributes.color.needsUpdate=true;
+   tipHalo.material.opacity=0.35*par.lights;}
+  // approach strobes: the rabbit runs in out of the cloud toward the threshold
+  {let i=0,a=0;const sb=0.4+0.6*par.lights;for(const st of strobes){const N=st.length,head=((t*1.8+a*0.5)%1)*N*1.3;for(let k=0;k<N;k++){const d=head-k,v=(d>=0&&d<1.6)?Math.pow(1-d/1.6,2)*sb:0;sbCol[i*3]=stCol.r*v;sbCol[i*3+1]=stCol.g*v;sbCol[i*3+2]=stCol.b*v;i++;}a++;}
+    sbGeo.attributes.color.needsUpdate=true;}
+  // beacon sweep + obstruction light
+  beacon.rotation.y=t*1.4;{const fl=Math.pow(Math.abs(Math.cos(t*1.4+camA)),24);bHead.material.opacity=(0.25+0.75*fl)*(0.4+0.6*par.lights);bHead.material.size=5+9*fl;}
+  beacon.children[0].material.opacity=0.2+0.6*par.lights;obst.material.opacity=((t%1.6)<0.5?1:0.12)*(0.5+0.5*par.lights);
+  // wisps drift across the field
+  {let k=0;for(let w=0;w<WSP.length;w++){const s=WSP[w];s.x+=s.v*dt;if(s.x>220)s.x=-220;const cy=seaY+s.dy;for(let i=0;i<WPN;i++,k++){wsP[k*3]=s.x+wOff[k*3]*s.sx;wsP[k*3+1]=cy+wOff[k*3+1]*s.sy;wsP[k*3+2]=s.z+wOff[k*3+2]*s.sz;}}wsGeo.attributes.position.needsUpdate=true;}
+  // sky lanterns rise out of the cloud
+  for(let i=0;i<LN;i++){const l=lan[i];l.y+=l.vy;l.x+=l.dx+0.02*Math.sin(t*0.4+l.ph);if(l.y>170){l.y=seaY+rand(0,6);l.x=rand(-160,160);l.z=rand(-160,160);}lanPos[i*3]=l.x;lanPos[i*3+1]=Math.max(l.y,seaY);lanPos[i*3+2]=l.z;}lanGeo.attributes.position.needsUpdate=true;
+  // vines sway
+  {let i=0;for(const v of vines){let pv0=v.ax,pv1=v.ay,pv2=v.az;for(let s=1;s<=VS;s++){const f=s/VS,x=v.ax+v.sway*f*Math.sin(t*0.7+v.ph-f*1.4),y=v.ay-f*v.len,z=v.az+v.sway*0.5*f*Math.cos(t*0.6+v.ph);vP[i*6]=pv0;vP[i*6+1]=pv1;vP[i*6+2]=pv2;vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;pv0=x;pv1=y;pv2=z;i++;}}vGeo.attributes.position.needsUpdate=true;}
+  // stars twinkle (every other frame)
+  if(par.star>0.01&&(frame&1)===0){const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  // shooting stars: seeded schedule, short bright streak + fading tail
+  if(t>nextMet){nextMet=t+rand(8,20);const m=mets.find(q=>!q.on);if(m){const az=camA+Math.PI+rand(-0.75,0.75),R=rand(260,340);m.x=camera.position.x+Math.cos(az)*R;m.z=camera.position.z+Math.sin(az)*R;m.y=camY+R*rand(0.15,0.4);
+    const a2=rand(0,6.28);let dx=Math.cos(a2),dy=-rand(0.25,0.6),dz=Math.sin(a2);const l=Math.hypot(dx,dy,dz);m.dx=dx/l;m.dy=dy/l;m.dz=dz/l;m.v=rand(110,180);m.life=rand(0.6,1.1);m.age=0;m.on=true;}}
+  {const vis=MU.clamp(par.star*1.3,0,1);for(let i=0;i<SM;i++){const m=mets[i];let env=0,hx=0,hy=-999,hz=0,Ln=0;if(m.on){m.age+=dt;if(m.age>m.life)m.on=false;else{env=Math.sin(Math.PI*m.age/m.life)*vis;const d=m.v*m.age;hx=m.x+m.dx*d;hy=m.y+m.dy*d;hz=m.z+m.dz*d;Ln=Math.min(d,42);}}
+    for(let j=0;j<STS;j++){const o=(i*STS+j)*6,u0=j/STS,u1=(j+1)/STS,f0=Math.pow(1-u0,2)*env,f1=Math.pow(1-u1,2)*env;
+      mlPos[o]=hx-m.dx*Ln*u0;mlPos[o+1]=hy-m.dy*Ln*u0;mlPos[o+2]=hz-m.dz*Ln*u0;mlPos[o+3]=hx-m.dx*Ln*u1;mlPos[o+4]=hy-m.dy*Ln*u1;mlPos[o+5]=hz-m.dz*Ln*u1;
+      mlCol[o]=0.85*f0;mlCol[o+1]=0.92*f0;mlCol[o+2]=f0;mlCol[o+3]=0.85*f1;mlCol[o+4]=0.92*f1;mlCol[o+5]=f1;}
+    mhPos[i*3]=hx;mhPos[i*3+1]=hy;mhPos[i*3+2]=hz;mhCol[i*3]=env;mhCol[i*3+1]=env;mhCol[i*3+2]=env;}
+   mlGeo.attributes.position.needsUpdate=true;mlGeo.attributes.color.needsUpdate=true;mhGeo.attributes.position.needsUpdate=true;mhGeo.attributes.color.needsUpdate=true;}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

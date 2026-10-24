@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drowned towers (study)</title>
+<style>
+  :root{--cream:#F4E6EC;--gold:#F6B8CE;--pale:#E2B4C6;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#2A1028;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px;text-shadow:0 1px 10px #000}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px;text-shadow:0 1px 10px #000}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(30,10,26,.55);border:1px solid rgba(226,180,198,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="28"><h1>drowned towers</h1>
+  <div class="sub">phylla-kodama study · working title · draft</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill on" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill" data-t="0.75">night</button></span>
+  <span class="grp">flood <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name · © Marko Manriquez, all rights reserved</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* drowned towers — abandoned skyscrapers standing in fog and floodwater. Vines spill
+   down the façades, trees root on the broken crowns, bent masts still blink, rusted
+   girders, cables and chains sag between the towers. Fog banks layer near to far.
+   Near single-hue rose palette, tiny pale accents. Time + flood cycles. r128. */
+const PAL={tLo:0x22081C,tHi:0x5A1E46,fLo:0x3E1636,fHi:0x74305E,rust:0x8E2C40,rustHi:0xC25A60,
+  vine:0x7A2454,vineHi:0xC8588E,leaf:0xB0407A,canopy:0x9A3468,canopyHi:0xEE8AB6,
+  win:0xFFE8F0,win2:0xFFF2E4,lamp:0xFF9CB6,moon:0xFFF2F6,moonLo:0xE2B0C6,mote:0xFFD8E8,foam:0xF8D0DE,cable:0x2E0C24};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261024);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x4A1A40);scene.fog=new THREE.FogExp2(0x4A1A40,0.0055);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.5,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.localClippingEnabled=true;
+const world=new THREE.Group();scene.add(world);
+let waterY=8;
+const FL=3.2;
+
+/* ---------- sky dome (single-hue gradient) ---------- */
+const skyU={top:{value:new THREE.Color(0x12060F)},bot:{value:new THREE.Color(0x4A1A40)}};
+const dome=new THREE.Mesh(new THREE.SphereGeometry(1600,24,12),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,fog:false,
+  vertexShader:'varying float vh;void main(){vh=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 top;uniform vec3 bot;varying float vh;void main(){gl_FragColor=vec4(mix(bot,top,smoothstep(0.02,0.55,vh)),1.0);}'}));
+dome.renderOrder=-10;scene.add(dome);
+
+/* ---------- towers ---------- */
+const TP={core:{p:[],c:[]},ring:{p:[],c:[]},far:{p:[],c:[]}};
+const SL=[],SC=[];// static structure lines (towers, girders, masts, cables, trunks)
+function seg(a,b,c1,c2){c2=c2||c1;SL.push(a[0],a[1],a[2],b[0],b[1],b[2]);SC.push(c1.r,c1.g,c1.b,c2.r,c2.g,c2.b);}
+const towers=[];
+function tower(cx,cz,w,d,h,rot,tier){
+  const far=tier==='far',S=tier==='core'?0.72:tier==='ring'?0.95:1.75,slabEvery=far?2:1,colStep=far?8:4.4,vStep=far?2.4:S*1.15;
+  const ca=Math.cos(rot),sa=Math.sin(rot),P=2*(w+d);
+  const W=(lx,lz)=>[cx+lx*ca-lz*sa,cz+lx*sa+lz*ca];
+  const per=u=>{u=((u%P)+P)%P;if(u<w)return [u-w/2,-d/2,0,-1];u-=w;if(u<d)return [w/2,u-d/2,1,0];u-=d;if(u<w)return [w/2-u,d/2,0,1];u-=w;return [-w/2,d/2-u,-1,0];};
+  const at=(u,y,o)=>{o=o||0;const q=per(u),r=W(q[0]+q[2]*o,q[1]+q[3]*o);return [r[0],y,r[1]];};
+  const nrm=u=>{const q=per(u);return [q[2]*ca-q[3]*sa,q[2]*sa+q[3]*ca];};
+  const brk=rng()<0.72,bA=rand(4,15),bF=rand(0.12,0.4),bPh=rand(0,6.28);
+  const top=u=>brk?h-bA*Math.max(0,Math.sin(u*bF+bPh))*(0.55+0.45*Math.sin(u*0.31+bPh*2)):h;
+  const minTop=brk?h-bA:h;
+  const holes=[];for(let k=0;k<(far?2:5);k++){const u0=rand(0,P),y0=rand(6,h*0.85);holes.push([u0,u0+rand(3,8),y0,y0+rand(4,12)]);}
+  const hole=(u,y)=>{for(const H of holes)if(u>H[0]&&u<H[1]&&y>H[2]&&y<H[3])return true;return false;};
+  const dst=TP[tier],lo=far?PAL.fLo:PAL.tLo,hi=far?PAL.fHi:PAL.tHi;
+  const add=(u,y,c)=>{const q=at(u,y,0);dst.p.push(q[0]+rand(-.07,.07),y,q[2]+rand(-.07,.07));dst.c.push(c.r,c.g,c.b);};
+  for(let f=1;f*FL<h;f++){if(f%slabEvery)continue;const y=f*FL;for(let u=0;u<P;u+=S){if(y>top(u)||hole(u,y))continue;
+    const c=rng()<0.1?lerpC(PAL.rust,PAL.rustHi,rng()*0.6):lerpC(lo,hi,0.15+0.7*rng()*(0.5+0.5*y/h));add(u,y,c);}}
+  const cols=[];for(let u=0;u<P;u+=colStep)cols.push(u);cols.push(w,w+d,2*w+d);
+  for(const u of cols){const tu=top(u),rs=rng()<0.25;for(let y=0;y<tu;y+=vStep){if(hole(u,y))continue;const c=(rs&&rng()<0.6)?lerpC(PAL.rust,PAL.rustHi,rng()*0.5):lerpC(lo,hi,0.25+0.5*rng());add(u,y,c);}}
+  if(!brk){for(let i=0;i<w*d*(far?0.06:0.18);i++){const r=W(rand(-w/2,w/2),rand(-d/2,d/2));dst.p.push(r[0],h,r[1]);const c=lerpC(lo,hi,0.4*rng());dst.c.push(c.r,c.g,c.b);}}
+  const lc=lerpC(lo,hi,0.45),cs=[0,w,w+d,2*w+d,P];
+  for(let k=0;k<4;k++)seg(at(cs[k],0,0),at(cs[k],top(cs[k]),0),lc);
+  for(let f=3;f*FL<minTop;f+=far?4:3){const y=f*FL;for(let k=0;k<4;k++)seg(at(cs[k],y,0),at(cs[k+1],y,0),lc);}
+  return {cx,cz,w,d,h,rot,ca,sa,P,W,per,at,nrm,top,minTop,brk,tier,rad:Math.hypot(w,d)/2,roofY:brk?minTop+1:h};}
+function place(n,r0,r1,wr,hr,tier,gap){let tries=0,k=0;while(k<n&&tries<600){tries++;const a=rand(0,6.28),r=r0+(r1-r0)*Math.sqrt(rng()),cx=r*Math.cos(a),cz=r*Math.sin(a),w=rand(wr[0],wr[1]),d=rand(wr[0],wr[1]),rad=Math.hypot(w,d)/2;
+  if(towers.some(T=>Math.hypot(T.cx-cx,T.cz-cz)<T.rad+rad+gap))continue;towers.push(tower(cx,cz,w,d,rand(hr[0],hr[1]),rand(0,3.14),tier));k++;}}
+place(4,0,30,[12,17],[80,118],'core',6);place(7,44,86,[10,15],[42,84],'ring',9);place(12,238,330,[14,24],[60,135],'far',12);
+const nearT=towers.filter(T=>T.tier!=='far');
+// street-level rubble mounds (visible only at low water)
+for(const T of nearT)for(let i=0;i<110;i++){const u=rand(0,T.P),o=rand(0.3,5),y=Math.max(0,rand(0,3.4)*(1-o/5.5));const q=T.at(u,y,o);TP.ring.p.push(q[0],q[1],q[2]);const c=rng()<0.3?lerpC(PAL.vine,PAL.leaf,rng()):lerpC(PAL.tLo,PAL.rust,rng()*0.6);TP.ring.c.push(c.r,c.g,c.b);}
+const towerObjs=[];
+for(const [k,sz] of [['core',0.85],['ring',1.0],['far',1.9]]){const o=rockPoints(TP[k].p,TP[k].c,sz);world.add(o);towerObjs.push(o);}
+
+/* ---------- overgrowth: vines spilling down façades, moss on the crowns ---------- */
+const VL=[],VC=[],LFp=[],LFc=[];
+for(const T of towers){const far=T.tier==='far',n=Math.round(T.P*(T.tier==='core'?0.62:T.tier==='ring'?0.55:0.14));
+  for(let i=0;i<n;i++){const u=rand(0,T.P),roof=rng()<0.62,tu=T.top(u),y0=roof?tu:Math.min(tu,FL*Math.floor(rand(4,T.h/FL))),
+    len=rand(4,Math.max(6,y0*(far?0.3:0.7))),ph=rand(0,6.28),step=far?2:1.1;
+    let prev=T.at(u,y0,0.25);
+    for(let m=0;m<(far?2:5);m++){LFp.push(prev[0]+rand(-.8,.8),prev[1]+rand(-.3,.6),prev[2]+rand(-.8,.8));const c=lerpC(PAL.leaf,PAL.vineHi,rng());LFc.push(c.r,c.g,c.b);}
+    for(let s=step;s<len;s+=step){const f=s/len,q=T.at(u+0.45*Math.sin(s*0.45+ph),y0-s,0.25+0.4*f*f);
+      const c1=lerpC(PAL.vineHi,PAL.vine,f);VL.push(prev[0],prev[1],prev[2],q[0],q[1],q[2]);VC.push(c1.r,c1.g,c1.b,c1.r,c1.g,c1.b);
+      if(rng()<(far?0.4:0.65)){LFp.push(q[0]+rand(-.45,.45),q[1]+rand(-.4,.4),q[2]+rand(-.45,.45));const c=lerpC(PAL.leaf,PAL.vineHi,rng()*0.7);LFc.push(c.r,c.g,c.b);}
+      prev=q;}}}
+const vineObj=new THREE.LineSegments(mkGeo(VL,VC),new THREE.LineBasicMaterial({vertexColors:true}));world.add(vineObj);
+const leafObj=rockPoints(LFp,LFc,0.75);world.add(leafObj);
+
+/* ---------- rooftop trees ---------- */
+const canopies=[],perches=[];
+{const hosts=nearT.slice().sort(()=>rng()-0.5).slice(0,8);
+  for(const T of hosts){const r=T.W(rand(-T.w/4,T.w/4),rand(-T.d/4,T.d/4)),base=[r[0],T.roofY-0.5,r[1]],th=rand(3,7),lean=rand(-.6,.6),tc=lerpC(PAL.tLo,PAL.vine,0.6);
+    const tp=[base[0]+lean,base[1]+th,base[2]+lean*0.5];seg(base,tp,tc);
+    const p=[],col=[],S=rand(0.8,1.25);
+    for(let l=0;l<5;l++){const lc=[tp[0]+rand(-3.5,3.5)*S,tp[1]+rand(0,3.5)*S,tp[2]+rand(-3.5,3.5)*S],R=rand(2,4.2)*S;seg(tp,lc,tc);
+      for(let i=0;i<70;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),rr=R*Math.pow(rng(),0.35);const y=rr*Math.cos(v)*0.7;
+        p.push(lc[0]+rr*Math.sin(v)*Math.cos(u)-base[0],lc[1]+y-base[1],lc[2]+rr*Math.sin(v)*Math.sin(u)-base[2]);const c=lerpC(PAL.canopy,PAL.canopyHi,MU.clamp(0.25+y/R*0.6+rand(-.2,.2),0,1));col.push(c.r,c.g,c.b);}}
+    const o=rockPoints(p,col,0.95);o.position.set(base[0],base[1],base[2]);world.add(o);canopies.push({o,ph:rand(0,6.28)});
+    perches.push([tp[0],tp[1]+5*S,tp[2]]);}}
+
+/* ---------- masts and antennas (some bent, some broken) + warning lamps ---------- */
+const lampP=[],lampPh=[];
+function mast(b,H,bend,lattice,broken){const dir=rand(0,6.28),dx=Math.cos(dir),dz=Math.sin(dir),bAt=rand(0.45,0.8),mc=lerpC(PAL.rust,PAL.tHi,0.55),gc=lerpC(PAL.tLo,PAL.tHi,0.6);
+  let p=b.slice(),ang=0;const pts=[p];
+  for(let s=1;s<=H;s++){const f=s/H;if(f>bAt)ang=Math.min(bend,ang+bend*0.25);const np=[p[0]+Math.sin(ang)*dx,p[1]+Math.cos(ang),p[2]+Math.sin(ang)*dz];seg(p,np,mc);
+    if(s%3===0&&rng()<0.8){const L=rand(0.8,2.2)*(1-f*0.6);seg([np[0]+dz*L,np[1],np[2]-dx*L],[np[0]-dz*L,np[1],np[2]+dx*L],mc);}
+    p=np;pts.push(p);}
+  if(lattice){const n=Math.floor(H*bAt),R=0.8;for(let k=0;k<3;k++){const a0=k*2.094,a1=a0+2.094;for(let s=0;s<n;s+=2){const y=b[1]+s;
+      seg([b[0]+R*Math.cos(a0),y,b[2]+R*Math.sin(a0)],[b[0]+R*Math.cos(a0),y+2,b[2]+R*Math.sin(a0)],mc);seg([b[0]+R*Math.cos(a0),y,b[2]+R*Math.sin(a0)],[b[0]+R*Math.cos(a1),y+2,b[2]+R*Math.sin(a1)],mc);}}}
+  const g=pts[Math.floor(pts.length*0.55)];for(let k=0;k<3;k++){const a=dir+k*2.1+0.5;seg(g,[b[0]+6*Math.cos(a),b[1],b[2]+6*Math.sin(a)],gc);}
+  if(broken){let q=p;for(let s=1;s<=8;s++){const nq=[p[0]+0.5*s*dx*0.4,p[1]-s*1.1,p[2]+0.5*s*dz*0.4];seg(q,nq,gc);q=nq;}}
+  else{lampP.push(p[0],p[1]+0.4,p[2]);lampPh.push(rng());}
+  if(H>18){const m=pts[Math.floor(pts.length*0.5)];lampP.push(m[0],m[1],m[2]);lampPh.push(rng());}}
+for(const T of towers){const far=T.tier==='far',n=T.tier==='core'?(rng()<0.6?2:1):(rng()<(far?0.6:0.55)?1:0);
+  for(let i=0;i<n;i++){const r=T.W(rand(-T.w/3,T.w/3),rand(-T.d/3,T.d/3)),H=far?rand(20,46):T.tier==='core'?rand(12,34):rand(8,22);
+    mast([r[0],T.roofY-1,r[1]],Math.round(H),rng()<0.42?rand(0.35,1.35):0,H>22&&rng()<0.6,rng()<0.18);}}
+
+/* ---------- rusted girders between towers ---------- */
+function edgeToward(A,B){const dx=B.cx-A.cx,dz=B.cz-A.cz,L=Math.hypot(dx,dz);return [A.cx+dx/L*Math.min(A.w,A.d)*0.5,A.cz+dz/L*Math.min(A.w,A.d)*0.5];}
+const pairs=[];for(let i=0;i<nearT.length;i++)for(let j=i+1;j<nearT.length;j++){const A=nearT[i],B=nearT[j],dd=Math.hypot(A.cx-B.cx,A.cz-B.cz);pairs.push({A,B,dd});}
+pairs.sort((a,b)=>a.dd-b.dd);
+{let made=0;for(const pr of pairs){if(made>=10||pr.dd>62)break;const nG=rng()<0.4?2:1;
+  for(let g=0;g<nG;g++){const y=rand(14,Math.min(pr.A.minTop,pr.B.minTop)*0.85),pa=edgeToward(pr.A,pr.B),pb=edgeToward(pr.B,pr.A),broken=rng()<0.35,span=broken?rand(0.35,0.7):1,drop=broken?rand(2,8):0;
+    const L=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]),n=Math.max(4,Math.round(L*span/2.6)),rc=()=>lerpC(PAL.rust,PAL.rustHi,rng()*0.5);
+    const P=(s,dy)=>{const f=s*span;return [pa[0]+(pb[0]-pa[0])*f,y+dy-drop*s*s,pa[1]+(pb[1]-pa[1])*f];};
+    for(let k=0;k<n;k++){const s0=k/n,s1=(k+1)/n,a1=P(s0,1.2),a2=P(s1,1.2),b1=P(s0,-1.2),b2=P(s1,-1.2);seg(a1,a2,rc());seg(b1,b2,rc());seg(k%2?a1:b1,k%2?b2:a2,rc());seg(a1,b1,rc());}
+    made++;}}}
+
+/* ---------- cables (static, dangling, swaying) and chains ---------- */
+const catP=(a,b,sag,s)=>[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s-sag*4*s*(1-s),a[2]+(b[2]-a[2])*s];
+function anchor(A,B,y){const e=edgeToward(A,B);return [e[0],y,e[1]];}
+const cablePairs=pairs.filter(p=>p.dd<95);
+for(let i=0;i<28;i++){const pr=pick(cablePairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(10,mt)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-12,12),8,mt)),cc=lerpC(PAL.cable,PAL.tHi,rng()*0.5);
+  if(rng()<0.25){let q=a;const dx=(b[0]-a[0])/pr.dd,dz=(b[2]-a[2])/pr.dd,L=rand(8,22);for(let s=1;s<=14;s++){const f=s/14,nq=[a[0]+dx*6*Math.sqrt(f),a[1]-L*f*f,a[2]+dz*6*Math.sqrt(f)];seg(q,nq,cc);q=nq;}}
+  else{const sag=rand(3,14);let q=a;for(let s=1;s<=24;s++){const nq=catP(a,b,sag,s/24);seg(q,nq,cc);q=nq;}}}
+const chainP=[],chainC=[];
+for(let i=0;i<10;i++){const pr=pick(cablePairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(12,mt*0.9)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-8,8),10,mt)),sag=rand(4,12),L=Math.hypot(b[0]-a[0],b[2]-a[2]),n=Math.round(L/0.32);
+  const px2=-(b[2]-a[2])/L,pz2=(b[0]-a[0])/L;
+  for(let k=0;k<=n;k++){const q=catP(a,b,sag,k/n),o=(k%2?0.09:-0.09);chainP.push(q[0]+px2*o,q[1]+(k%2?0.06:-0.06),q[2]+pz2*o);const c=k%2?lerpC(PAL.rust,PAL.rustHi,rng()*0.6):lerpC(PAL.cable,PAL.rust,0.3);chainC.push(c.r,c.g,c.b);}}
+const chainObj=rockPoints(chainP,chainC,0.55);world.add(chainObj);
+const DCN=9,DCS=20,dCab=[];for(let i=0;i<DCN;i++){const pr=pick(cablePairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(16,mt)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-6,6),14,mt));
+  const L=Math.hypot(b[0]-a[0],b[2]-a[2]);dCab.push({a,b,sag:rand(5,13),ph:rand(0,6.28),px:-(b[2]-a[2])/L,pz:(b[0]-a[0])/L});}
+const {a:dcPos,g:dcGeo}=dynBuf(DCN*DCS*2);{const col=[];for(let i=0;i<DCN*DCS*2;i++){const c=lerpC(PAL.cable,PAL.rust,0.35);col.push(c.r,c.g,c.b);}dcGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const dCabObj=new THREE.LineSegments(dcGeo,new THREE.LineBasicMaterial({vertexColors:true}));world.add(dCabObj);
+
+const structObj=new THREE.LineSegments(mkGeo(SL,SC),new THREE.LineBasicMaterial({vertexColors:true}));world.add(structObj);
+
+/* ---------- swaying vines off the near towers ---------- */
+const vines=[];for(const T of nearT){const n=T.tier==='core'?9:4;for(let k=0;k<n;k++){const u=rand(0,T.P),y=T.top(u),q=T.at(u,y,0.4),nn=T.nrm(u);vines.push({ax:q[0],ay:y,az:q[2],nx:nn[0],nz:nn[1],tx:-nn[1],tz:nn[0],len:rand(10,Math.min(32,y*0.6)),ph:rand(0,6.28),sway:rand(0.8,2.2)});}}
+const VS=10,{a:svP,g:svGeo}=dynBuf(vines.length*VS*2);
+{const col=[];for(const v of vines)for(let s=0;s<VS;s++){const c=lerpC(PAL.vineHi,PAL.vine,s/(VS-1));col.push(c.r,c.g,c.b,c.r,c.g,c.b);}svGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const swayVines=new THREE.LineSegments(svGeo,new THREE.LineBasicMaterial({vertexColors:true}));world.add(swayVines);
+
+/* ---------- surviving window lights ---------- */
+const winP=[],winBase=[],winPh=[];
+for(let i=0;i<150;i++){const r=rng(),pool=r<0.42?towers.filter(T=>T.tier==='core'):r<0.8?towers.filter(T=>T.tier==='ring'):towers.filter(T=>T.tier==='far'),T=pick(pool);
+  const f=Math.floor(rand(1,T.h/FL-1)),y=f*FL+1.6,u=rand(0,T.P);if(y>T.top(u)-1.5)continue;const q=T.at(u,y,0.2);winP.push(q[0],q[1],q[2]);
+  const c=lerpC(PAL.win,PAL.win2,rng());winBase.push(c.r,c.g,c.b);winPh.push(rng()<0.3?rand(0,6.28):-1);}
+const winN=winPh.length,winObj=glowPoints(winP,winBase,3.2,1);world.add(winObj);const winB=new Float32Array(winBase);
+const lampN=lampPh.length,lampObj=glowPoints(lampP,new Array(lampN*3).fill(1),3.4,1);world.add(lampObj);const lampCol=new THREE.Color(PAL.lamp);
+
+/* ---------- the flood ---------- */
+const waterMat=new THREE.MeshBasicMaterial({color:0x2A0E26,transparent:true,opacity:0.8,depthWrite:false});
+const waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(1500,1500),waterMat);waterPlane.rotation.x=-Math.PI/2;waterPlane.renderOrder=1;world.add(waterPlane);
+const inFoot=(x,z)=>{for(const T of nearT){const dx=x-T.cx,dz=z-T.cz,lx=dx*T.ca+dz*T.sa,lz=-dx*T.sa+dz*T.ca;if(Math.abs(lx)<T.w/2+0.3&&Math.abs(lz)<T.d/2+0.3)return true;}return false;};
+const wPts=[],wCol=[],wPh=[];for(let x=-210;x<=210;x+=4.1)for(let z=-210;z<=210;z+=4.1){const xx=x+rand(-1,1),zz=z+rand(-1,1);if(Math.hypot(xx,zz)>210||inFoot(xx,zz))continue;wPts.push(xx,0,zz);wPh.push(rand(0,6.28));const g=0.45+0.55*rng();wCol.push(g,g,g);}
+const wGeo=mkGeo(wPts,wCol),waterPts=new THREE.Points(wGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));waterPts.renderOrder=2;world.add(waterPts);
+const wPos=wGeo.attributes.position.array,wN=wPh.length;
+// waterline foam around each near tower (moves with the flood, no per-vertex rewrite)
+{const p=[],col=[];for(const T of nearT)for(let u=0;u<T.P;u+=0.7){const q=T.at(u,rand(-.15,.15),rand(0.3,1.1));p.push(q[0],q[1],q[2]);const c=lerpC(PAL.foam,0xFFFFFF,rng()*0.3);col.push(c.r,c.g,c.b);}
+  var foam=glowPoints(p,col,1.1,0.5);foam.renderOrder=2;world.add(foam);}
+// moon glitter on the water
+const GLN=150,{a:glPos,g:glGeo}=dynBuf(GLN),glIt=[];{const col=[];for(let i=0;i<GLN;i++){glIt.push({d:rand(15,260),j:rand(-1,1),ph:rand(0,6.28)});const c=lerpC(PAL.moon,PAL.foam,rng());col.push(c.r,c.g,c.b);}glGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const glitter=new THREE.Points(glGeo,new THREE.PointsMaterial({size:1.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));glitter.renderOrder=2;world.add(glitter);
+
+/* ---------- reflections: mirrored copies clipped at the waterline ---------- */
+const clipPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),waterY);
+const mirror=new THREE.Group();mirror.scale.y=-1;world.add(mirror);
+const mirrorMats=[];
+function mirrorOf(obj,op,dim){const m=obj.material.clone();m.clippingPlanes=[clipPlane];m.transparent=true;m.opacity=op;m.depthWrite=false;
+  const o=new obj.constructor(obj.geometry,m);o.position.copy(obj.position);o.renderOrder=2;mirror.add(o);if(dim)mirrorMats.push(m);return o;}
+for(const o of towerObjs)mirrorOf(o,0.55,true);mirrorOf(structObj,0.45,true);mirrorOf(vineObj,0.45,true);mirrorOf(leafObj,0.5,true);
+const winRef=mirrorOf(winObj,0.55,false),lampRef=mirrorOf(lampObj,0.6,false);
+
+/* ---------- layered fog banks, near to far ---------- */
+const fogLayers=[];
+function fogLayer(n,r0,r1,y0,y1,size,op,spd,follow){const p=[],col=[];for(let i=0;i<n;i++){const a=rand(0,6.28),r=r0+(r1-r0)*Math.sqrt(rng());p.push(r*Math.cos(a),rand(y0,y1),r*Math.sin(a));const b=0.55+0.45*rng();col.push(b,b,b);}
+  const o=glowPoints(p,col,size,op);o.material.fog=false;o.renderOrder=3;world.add(o);fogLayers.push({o,op,spd,follow,ph:rand(0,6.28)});}
+fogLayer(230,8,95,0.5,5,14,0.16,0.010,true);   // mist on the water
+fogLayer(150,30,95,28,62,14,0.09,-0.006,false); // between core and ring
+fogLayer(200,232,270,4,46,24,0.13,0.004,false); // beyond the orbit
+fogLayer(200,285,345,8,72,36,0.15,-0.003,false);// among the far towers
+fogLayer(200,360,460,0,95,58,0.18,0.002,false);  // the far wall
+fogLayer(240,0,330,98,114,22,0.12,0.003,false); // cloud deck the masts rise through
+
+/* ---------- sky: giant moon, sun, stars ---------- */
+const MC=new THREE.Vector3(-90,150,-430);let moonMat,haloMat,sunMat,starMat;
+{const R=40,p=[],col=[],n=MC.clone().normalize().negate(),e1=new THREE.Vector3(0,1,0).cross(n).normalize(),e2=n.clone().cross(e1);
+  for(let i=0;i<900;i++){const a=rand(0,6.28),r=R*Math.sqrt(rng()),x=r*Math.cos(a),y=r*Math.sin(a);const cr=0.5+0.5*Math.sin(x*0.13+1)*Math.cos(y*0.11)+0.25*Math.sin(x*0.4)*Math.sin(y*0.37);
+    const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.45+0.5*cr,0,1));p.push(MC.x+e1.x*x+e2.x*y,MC.y+e1.y*x+e2.y*y,MC.z+e1.z*x+e2.z*y);col.push(c.r,c.g,c.b);}
+  const m=glowPoints(p,col,15,0.7);m.material.fog=false;moonMat=m.material;world.add(m);
+  const h=glowPoints([MC.x,MC.y,MC.z],[1,0.86,0.92],300,0.2);h.material.fog=false;haloMat=h.material;world.add(h);
+  const s=glowPoints([420,150,300],[1,0.9,0.88],320,0);s.material.fog=false;sunMat=s.material;world.add(s);}
+let stars,starBase,starPh;{const p=[],col=[],ph=[];for(let i=0;i<600;i++){const u=rand(0,6.28),v=Math.acos(rand(0.12,1)),R=900;p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),cc=lerpC(PAL.mote,0xFFFFFF,rng());col.push(cc.r*b,cc.g*b,cc.b*b);ph.push(rand(0,6.28));}
+  starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,4,0.8);stars.material.fog=false;starMat=stars.material;world.add(stars);}
+
+/* ---------- kodama spirit motes ---------- */
+const MN=140,motes=[],{a:moPos,g:moGeo}=dynBuf(MN);{const col=[];for(let i=0;i<MN;i++){const a=rand(0,6.28),r=rand(5,110);motes.push({x:r*Math.cos(a),z:r*Math.sin(a),h:rand(1,45),v:rand(0.4,1.4),ph:rand(0,6.28)});const c=lerpC(PAL.mote,0xFFFFFF,rng()*0.4);col.push(c.r,c.g,c.b);}moGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const moteObj=new THREE.Points(moGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(moteObj);
+const spirits=[];function makeSpirit(){const hp=[],hc=[];for(let i=0;i<60;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=1.5;hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v),r*Math.sin(v)*Math.sin(u));const cc=new THREE.Color(PAL.mote);hc.push(cc.r,cc.g,cc.b);}
+  const g=new THREE.Group(),head=glowPoints(hp,hc,1.1,0);g.add(head);g.visible=false;world.add(g);const sp={g,head,state:'wait',timer:rand(0,6),op:0};spirits.push(sp);repos(sp);}
+function repos(sp){const q=pick(perches);sp.g.position.set(q[0],q[1],q[2]);}
+for(let i=0;i<3;i++)makeSpirit();
+let nightAmt=1;
+function updSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.5;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.5,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(3,6);}}
+  else if(sp.state==='hold'){if(sp.timer<=0){sp.state='out';sp.timer=1.7;}}
+  else{sp.op=MU.clamp(sp.op-dt/1.7,0,1);if(sp.timer<=0){sp.state='wait';sp.timer=rand(3,7);sp.g.visible=false;repos(sp);}}
+  sp.g.position.y+=0.004*Math.sin(t+sp.timer);sp.head.material.opacity=0.85*sp.op*(0.3+0.7*nightAmt);}}
+
+/* ---------- TIME + FLOOD cycles ---------- */
+const TK=[
+ {p:0.00,top:0x7A3462,bot:0xD48CA8,dens:0.0054,fogK:0.75,mul:0.85,win:0.35,lamp:0.75,moonO:0.45,sunO:0.35,star:0.1, fogL:1.0, wat:0.5},
+ {p:0.25,top:0xB86A92,bot:0xF0C6D4,dens:0.0040,fogK:0.4,mul:1.0, win:0.06,lamp:0.4, moonO:0.12,sunO:1.0, star:0.0, fogL:0.75,wat:0.58},
+ {p:0.50,top:0x420F3A,bot:0xB2467C,dens:0.0046,fogK:0.7,mul:0.72,win:0.7, lamp:0.9, moonO:0.8, sunO:0.3, star:0.3, fogL:0.65,wat:0.45},
+ {p:0.75,top:0x10050E,bot:0x4A1A42,dens:0.0040,fogK:1.0,mul:0.5, win:1.0, lamp:1.0, moonO:1.0, sunO:0.0, star:1.0, fogL:0.5, wat:0.4}];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],B=TK[(i+1)%TK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of ['dens','fogK','mul','win','lamp','moonO','sunO','star','fogL','wat'])o[k2]=MU.lerp(A[k2],B[k2],f);o.top=lerpC(A.top,B.top,f);o.bot=lerpC(A.bot,B.bot,f);return o;}
+let P=0.5,timeAuto=true,targetP=0.5,F=0.5,floodAuto=true,targetF=0.5;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')timeAuto=true;else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto')floodAuto=true;else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera */
+const target=new THREE.Vector3(0,30,0);let camA=Math.PI*0.3,camR=188,camY=56,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,34,78);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,150,205);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.lamp,'warning lamps','still blinking on bent masts'],[PAL.win,'window lights','a few left on'],[PAL.vineHi,'overgrowth','vines and rooftop trees'],[PAL.foam,'the flood','rising up the towers']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+
+/* ---------- animate ---------- */
+const clock=new THREE.Clock();let last=0;const tmpC=new THREE.Color();
+const dimMats=[...towerObjs.map(o=>o.material),structObj.material,vineObj.material,leafObj.material,chainObj.material,dCabObj.material,swayVines.material,...canopies.map(cn=>cn.o.material)];
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0006;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);dome.position.copy(camera.position);
+  if(timeAuto)P=(P+dt/110)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto)F=0.5+0.5*Math.sin(t*0.05);else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);nightAmt=par.star;
+  skyU.top.value.copy(par.top);skyU.bot.value.copy(par.bot);scene.background.copy(par.bot);scene.fog.color.copy(par.bot);scene.fog.density=par.dens*(1+0.15*F);
+  for(const m of dimMats)m.color.setScalar(par.mul);for(const m of mirrorMats)m.color.setScalar(par.mul*0.8);
+  moonMat.opacity=0.32*par.moonO;haloMat.opacity=0.2*par.moonO;sunMat.opacity=0.55*par.sunO;starMat.opacity=0.8*par.star;
+  waterY=0.8+F*25;
+  waterMat.color.copy(par.bot).multiplyScalar(par.wat);
+  waterPts.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.45);waterPts.material.opacity=0.28+0.18*(1-par.star*0.5);
+  foam.position.y=waterY+0.1*Math.sin(t*1.3);foam.material.opacity=0.35+0.25*par.fogL;
+  clipPlane.constant=waterY;mirror.position.set(0.25*Math.sin(t*1.1),2*waterY,0);
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · flood '+Math.round(F*100)+'% · water at floor '+Math.max(0,Math.floor(waterY/FL))+' —';
+  // water surface
+  for(let i=0;i<wN;i++)wPos[i*3+1]=waterY+0.22*Math.sin(t*1.5+wPh[i])+0.15*Math.sin(wPos[i*3]*0.06+t*0.7);
+  wGeo.attributes.position.needsUpdate=true;
+  // glitter column toward the moon
+  {let dx=MC.x-camera.position.x,dz=MC.z-camera.position.z;const L=Math.hypot(dx,dz);dx/=L;dz/=L;
+    for(let i=0;i<GLN;i++){const g=glIt[i],w=0.5+g.d*0.035;glPos[i*3]=camera.position.x+dx*g.d-dz*g.j*w*(1+0.3*Math.sin(t*2+g.ph));glPos[i*3+1]=waterY+0.3;glPos[i*3+2]=camera.position.z+dz*g.d+dx*g.j*w*(1+0.3*Math.sin(t*2+g.ph));}
+    glGeo.attributes.position.needsUpdate=true;glitter.material.opacity=0.55*par.moonO+0.1;}
+  // fog banks drift
+  for(const L of fogLayers){L.o.rotation.y+=L.spd*dt;if(L.follow)L.o.position.y=waterY;L.o.material.opacity=L.op*par.fogL*(0.85+0.15*Math.sin(t*0.2+L.ph));L.o.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.2).multiplyScalar(par.fogK);}
+  // window lights — drowned floors go dark
+  {const arr=winObj.geometry.attributes.color.array;for(let i=0;i<winN;i++){const y=winP[i*3+1],wet=MU.clamp((y-waterY)/1.2,0,1),fl=winPh[i]>=0?(0.55+0.45*Math.sin(t*3.1+winPh[i])*(Math.sin(t*17+winPh[i]*3)>0.9?0.2:1)):1,k=par.win*wet*fl;
+    arr[i*3]=winB[i*3]*k;arr[i*3+1]=winB[i*3+1]*k;arr[i*3+2]=winB[i*3+2]*k;}winObj.geometry.attributes.color.needsUpdate=true;}
+  // warning lamps blink
+  {const arr=lampObj.geometry.attributes.color.array;for(let i=0;i<lampN;i++){const ph=(t*0.55+lampPh[i])%1,on=ph<0.16?1:0.06,wet=lampP[i*3+1]>waterY?1:0,k=on*wet*par.lamp;arr[i*3]=lampCol.r*k;arr[i*3+1]=lampCol.g*k;arr[i*3+2]=lampCol.b*k;}lampObj.geometry.attributes.color.needsUpdate=true;}
+  // swaying cables
+  {let i=0;for(const cb of dCab){const sw=1.6*Math.sin(t*0.5+cb.ph),sg=cb.sag*(1+0.06*Math.sin(t*0.8+cb.ph));let prev=cb.a;
+    for(let s=1;s<=DCS;s++){const f=s/DCS,q=catP(cb.a,cb.b,sg,f),o=sw*4*f*(1-f);const x=q[0]+cb.px*o,z=q[2]+cb.pz*o;
+      dcPos[i*6]=prev[0];dcPos[i*6+1]=prev[1];dcPos[i*6+2]=prev[2];dcPos[i*6+3]=x;dcPos[i*6+4]=q[1];dcPos[i*6+5]=z;prev=[x,q[1],z];i++;}}dcGeo.attributes.position.needsUpdate=true;}
+  // swaying vines
+  {let i=0;for(const v of vines){let x0=v.ax,y0=v.ay,z0=v.az;for(let s=1;s<=VS;s++){const f=s/VS,out=0.3+f*(0.6+0.5*(0.5+0.5*Math.sin(t*0.6+v.ph))),tg=v.sway*f*Math.sin(t*0.7+v.ph-f*1.4);
+    const x=v.ax+v.nx*out+v.tx*tg,y=v.ay-f*v.len,z=v.az+v.nz*out+v.tz*tg;svP[i*6]=x0;svP[i*6+1]=y0;svP[i*6+2]=z0;svP[i*6+3]=x;svP[i*6+4]=y;svP[i*6+5]=z;x0=x;y0=y;z0=z;i++;}}svGeo.attributes.position.needsUpdate=true;}
+  // tree canopies sway
+  for(const cn of canopies){cn.o.rotation.z=0.025*Math.sin(t*0.9+cn.ph);cn.o.rotation.x=0.02*Math.sin(t*0.7+cn.ph*1.3);}
+  // spirit motes
+  for(let i=0;i<MN;i++){const m=motes[i];m.h+=m.v*dt*0.6;if(m.h>48)m.h=1;moPos[i*3]=m.x+1.5*Math.sin(t*0.3+m.ph);moPos[i*3+1]=waterY+m.h;moPos[i*3+2]=m.z+1.5*Math.cos(t*0.27+m.ph);}
+  moGeo.attributes.position.needsUpdate=true;moteObj.material.opacity=0.25+0.6*par.star;
+  // stars twinkle
+  if(par.star>0.01){const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  updSpirits(t,dt);
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flooded under-city (study)</title>
+<style>
+  :root{--cream:#E8ECF2;--gold:#F2C46A;--pale:#B4C4D8;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#1E2438;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px;text-shadow:0 1px 10px #000}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px;text-shadow:0 1px 10px #000}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(14,18,30,.55);border:1px solid rgba(180,196,216,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="31"><h1>flooded under-city</h1><div class="sub">phylla-kodama study · working title · draft</div><div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill on" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill" data-t="0.75">night</button></span>
+  <span class="grp">flood <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name · © Marko Manriquez, all rights reserved</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* flooded under-city — a section cut through one city block, seen from outside like a
+   cutaway model floating over a fog sea. Drowned towers stand on the street; under it,
+   the cut faces show strata, the arched sewers, conduits and a cistern. One water line
+   runs through both: FLOOD raises it from half-full sewers up the tower bases. Drips,
+   rings, vines over the cut edge, status lamps and mast lamps. TIME = the hour. r128.
+   Original artwork © Marko Manriquez, all rights reserved. */
+const PAL={fog:0x2C3450,stone:0x0B1820,stoneHi:0x284656,soil:0x121C26,soilHi:0x3A5064,clay:0x16222D,clayHi:0x46607A,brick:0x36262A,brickHi:0x7A4C3C,
+  pipe:0x06121A,pipeHi:0x2C4C5C,rust:0x3A2420,rustHi:0x8A4C34,moss:0x163E3A,mossHi:0x4E9A86,
+  tLo:0x18172E,tHi:0x4A4A76,fLo:0x2A2C48,fHi:0x56587E,vine:0x1E4A40,vineHi:0x5EA88C,leaf:0x3E8A70,canopy:0x2E6A5A,canopyHi:0x8AD0B0,
+  lampA:0xFFB347,lampR:0xFF5A36,lampW:0xFFD98A,lampT:0x9FF2E2,win:0xFFEBD0,win2:0xFFF4E8,
+  water:0x0A1C26,glint:0x9AD8E0,drip:0xC8F0F4,foam:0xD8F0F4,mist:0xA8C8D8,cable:0x060C12,chain:0x16222A,moon:0xF2F4FF,moonLo:0xB8C4DC,mote:0xE4F2FF};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261031);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+const DOT=(()=>{const s=32,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d');g.fillStyle='#fff';g.beginPath();g.arc(s/2,s/2,s/2-1,0,Math.PI*2);g.fill();return new THREE.CanvasTexture(cv);})();
+function roundDots(o){o.material.map=DOT;o.material.alphaTest=0.5;o.material.needsUpdate=true;return o;}
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+function dynCol(g,n){const a=new Float32Array(n*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));return a;}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.fog);scene.fog=new THREE.FogExp2(PAL.fog,0.0038);
+/* pass 2: reflections, drawn only where the water surface is visible (stencil) */
+const mirrorScene=new THREE.Scene();mirrorScene.fog=scene.fog;
+/* pass 3: things that lie on the water surface (glints, rings, foam), same stencil */
+const overScene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.5,2400);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.localClippingEnabled=true;
+const world=new THREE.Group();scene.add(world);
+const refl=new THREE.Group();refl.scale.y=-1;mirrorScene.add(refl);
+const clipBelow=new THREE.Plane(new THREE.Vector3(0,-1,0),0);// keeps y <= waterY
+function stencilTest(m,noDepth){m.stencilWrite=true;m.stencilWriteMask=0;m.stencilFunc=THREE.EqualStencilFunc;m.stencilRef=1;m.stencilFuncMask=0xff;m.stencilFail=m.stencilZFail=m.stencilZPass=THREE.KeepStencilOp;if(noDepth)m.depthTest=false;return m;}
+const AMB=[],MIR=[];
+function amb(m,up){AMB.push({m,base:m.color.clone(),up:!!up});return m;}
+function mirror(o,op,k){const m=o.material.clone();m.clippingPlanes=[clipBelow];m.transparent=true;m.opacity=op;m.depthWrite=!(o.material.blending===THREE.AdditiveBlending);stencilTest(m);
+  const r=new o.constructor(o.geometry,m);r.position.copy(o.position);r.rotation.copy(o.rotation);r.scale.copy(o.scale);refl.add(r);MIR.push({src:o.material,m,k:k||0.7,op});return r;}
+function glowAdd(o,parent){o.material.fog=false;o.renderOrder=6;(parent||world).add(o);return o;}
+function overAdd(o){stencilTest(o.material,true);o.material.fog=false;o.renderOrder=1;overScene.add(o);return o;}
+let waterY=-10;
+const C=h=>new THREE.Color(h);
+const cPipe=C(PAL.pipe),cPipeHi=C(PAL.pipeHi),cRust=C(PAL.rust),cRustHi=C(PAL.rustHi),cMoss=C(PAL.moss),cMossHi=C(PAL.mossHi),cStone=C(PAL.stone),cStoneHi=C(PAL.stoneHi);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+function line(A,B,step){const L=A.distanceTo(B),n=Math.max(1,Math.ceil(L/step)),o=[];for(let i=0;i<=n;i++)o.push(A.clone().lerp(B,i/n));return o;}
+function plen(p){let L=0;for(let i=1;i<p.length;i++)L+=p[i].distanceTo(p[i-1]);return L;}
+function angD(a,b){let d=a-b;return((d+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;}
+
+/* ---------- the block: plan + section ---------- */
+const B=48,BOT=-46;                          // half width, bottom of the cut
+const TW=7,TF=-32,TS=-25;                    // sewer arch: half width, floor, springline (crown -18)
+const ZX=-12,XZ=14,CR=13,CHF=-34,CHC=-15;    // sewer along x at z=ZX, along z at x=XZ, cistern where they cross
+const CXZ=24,CXY=-10,CXR=3.2,CZX=-30,CZY=-23,CZ0=-5; // conduits
+const OX=-28,OY=-6,OR=1.6;                   // outfall through the south face
+const M1={x:-22,z:ZX,r:1.8,y0:TS+TW-0.6},M2={x:XZ,z:34,r:1.8,y0:TS+TW-0.6},MG0={x:XZ,z:ZX,r:3,y0:CHC};
+const HOLES_ST=[M1,M2,MG0];
+const archTop=u=>Math.abs(u)<TW?TS+Math.sqrt(TW*TW-u*u):-1e9;
+const FACES=[{nx:1,nz:0,h:[{t:'a',u:ZX},{t:'o',u:CXZ,v:CXY,r:CXR}]},{nx:-1,nz:0,h:[{t:'a',u:ZX},{t:'o',u:CXZ,v:CXY,r:CXR}]},
+  {nx:0,nz:1,h:[{t:'a',u:XZ},{t:'o',u:CZX,v:CZY,r:CXR}]},{nx:0,nz:-1,h:[{t:'a',u:XZ},{t:'o',u:OX,v:OY,r:OR}]}];
+const UP=[{ax:'x',c:-34,y:-3.5,r:0.9},{ax:'x',c:6,y:-6.5,r:1.3},{ax:'x',c:38,y:-3,r:0.7},{ax:'z',c:-10,y:-4,r:1.1},{ax:'z',c:30,y:-7.2,r:0.8},{ax:'z',c:-40,y:-2.6,r:0.6}];
+for(const f of FACES)f.up=UP.filter(p=>(p.ax==='x')===(f.nx!==0));
+const fw=(f,u,v,off)=>f.nx?[f.nx*(B+off),v,u]:[u,v,f.nz*(B+off)];
+function inHole(f,u,v,pad){for(const h of f.h){if(h.t==='a'){if(Math.abs(u-h.u)<TW+pad&&v>TF-pad&&v<archTop(MU.clamp(Math.abs(u-h.u)-pad,0,TW-1e-3))+pad)return true;}else if(Math.hypot(u-h.u,v-h.v)<h.r+pad)return true;}return false;}
+function holePath(h,P){if(h.t==='a'){P.moveTo(h.u-TW,TF);P.lineTo(h.u+TW,TF);P.lineTo(h.u+TW,TS);P.absarc(h.u,TS,TW,0,Math.PI,false);P.lineTo(h.u-TW,TF);}else P.absarc(h.u,h.v,h.r,0,Math.PI*2,true);return P;}
+function shapeWorld(shape,f,off,pos,idx){const g=new THREE.ShapeGeometry(shape,20),p=g.attributes.position.array,base=pos.length/3;
+  for(let i=0;i<p.length;i+=3){const w=fw(f,p[i],p[i+1],off);pos.push(w[0],w[1],w[2]);}const ix=g.index.array;for(let i=0;i<ix.length;i++)idx.push(base+ix[i]);g.dispose();}
+function meshOf(pos,idx,mat){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);return new THREE.Mesh(g,mat);}
+
+/* cut faces (solid, with the sewer and conduit openings) + bottom */
+{const pos=[],idx=[];for(const f of FACES){const s=new THREE.Shape();s.moveTo(-B,BOT);s.lineTo(B,BOT);s.lineTo(B,0);s.lineTo(-B,0);s.lineTo(-B,BOT);for(const h of f.h)s.holes.push(holePath(h,new THREE.Path()));shapeWorld(s,f,0,pos,idx);}
+  const base=pos.length/3;pos.push(-B,BOT,-B,B,BOT,-B,B,BOT,B,-B,BOT,B);idx.push(base,base+1,base+2,base,base+2,base+3);
+  const m=meshOf(pos,idx,new THREE.MeshBasicMaterial({color:0x0A141C,side:THREE.DoubleSide}));world.add(m);amb(m.material);}
+/* the street, with the manholes and the cistern grate open */
+let streetMesh;{const s=new THREE.Shape();s.moveTo(-B,-B);s.lineTo(B,-B);s.lineTo(B,B);s.lineTo(-B,B);s.lineTo(-B,-B);
+  for(const h of HOLES_ST){const p=new THREE.Path();p.absarc(h.x,-h.z,h.r,0,Math.PI*2,true);s.holes.push(p);}
+  const g=new THREE.ShapeGeometry(s,20);g.rotateX(-Math.PI/2);streetMesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0x121C26,side:THREE.DoubleSide}));world.add(streetMesh);amb(streetMesh.material,true);}
+
+/* strata on the cut faces: crust, fill, utility band, rubble, layered clay, bedrock */
+function strataCol(u,v,fi){const w=v+0.9*Math.sin(u*0.11+fi*1.7)+0.5*Math.sin(u*0.37+fi);let c;
+  if(w>-1.1)c=lerpC(PAL.stoneHi,0x5A6A78,0.25*rng());
+  else if(w>-5)c=lerpC(PAL.soil,PAL.soilHi,0.25+0.6*rng());
+  else if(w>-9){c=lerpC(PAL.soil,PAL.clay,rng());if(rng()<0.06)c.lerp(cRustHi,0.5);}
+  else if(w>-15)c=rng()<0.55?lerpC(PAL.brick,PAL.brickHi,rng()*0.7):lerpC(PAL.soil,PAL.clay,rng());
+  else if(w>-37){const lam=0.5+0.5*Math.sin(w*1.7+Math.sin(u*0.05));c=lerpC(PAL.clay,PAL.clayHi,0.15+0.75*lam*lam*(0.6+0.4*rng()));}
+  else c=lerpC(PAL.stone,PAL.moss,0.35*rng());
+  return c;}
+{const p=[],col=[],S=0.9;
+  FACES.forEach((f,fi)=>{for(let v=-0.3;v>BOT;v-=S)for(let u=-B+0.3;u<B;u+=S){const uu=u+rand(-.25,.25),vv=v+rand(-.25,.25);if(inHole(f,uu,vv,0.35))continue;
+      let inUP=false;for(const q of f.up)if(Math.hypot(uu-q.c,vv-q.y)<q.r+0.25)inUP=true;if(inUP)continue;
+      const w=fw(f,uu,vv,0.06),cc=strataCol(uu,vv,fi);p.push(w[0],w[1],w[2]);col.push(cc.r,cc.g,cc.b);}
+    // brick lining around each opening
+    for(const h of f.h){if(h.t==='a'){for(const rr of [TW+0.35,TW+1.0,TW+1.65]){const N=(Math.PI*rr/0.42)|0;for(let i=0;i<=N;i++){const th=i/N*Math.PI,w=fw(f,h.u+rr*Math.cos(th),TS+rr*Math.sin(th),0.08),cc=cStoneHi.clone().lerp(cStone,0.3+0.3*rng());p.push(w[0],w[1],w[2]);col.push(cc.r,cc.g,cc.b);}}
+        for(const s of [-1,1])for(let y=TF;y<TS;y+=0.45){const w=fw(f,h.u+s*(TW+0.4),y,0.08),cc=cStoneHi.clone().lerp(cStone,0.5);p.push(w[0],w[1],w[2]);col.push(cc.r,cc.g,cc.b);}}
+      else for(const rr of [h.r+0.2,h.r+0.5]){const N=(2*Math.PI*rr/0.3)|0;for(let i=0;i<N;i++){const a=i/N*Math.PI*2,w=fw(f,h.u+rr*Math.cos(a),h.v+rr*Math.sin(a),0.08),cc=lerpC(PAL.rust,PAL.rustHi,rng()*0.7);p.push(w[0],w[1],w[2]);col.push(cc.r,cc.g,cc.b);}}}
+    // utility pipes cut in section
+    for(const q of f.up){for(let rr=0;rr<q.r+0.2;rr+=0.22){const N=Math.max(1,(2*Math.PI*rr/0.24)|0);for(let i=0;i<N;i++){const a=i/N*Math.PI*2,w=fw(f,q.c+rr*Math.cos(a),q.y+rr*Math.sin(a),0.07);
+        const cc=rr>q.r-0.05?lerpC(PAL.rustHi,0xC8D0D0,0.3*rng()):rr>q.r-0.3?lerpC(PAL.rust,PAL.rustHi,rng()):C(0x04080A);p.push(w[0],w[1],w[2]);col.push(cc.r,cc.g,cc.b);}}}});
+  // bottom face speckle so a lowered view never sees a hole
+  for(let i=0;i<300;i++){const x=rand(-B,B),z=rand(-B,B);p.push(x,BOT-0.06,z);const cc=lerpC(PAL.stone,PAL.moss,0.4*rng());col.push(cc.r,cc.g,cc.b);}
+  const o=rockPoints(p,col,0.78);world.add(o);amb(o.material);}
+
+/* ---------- solids under the street: sewers, cistern, shafts, conduits, pipes (one merged mesh) ---------- */
+const MG={p:[],c:[],i:[]},_up=V(0,1,0),PIPES=[];
+function grid(nu,nv,pos,colF,skip){const base=MG.p.length/3,W=nu+1;
+  for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++){const P=pos(i,j);MG.p.push(P.x,P.y,P.z);const cc=colF(P,i,j);MG.c.push(cc.r,cc.g,cc.b);}
+  for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){if(skip&&skip(i+0.5,j+0.5))continue;const a=base+j*W+i;MG.i.push(a,a+1,a+W,a+1,a+W+1,a+W);}}
+function tube(path,r,seg,colF,rot){rot=rot||0;const base=MG.p.length/3,n=path.length;let N=null;
+  for(let k=0;k<n;k++){const T=new THREE.Vector3().subVectors(path[Math.min(n-1,k+1)],path[Math.max(0,k-1)]).normalize();
+    if(!N)N=Math.abs(T.y)>0.9?V(1,0,0):_up.clone();N.sub(T.clone().multiplyScalar(N.dot(T))).normalize();const Bn=new THREE.Vector3().crossVectors(T,N);
+    for(let j=0;j<seg;j++){const an=j/seg*Math.PI*2+rot,dir=N.clone().multiplyScalar(Math.cos(an)).add(Bn.clone().multiplyScalar(Math.sin(an)));
+      const P=path[k].clone().addScaledVector(dir,r);MG.p.push(P.x,P.y,P.z);const cc=colF(k/((n-1)||1),dir.y,P);MG.c.push(cc.r,cc.g,cc.b);}}
+  for(let k=0;k<n-1;k++)for(let j=0;j<seg;j++){const a=base+k*seg+j,b=base+k*seg+(j+1)%seg;MG.i.push(a,a+seg,b,b,a+seg,b+seg);}}
+function pipeCol(seed,L){return (u,up)=>{const cc=cPipe.clone().lerp(cPipeHi,ss(up*0.55+0.45)*0.8);const s=u*L,rs=Math.sin(s*0.31+seed)+0.7*Math.sin(s*0.87+seed*2.3);
+  if(rs>0.8)cc.lerp(up>0?cRustHi:cRust,MU.clamp((rs-0.8)*1.1,0,0.8));if(up>0.55&&Math.sin(s*0.47+seed*3.1)>0.55)cc.lerp(cMossHi,0.5);return cc;};}
+const flCol=(u,up)=>cPipe.clone().lerp(cRustHi,0.25+0.4*ss(up*0.5+0.5));
+function pipe(path,r,seg,flange){const L=plen(path);tube(path,r,seg,pipeCol(rand(0,9),L));PIPES.push({path,r,L});
+  if(flange){let acc=0,next=3+rand(0,3);for(let i=1;i<path.length;i++){const A=path[i-1],Bp=path[i],l=A.distanceTo(Bp);while(acc+l>=next){const f=(next-acc)/l,P=A.clone().lerp(Bp,f),T=Bp.clone().sub(A).normalize();
+    tube([P.clone().addScaledVector(T,-0.22),P.clone().addScaledVector(T,0.22)],r*1.2,seg,flCol);next+=flange;}acc+=l;}}}
+// sewer profile: walls, arch, floor (closed loop)
+const PROF=[];for(let y=TF;y<TS;y+=1)PROF.push([-TW,y]);for(let i=0;i<=22;i++){const th=Math.PI-i/22*Math.PI;PROF.push([TW*Math.cos(th),TS+TW*Math.sin(th)]);}
+for(let y=TS-1;y>TF;y-=1)PROF.push([TW,y]);for(let u=TW;u>-TW+0.01;u-=1.4)PROF.push([u,TF]);PROF.push([-TW,TF]);
+const profAt=j=>{const a=Math.floor(j),b=Math.min(PROF.length-1,a+1),f=j-a;return [PROF[a][0]+(PROF[b][0]-PROF[a][0])*f,PROF[a][1]+(PROF[b][1]-PROF[a][1])*f];};
+function sewerCol(P,y,u){const up=(y-TF)/(TW+TS-TF);const cc=cStone.clone().lerp(cStoneHi,0.08+0.3*up+0.15*rng());
+  if(y<TS-1&&rng()<0.5)cc.lerp(cMoss,0.45);if(Math.abs(y-TS)<0.7)cc.lerp(cMossHi,0.45);if(y<TF+0.2)cc.lerp(C(0x05100E),0.5);return cc;}
+const NA=48,NP=PROF.length-1;
+// sewer along x
+grid(NA,NP,(i,j)=>{const q=profAt(j);return V(-B+i*2*B/NA,q[1],ZX+q[0]);},P=>sewerCol(P,P.y,P.z-ZX),
+  (i,j)=>{const a=-B+i*2*B/NA,q=profAt(j);return Math.hypot(a-XZ,q[0])<CR-0.2||(Math.hypot(a-M1.x,q[0])<M1.r&&q[1]>TS+3);});
+// sewer along z
+grid(NA,NP,(i,j)=>{const q=profAt(j);return V(XZ+q[0],q[1],-B+i*2*B/NA);},P=>sewerCol(P,P.y,P.x-XZ),
+  (i,j)=>{const a=-B+i*2*B/NA,q=profAt(j);return Math.hypot(a-ZX,q[0])<CR-0.2||(Math.hypot(a-M2.z,q[0])<M2.r&&q[1]>TS+3);});
+// cistern drum with four arched openings, ceiling ring and floor
+const TUNA=[0,Math.PI/2,Math.PI,Math.PI*1.5];
+function chOpen(a,y){for(const ta of TUNA){const d=angD(a,ta);if(Math.abs(d)<Math.PI/2){const u=CR*Math.sin(d);if(Math.abs(u)<TW&&y>TF-0.5&&y<archTop(u))return true;}}return false;}
+grid(80,19,(i,j)=>{const a=i/80*Math.PI*2;return V(XZ+CR*Math.cos(a),CHF+j,ZX+CR*Math.sin(a));},P=>{const cc=cStone.clone().lerp(cStoneHi,0.1+0.3*rng()*((P.y-CHF)/19));if(Math.abs(P.y-TS)<0.6)cc.lerp(cMossHi,0.5);return cc;},
+  (i,j)=>chOpen(i/80*Math.PI*2,CHF+j));
+grid(64,5,(i,j)=>{const a=i/64*Math.PI*2,r=MG0.r+j*(CR-MG0.r)/5;return V(XZ+r*Math.cos(a),CHC,ZX+r*Math.sin(a));},()=>cStone.clone().lerp(cStoneHi,0.15*rng()));
+grid(64,4,(i,j)=>{const a=i/64*Math.PI*2,r=j*CR/4;return V(XZ+r*Math.cos(a),CHF,ZX+r*Math.sin(a));},()=>cStone.clone().lerp(cMoss,0.4*rng()));
+// shafts
+for(const h of HOLES_ST){const n=Math.ceil((0-h.y0)/1.5);grid(16,n,(i,j)=>{const a=i/16*Math.PI*2;return V(h.x+h.r*Math.cos(a),h.y0+j*(0-h.y0)/n,h.z+h.r*Math.sin(a));},()=>cStone.clone().lerp(cStoneHi,0.1+0.25*rng()));}
+// conduits (open-ended, cut by the faces)
+const conCol=(u,up)=>cPipe.clone().lerp(cRust,0.3+0.3*ss(-up*0.5+0.5)).lerp(cPipeHi,0.15*ss(up));
+tube(line(V(-B,CXY,CXZ),V(B,CXY,CXZ),2),CXR,18,conCol);
+tube(line(V(CZX,CZY,CZ0),V(CZX,CZY,B),2),CXR,18,conCol);
+// outfall pushing out of the south face
+pipe(line(V(OX,OY,-B+8),V(OX,OY,-B-4),1),OR,14,0);tube([V(OX,OY,-B-3.8),V(OX,OY,-B-4.2)],OR*1.25,14,flCol);
+// pipes riding the sewer walls (they run on across the cistern)
+pipe(line(V(-B,TS+2.4,ZX+TW-0.9),V(B,TS+2.4,ZX+TW-0.9),1.5),0.65,10,6);
+pipe(line(V(-B,TS-1.6,ZX-TW+0.8),V(B,TS-1.6,ZX-TW+0.8),1.5),0.45,8,5);
+pipe(line(V(XZ-TW+0.9,TS+2.0,-B),V(XZ-TW+0.9,TS+2.0,B),1.5),0.7,10,7);
+pipe(line(V(XZ+TW-0.8,TS-1.2,-B),V(XZ+TW-0.8,TS-1.2,B),1.5),0.5,8,5);
+// downpipes and panels in the cistern
+for(let k=0;k<4;k++){const a=Math.PI/4+k*Math.PI/2-0.22;pipe(line(V(XZ+(CR-1)*Math.cos(a),CHC,ZX+(CR-1)*Math.sin(a)),V(XZ+(CR-1)*Math.cos(a),CHF,ZX+(CR-1)*Math.sin(a)),1.5),0.6,10,5);}
+const PANELS=[0,1,2,3].map(k=>Math.PI/4+k*Math.PI/2+0.22);
+for(const a of PANELS){tube([V(XZ+(CR+0.2)*Math.cos(a),-21,ZX+(CR+0.2)*Math.sin(a)),V(XZ+(CR-0.9)*Math.cos(a),-21,ZX+(CR-0.9)*Math.sin(a))],1.2,4,(u,up)=>cPipe.clone().lerp(cStoneHi,0.25+0.3*ss(up*0.5+0.5)),Math.PI/4);}
+const solid=meshOf(MG.p,MG.i,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));solid.geometry.setAttribute('color',new THREE.Float32BufferAttribute(MG.c,3));
+world.add(solid);amb(solid.material);mirror(solid,0.55,0.8);
+
+/* brick stipple inside the sewers + rust and moss on the pipes */
+{const p=[],col=[];
+  for(const ax of ['x','z'])for(let a=-B+0.5;a<B;a+=1.15)for(let j=0;j<NP;j+=0.9){const q=profAt(j);if(q[1]<TF+0.1)continue;const cA=ax==='x'?XZ:ZX,cU=ax==='x'?ZX:XZ;if(Math.hypot(a-cA,q[0])<CR)continue;
+    const inset=0.12,ux=q[0]*(1-inset/TW),P=ax==='x'?V(a,q[1]-0.05,cU+ux):V(cU+ux,q[1]-0.05,a);const ring=((a+B)/1.15|0)%5===0;
+    const cc=cStone.clone().lerp(cStoneHi,(ring?0.5:0.18)+0.25*rng());if(q[1]<TS&&rng()<0.4)cc.lerp(cMoss,0.5);p.push(P.x,P.y,P.z);col.push(cc.r,cc.g,cc.b);}
+  for(const pp of PIPES){const n=(pp.L*pp.r*1.4)|0;for(let i=0;i<n;i++){const k=(rng()*(pp.path.length-1))|0,P=pp.path[k].clone().lerp(pp.path[k+1],rng()),an=rand(-1.3,1.3);
+    const top=rng()<0.6;P.y+=top?pp.r*Math.cos(an)+0.06:-pp.r*Math.cos(an)*0.8;const cc=top?(rng()<0.5?lerpC(PAL.moss,PAL.mossHi,rng()):lerpC(PAL.rust,PAL.rustHi,rng())):lerpC(PAL.rust,PAL.pipeHi,rng()*0.4);p.push(P.x,P.y,P.z);col.push(cc.r,cc.g,cc.b);}}
+  const o=roundDots(rockPoints(p,col,0.4));world.add(o);amb(o.material);}
+
+/* ---------- the street ---------- */
+const TOW=[[-27,24,13,12,62,0.12],[31,31,11,12,50,-0.08],[-29,-31,13,13,56,0.2],[33,-30,11,12,42,-0.15],[-3,6,10,9,34,0.35]];
+const inTowerFoot=(x,z,pad)=>{for(const T of TOW){const dx=x-T[0],dz=z-T[1],ca=Math.cos(T[5]),sa=Math.sin(T[5]),lx=dx*ca+dz*sa,lz=-dx*sa+dz*ca;if(Math.abs(lx)<T[2]/2+pad&&Math.abs(lz)<T[3]/2+pad)return true;}return false;};
+const SL=[],SC=[];function seg(a,b,c1,c2){c2=c2||c1;SL.push(a[0],a[1],a[2],b[0],b[1],b[2]);SC.push(c1.r,c1.g,c1.b,c2.r,c2.g,c2.b);}
+{const p=[],col=[];for(let x=-B+0.6;x<B;x+=1.3)for(let z=-B+0.6;z<B;z+=1.3){const xx=x+rand(-.4,.4),zz=z+rand(-.4,.4);if(inTowerFoot(xx,zz,0.2))continue;let hole=false;for(const h of HOLES_ST)if(Math.hypot(xx-h.x,zz-h.z)<h.r+0.3)hole=true;if(hole)continue;
+    const kerb=inTowerFoot(xx,zz,3.2),crack=Math.sin(xx*0.21+Math.sin(zz*0.13)*3)>0.93;let cc=lerpC(PAL.soilHi,0x56687A,0.2+0.5*rng());if(kerb)cc.lerp(C(0x7A8C9C),0.35);if(crack)cc=lerpC(PAL.moss,PAL.mossHi,rng()*0.7);
+    p.push(xx,0.06,zz);col.push(cc.r,cc.g,cc.b);}
+  // the cut edge of the street, crisp
+  for(let s=-B;s<=B;s+=0.32)for(const [x,z] of [[s,-B],[s,B],[-B,s],[B,s]]){p.push(x,0.04,z);const cc=lerpC(PAL.stoneHi,0x8A9CAC,0.3*rng());col.push(cc.r,cc.g,cc.b);}
+  // grate rims
+  for(const h of HOLES_ST){const N=(2*Math.PI*(h.r+0.25)/0.2)|0;for(let i=0;i<N;i++){const a=i/N*Math.PI*2;p.push(h.x+(h.r+0.25)*Math.cos(a),0.1,h.z+(h.r+0.25)*Math.sin(a));const cc=lerpC(PAL.rust,PAL.rustHi,rng());col.push(cc.r,cc.g,cc.b);}}
+  const o=rockPoints(p,col,0.85);world.add(o);amb(o.material,true);}
+// grate bars + section outline of the block
+{const ic=C(0x0A1418),ec=C(0x3C5466);for(const h of HOLES_ST)for(let u=-h.r+0.25;u<h.r;u+=0.45){const L=Math.sqrt(h.r*h.r-u*u);seg([h.x+u,0.12,h.z-L],[h.x+u,0.12,h.z+L],ic);}
+  for(const y of [0,BOT])for(const [a,b] of [[[-B,-B],[B,-B]],[[B,-B],[B,B]],[[B,B],[-B,B]],[[-B,B],[-B,-B]]])seg([a[0],y,a[1]],[b[0],y,b[1]],ec);
+  for(const [x,z] of [[-B,-B],[B,-B],[B,B],[-B,B]])seg([x,0,z],[x,BOT,z],ec);}
+// street lamp posts
+const POSTS=[[-8,-42],[4,42],[43,4],[-43,-6],[8,-26],[-14,30]];
+{const pc=C(0x1A2630);for(const [x,z] of POSTS){seg([x,0,z],[x,6.5,z],pc);seg([x,6.5,z],[x*0.96,6.9,z*0.96],pc);}}
+
+/* ---------- towers (drowned at high water) ---------- */
+const FL=3.2,TP={core:{p:[],c:[]},far:{p:[],c:[]}};const towers=[];
+function tower(cx,cz,w,d,h,rot,tier){
+  const far=tier==='far',S=far?2.6:0.82,slabEvery=far?3:1,colStep=far?9:4.4,vStep=far?3.2:S*1.15;
+  const ca=Math.cos(rot),sa=Math.sin(rot),P=2*(w+d);
+  const W=(lx,lz)=>[cx+lx*ca-lz*sa,cz+lx*sa+lz*ca];
+  const per=u=>{u=((u%P)+P)%P;if(u<w)return [u-w/2,-d/2,0,-1];u-=w;if(u<d)return [w/2,u-d/2,1,0];u-=d;if(u<w)return [w/2-u,d/2,0,1];u-=w;return [-w/2,d/2-u,-1,0];};
+  const at=(u,y,o)=>{o=o||0;const q=per(u),r=W(q[0]+q[2]*o,q[1]+q[3]*o);return [r[0],y,r[1]];};
+  const nrm=u=>{const q=per(u);return [q[2]*ca-q[3]*sa,q[2]*sa+q[3]*ca];};
+  const brk=rng()<0.72,bA=rand(4,13),bF=rand(0.12,0.4),bPh=rand(0,6.28);
+  const top=u=>brk?h-bA*Math.max(0,Math.sin(u*bF+bPh))*(0.55+0.45*Math.sin(u*0.31+bPh*2)):h;
+  const minTop=brk?h-bA:h;
+  const holes=[];for(let k=0;k<(far?2:4);k++){const u0=rand(0,P),y0=rand(16,h*0.85);holes.push([u0,u0+rand(3,7),y0,y0+rand(4,10)]);}
+  const hole=(u,y)=>{for(const H of holes)if(u>H[0]&&u<H[1]&&y>H[2]&&y<H[3])return true;return false;};
+  const dst=TP[tier],lo=far?PAL.fLo:PAL.tLo,hi=far?PAL.fHi:PAL.tHi;
+  const add=(u,y,c)=>{const q=at(u,y,0);dst.p.push(q[0]+rand(-.07,.07),y,q[2]+rand(-.07,.07));dst.c.push(c.r,c.g,c.b);};
+  for(let f=1;f*FL<h;f++){if(f%slabEvery)continue;const y=f*FL;for(let u=0;u<P;u+=S){if(y>top(u)||hole(u,y))continue;
+    const c=rng()<0.1?lerpC(PAL.rust,PAL.rustHi,rng()*0.6):lerpC(lo,hi,0.15+0.7*rng()*(0.5+0.5*y/h));if(!far&&y<14&&rng()<0.35)c.lerp(cMoss,0.5);add(u,y,c);}}
+  const cols=[];for(let u=0;u<P;u+=colStep)cols.push(u);cols.push(w,w+d,2*w+d);
+  for(const u of cols){const tu=top(u),rs=rng()<0.25;for(let y=0;y<tu;y+=vStep){if(hole(u,y))continue;const c=(rs&&rng()<0.6)?lerpC(PAL.rust,PAL.rustHi,rng()*0.5):lerpC(lo,hi,0.25+0.5*rng());add(u,y,c);}}
+  if(!brk){for(let i=0;i<w*d*(far?0.06:0.18);i++){const r=W(rand(-w/2,w/2),rand(-d/2,d/2));dst.p.push(r[0],h,r[1]);const c=lerpC(lo,hi,0.4*rng());dst.c.push(c.r,c.g,c.b);}}
+  if(!far){const lc=lerpC(lo,hi,0.45),cs=[0,w,w+d,2*w+d,P];for(let k=0;k<4;k++)seg(at(cs[k],0,0),at(cs[k],top(cs[k]),0),lc);
+    for(let f=3;f*FL<minTop;f+=3){const y=f*FL;for(let k=0;k<4;k++)seg(at(cs[k],y,0),at(cs[k+1],y,0),lc);}}
+  const T={cx,cz,w,d,h,rot,ca,sa,P,W,per,at,nrm,top,minTop,brk,tier,rad:Math.hypot(w,d)/2,roofY:brk?minTop+1:h};towers.push(T);return T;}
+for(const t of TOW)tower(t[0],t[1],t[2],t[3],t[4],t[5],'core');
+const nearT=towers.slice();
+{let k=0,tries=0;while(k<12&&tries<500){tries++;const a=rand(0,6.28),r=rand(380,540),cx=r*Math.cos(a),cz=r*Math.sin(a);if(towers.some(T=>T.tier==='far'&&Math.hypot(T.cx-cx,T.cz-cz)<T.rad+30))continue;tower(cx,cz,rand(14,22),rand(14,22),rand(80,150),rand(0,3.14),'far');k++;}}
+const towerCore=rockPoints(TP.core.p,TP.core.c,0.85);world.add(towerCore);amb(towerCore.material,true);mirror(towerCore,0.5,0.75);
+const towerFar=rockPoints(TP.far.p,TP.far.c,1.9);towerFar.position.y=-44;world.add(towerFar);amb(towerFar.material,true);
+
+/* façade overgrowth + rooftop trees */
+{const VL=[],VC=[],LFp=[],LFc=[];
+  for(const T of nearT){const n=Math.round(T.P*0.5);for(let i=0;i<n;i++){const u=rand(0,T.P),roof=rng()<0.6,tu=T.top(u),y0=roof?tu:Math.min(tu,FL*Math.floor(rand(4,T.h/FL))),len=rand(4,Math.max(6,y0*0.6)),ph=rand(0,6.28);
+    let prev=T.at(u,y0,0.25);for(let m=0;m<4;m++){LFp.push(prev[0]+rand(-.8,.8),prev[1]+rand(-.3,.6),prev[2]+rand(-.8,.8));const c=lerpC(PAL.leaf,PAL.vineHi,rng());LFc.push(c.r,c.g,c.b);}
+    for(let s=1.1;s<len;s+=1.1){const f=s/len,q=T.at(u+0.45*Math.sin(s*0.45+ph),y0-s,0.25+0.4*f*f);const c1=lerpC(PAL.vineHi,PAL.vine,f);VL.push(prev[0],prev[1],prev[2],q[0],q[1],q[2]);VC.push(c1.r,c1.g,c1.b,c1.r,c1.g,c1.b);
+      if(rng()<0.6){LFp.push(q[0]+rand(-.45,.45),q[1]+rand(-.4,.4),q[2]+rand(-.45,.45));const c=lerpC(PAL.leaf,PAL.vineHi,rng()*0.7);LFc.push(c.r,c.g,c.b);}prev=q;}}}
+  const vo=new THREE.LineSegments(mkGeo(VL,VC),new THREE.LineBasicMaterial({vertexColors:true}));world.add(vo);amb(vo.material,true);
+  const lo=rockPoints(LFp,LFc,0.7);world.add(lo);amb(lo.material,true);}
+const canopies=[];
+for(const T of [nearT[0],nearT[2],nearT[4]]){const r=T.W(rand(-T.w/4,T.w/4),rand(-T.d/4,T.d/4)),base=[r[0],T.roofY-0.5,r[1]],th=rand(3,6),lean=rand(-.6,.6),tc=lerpC(PAL.tLo,PAL.vine,0.6);
+  const tp=[base[0]+lean,base[1]+th,base[2]+lean*0.5];seg(base,tp,tc);const p=[],col=[],S=rand(0.8,1.2);
+  for(let l=0;l<5;l++){const lc=[tp[0]+rand(-3.5,3.5)*S,tp[1]+rand(0,3.5)*S,tp[2]+rand(-3.5,3.5)*S],R=rand(2,4)*S;seg(tp,lc,tc);
+    for(let i=0;i<60;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),rr=R*Math.pow(rng(),0.35),y=rr*Math.cos(v)*0.7;
+      p.push(lc[0]+rr*Math.sin(v)*Math.cos(u)-base[0],lc[1]+y-base[1],lc[2]+rr*Math.sin(v)*Math.sin(u)-base[2]);const c=lerpC(PAL.canopy,PAL.canopyHi,MU.clamp(0.25+y/R*0.6+rand(-.2,.2),0,1));col.push(c.r,c.g,c.b);}}
+  const o=rockPoints(p,col,0.9);o.position.set(base[0],base[1],base[2]);world.add(o);amb(o.material,true);canopies.push({o,ph:rand(0,6.28)});}
+
+/* ---------- lamps (status lamps below, mast lamps above) ---------- */
+const LAMPS=[];function lamp(x,y,z,hex,mode){LAMPS.push({x,y,z,c:C(hex),mode,ph:rand(0,6.28),sp:rand(0.7,1.4)});}
+function mast(b,H,bend,broken){const dir=rand(0,6.28),dx=Math.cos(dir),dz=Math.sin(dir),bAt=rand(0.45,0.8),mc=lerpC(PAL.rust,PAL.tHi,0.55),gc=lerpC(PAL.tLo,PAL.tHi,0.6);
+  let p=b.slice(),ang=0;const pts=[p];
+  for(let s=1;s<=H;s++){const f=s/H;if(f>bAt)ang=Math.min(bend,ang+bend*0.25);const np=[p[0]+Math.sin(ang)*dx,p[1]+Math.cos(ang),p[2]+Math.sin(ang)*dz];seg(p,np,mc);
+    if(s%3===0&&rng()<0.8){const L=rand(0.8,2.2)*(1-f*0.6);seg([np[0]+dz*L,np[1],np[2]-dx*L],[np[0]-dz*L,np[1],np[2]+dx*L],mc);}p=np;pts.push(p);}
+  const g=pts[Math.floor(pts.length*0.55)];for(let k=0;k<3;k++){const a=dir+k*2.1+0.5;seg(g,[b[0]+5*Math.cos(a),b[1],b[2]+5*Math.sin(a)],gc);}
+  if(broken){let q=p;for(let s=1;s<=7;s++){const nq=[p[0]+0.2*s*dx,p[1]-s*1.1,p[2]+0.2*s*dz];seg(q,nq,gc);q=nq;}}else lamp(p[0],p[1]+0.4,p[2],PAL.lampR,1);
+  if(H>16){const m=pts[Math.floor(pts.length*0.5)];lamp(m[0],m[1],m[2],PAL.lampA,3);}}
+for(const T of nearT){const n=rng()<0.6?2:1;for(let i=0;i<n;i++){const r=T.W(rand(-T.w/3,T.w/3),rand(-T.d/3,T.d/3));mast([r[0],T.roofY-1,r[1]],Math.round(rand(9,24)),rng()<0.42?rand(0.35,1.2):0,rng()<0.15);}}
+// sewer mouths: lamps a little way in from each cut
+for(const [ax,cc] of [['x',ZX],['z',XZ]])for(const s of [-1,1]){let side=1;for(const d of [4,15,27]){const a=s*(B-d),u=side*(TW-0.35);if(ax==='x')lamp(a,TS+1.2,cc+u,rng()<0.3?PAL.lampR:PAL.lampA,pick([0,1,2,3]));else lamp(cc+u,TS+1.2,a,rng()<0.3?PAL.lampR:PAL.lampA,pick([0,1,2,3]));side=-side;}}
+for(const a of PANELS){const tx=-Math.sin(a),tz=Math.cos(a);for(let k=0;k<3;k++){const off=(k-1)*0.5,r=CR-1.05;lamp(XZ+r*Math.cos(a)+tx*off,-20.4,ZX+r*Math.sin(a)+tz*off,k===2?PAL.lampR:(k===1?PAL.lampT:PAL.lampA),k===0?0:(k===1?2:4));}}
+for(const h of [M1,M2])lamp(h.x+h.r*0.8,-7,h.z,PAL.lampA,3);
+for(let i=0;i<4;i++){const pp=PIPES[i+1],P=pp.path[(pp.path.length*pick([0.08,0.92]))|0];lamp(P.x,P.y-pp.r-0.1,P.z,i%2?PAL.lampA:PAL.lampR,i%2?1:3);}
+for(const [x,z] of POSTS)lamp(x*0.96,6.7,z*0.96,PAL.lampW,0);
+lamp(CZX,CZY+CXR-0.3,B-3,PAL.lampT,2);lamp(-B+3,CXY+CXR-0.3,CXZ,PAL.lampT,3);lamp(B-2.5,CXY-CXR+0.3,CXZ,PAL.lampA,4);
+const LN=LAMPS.length,{a:lmPos,g:lmGeo}=dynBuf(LN),lmCol=dynCol(lmGeo,LN);
+for(let i=0;i<LN;i++){lmPos[i*3]=LAMPS[i].x;lmPos[i*3+1]=LAMPS[i].y;lmPos[i*3+2]=LAMPS[i].z;}
+const lampCore=glowAdd(new THREE.Points(lmGeo,new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false})));
+const lampHalo=glowAdd(new THREE.Points(lmGeo,new THREE.PointsMaterial({size:6.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+mirror(lampCore,0.9,1);mirror(lampHalo,0.45,1);
+
+/* ---------- girders, cables, chains between the towers ---------- */
+function edgeToward(A,Bt){const dx=Bt.cx-A.cx,dz=Bt.cz-A.cz,L=Math.hypot(dx,dz);return [A.cx+dx/L*Math.min(A.w,A.d)*0.5,A.cz+dz/L*Math.min(A.w,A.d)*0.5];}
+const pairs=[];for(let i=0;i<nearT.length;i++)for(let j=i+1;j<nearT.length;j++){const A=nearT[i],Bt=nearT[j];pairs.push({A,B:Bt,dd:Math.hypot(A.cx-Bt.cx,A.cz-Bt.cz)});}
+pairs.sort((a,b)=>a.dd-b.dd);
+const SRC=[];// drip sources {x,y,z,fl,out}
+{let made=0;for(const pr of pairs){if(made>=7)break;const y=rand(14,Math.min(pr.A.minTop,pr.B.minTop)*0.85),pa=edgeToward(pr.A,pr.B),pb=edgeToward(pr.B,pr.A),broken=rng()<0.35,span=broken?rand(0.35,0.7):1,drop=broken?rand(2,7):0;
+  const L=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]),n=Math.max(4,Math.round(L*span/2.6)),rc=()=>lerpC(PAL.rust,PAL.rustHi,rng()*0.5);
+  const Pg=(s,dy)=>{const f=s*span;return [pa[0]+(pb[0]-pa[0])*f,y+dy-drop*s*s,pa[1]+(pb[1]-pa[1])*f];};
+  for(let k=0;k<n;k++){const s0=k/n,s1=(k+1)/n,a1=Pg(s0,1.2),a2=Pg(s1,1.2),b1=Pg(s0,-1.2),b2=Pg(s1,-1.2);seg(a1,a2,rc());seg(b1,b2,rc());seg(k%2?a1:b1,k%2?b2:a2,rc());seg(a1,b1,rc());if(rng()<0.4)SRC.push({x:b1[0],y:b1[1]-0.1,z:b1[2],fl:0,out:false});}
+  made++;}}
+const catP=(a,b,sag,s)=>[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s-sag*4*s*(1-s),a[2]+(b[2]-a[2])*s];
+function anchor(A,Bt,y){const e=edgeToward(A,Bt);return [e[0],y,e[1]];}
+for(let i=0;i<16;i++){const pr=pick(pairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(9,mt)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-10,10),8,mt)),cc=lerpC(PAL.cable,PAL.tHi,rng()*0.4),sag=rand(3,12);
+  let q=a;for(let s=1;s<=22;s++){const nq=catP(a,b,sag,s/22);seg(q,nq,cc);if(s===11&&rng()<0.6)SRC.push({x:nq[0],y:nq[1]-0.1,z:nq[2],fl:0,out:false});q=nq;}}
+{const p=[],col=[];for(let i=0;i<6;i++){const pr=pick(pairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(12,mt*0.9)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-8,8),10,mt)),sag=rand(4,10),L=Math.hypot(b[0]-a[0],b[2]-a[2]),n=Math.round(L/0.3);
+    const px2=-(b[2]-a[2])/L,pz2=(b[0]-a[0])/L;for(let k=0;k<=n;k++){const q=catP(a,b,sag,k/n),o=(k%2?0.08:-0.08);p.push(q[0]+px2*o,q[1]+(k%2?0.05:-0.05),q[2]+pz2*o);const c=k%2?lerpC(PAL.rust,PAL.rustHi,rng()*0.6):lerpC(PAL.chain,PAL.rust,0.3);col.push(c.r,c.g,c.b);}}
+  const o=roundDots(rockPoints(p,col,0.45));world.add(o);amb(o.material,true);}
+const DCN=6,DCS=18,dCab=[];for(let i=0;i<DCN;i++){const pr=pick(pairs),mt=Math.min(pr.A.minTop,pr.B.minTop),a=anchor(pr.A,pr.B,rand(14,mt)),b=anchor(pr.B,pr.A,MU.clamp(a[1]+rand(-6,6),12,mt));
+  const L=Math.hypot(b[0]-a[0],b[2]-a[2]);dCab.push({a,b,sag:rand(4,11),ph:rand(0,6.28),px:-(b[2]-a[2])/L,pz:(b[0]-a[0])/L});}
+const {a:dcPos,g:dcGeo}=dynBuf(DCN*DCS*2);{const cc=dynCol(dcGeo,DCN*DCS*2),k=lerpC(PAL.cable,PAL.rust,0.35);for(let i=0;i<DCN*DCS*2;i++){cc[i*3]=k.r;cc[i*3+1]=k.g;cc[i*3+2]=k.b;}}
+const dCabObj=new THREE.LineSegments(dcGeo,new THREE.LineBasicMaterial({vertexColors:true}));world.add(dCabObj);amb(dCabObj.material,true);
+const structObj=new THREE.LineSegments(mkGeo(SL,SC),new THREE.LineBasicMaterial({vertexColors:true}));world.add(structObj);amb(structObj.material,true);mirror(structObj,0.45,0.75);
+
+/* surviving window lights */
+const winP=[],winB=[],winPh=[];
+for(let i=0;i<120;i++){const T=pick(nearT),f=Math.floor(rand(1,T.h/FL-1)),y=f*FL+1.6,u=rand(0,T.P);if(y>T.top(u)-1.5)continue;const q=T.at(u,y,0.2);winP.push(q[0],q[1],q[2]);
+  const c=lerpC(PAL.win,PAL.win2,rng());winB.push(c.r,c.g,c.b);winPh.push(rng()<0.3?rand(0,6.28):-1);}
+const winN=winPh.length,winObj=glowAdd(glowPoints(winP,winB,2.6,1));const winBase=new Float32Array(winB),winArr=winObj.geometry.attributes.color.array;mirror(winObj,0.6,1);
+
+/* ---------- vines: over the cut edge, out of the sewer mouths, down the shafts, off the roofs ---------- */
+const vines=[];
+FACES.forEach(f=>{const tx=-f.nz,tz=f.nx;for(let k=0;k<10;k++){const u=rand(-B+2,B-2),w=fw(f,u,0,0.15);vines.push({ax:w[0],ay:-0.1,az:w[2],nx:f.nx,nz:f.nz,tx,tz,o:0.5,len:rand(3,15),ph:rand(0,6.28),sway:rand(0.3,0.9)});}
+  for(const h of f.h)if(h.t==='a')for(let k=0;k<3;k++){const du=rand(-4.5,4.5),w=fw(f,h.u+du,0,-0.6);vines.push({ax:w[0],ay:archTop(du)-0.2,az:w[2],nx:f.nx,nz:f.nz,tx,tz,o:0.15,len:rand(2,6),ph:rand(0,6.28),sway:rand(0.2,0.5)});}});
+for(const h of HOLES_ST)for(let k=0;k<3;k++){const a=rand(0,6.28);vines.push({ax:h.x+h.r*0.9*Math.cos(a),ay:-0.1,az:h.z+h.r*0.9*Math.sin(a),nx:0,nz:0,tx:1,tz:0,o:0,len:rand(4,11),ph:rand(0,6.28),sway:rand(0.15,0.4)});}
+for(const T of nearT)for(let k=0;k<6;k++){const u=rand(0,T.P),y=T.top(u),q=T.at(u,y,0.4),nn=T.nrm(u);vines.push({ax:q[0],ay:y,az:q[2],nx:nn[0],nz:nn[1],tx:-nn[1],tz:nn[0],o:1,len:rand(8,Math.min(28,y*0.6)),ph:rand(0,6.28),sway:rand(0.8,2.0)});}
+const VS=8,vN=vines.length,{a:vP,g:vGeo}=dynBuf(vN*VS*2);
+{const cc=dynCol(vGeo,vN*VS*2);let i=0;for(const v of vines)for(let s=0;s<VS;s++){const c=lerpC(PAL.vineHi,PAL.vine,s/(VS-1));for(let e=0;e<2;e++){cc[i*3]=c.r;cc[i*3+1]=c.g;cc[i*3+2]=c.b;i++;}}}
+const vineObj=new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true}));world.add(vineObj);amb(vineObj.material,true);
+const LF=2,{a:lfPos,g:lfGeo}=dynBuf(vN*VS*LF),lfJ=new Float32Array(vN*VS*LF*3);
+{const cc=dynCol(lfGeo,vN*VS*LF);for(let i=0;i<vN*VS*LF;i++){const c=lerpC(PAL.leaf,PAL.vineHi,rng()*0.8);cc[i*3]=c.r;cc[i*3+1]=c.g;cc[i*3+2]=c.b;lfJ[i*3]=rand(-.4,.4);lfJ[i*3+1]=rand(-.3,.2);lfJ[i*3+2]=rand(-.4,.4);}}
+const leafObj=roundDots(new THREE.Points(lfGeo,new THREE.PointsMaterial({size:0.42,vertexColors:true})));world.add(leafObj);amb(leafObj.material,true);
+
+/* dangling chains in the sewer mouths and the cistern */
+const chains=[];
+for(const [ax,cc] of [['x',ZX],['z',XZ]])for(const s of [-1,1]){const a=s*(B-rand(2.5,6)),u=rand(-2,2),y=archTop(u)-0.3;chains.push(ax==='x'?{ax:a,ay:y,az:cc+u}:{ax:cc+u,ay:y,az:a});}
+for(let k=0;k<3;k++){const a=rand(0,6.28),r=rand(5,11);chains.push({ax:XZ+r*Math.cos(a),ay:CHC-0.2,az:ZX+r*Math.sin(a)});}
+let chN=0;for(const ch of chains){ch.len=rand(3,7.5);ch.ph=rand(0,6.28);ch.amp=rand(0.03,0.08);ch.n=(ch.len/0.24)|0;ch.off=chN;chN+=ch.n+3;}
+const {a:chPos,g:chGeo}=dynBuf(chN);{const cc=dynCol(chGeo,chN);for(const ch of chains)for(let s=0;s<ch.n+3;s++){const c=s>=ch.n?lerpC(PAL.rust,PAL.rustHi,0.6):(rng()<0.3?lerpC(PAL.rust,PAL.rustHi,rng()):C(PAL.chain));cc[(ch.off+s)*3]=c.r;cc[(ch.off+s)*3+1]=c.g;cc[(ch.off+s)*3+2]=c.b;}}
+const chainObj=roundDots(new THREE.Points(chGeo,new THREE.PointsMaterial({size:0.34,vertexColors:true})));world.add(chainObj);amb(chainObj.material);
+
+/* ---------- the shared water ---------- */
+const waterMat=new THREE.MeshBasicMaterial({color:PAL.water,transparent:true,opacity:0.58,side:THREE.DoubleSide,depthWrite:false});
+waterMat.stencilWrite=true;waterMat.stencilFunc=THREE.AlwaysStencilFunc;waterMat.stencilRef=1;waterMat.stencilZPass=THREE.ReplaceStencilOp;
+const waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(2*B-0.1,2*B-0.1),waterMat);waterPlane.rotation.x=-Math.PI/2;waterPlane.renderOrder=5;world.add(waterPlane);
+// the water seen in section: in each opening, and above the street on every cut face
+const secMat=new THREE.MeshBasicMaterial({color:PAL.water,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false,clippingPlanes:[clipBelow]});
+{const pos=[],idx=[];for(const f of FACES){for(const h of f.h){const s=new THREE.Shape();holePath(h,s);shapeWorld(s,f,0.02,pos,idx);}
+    const s=new THREE.Shape();s.moveTo(-B,0);s.lineTo(B,0);s.lineTo(B,20);s.lineTo(-B,20);s.lineTo(-B,0);shapeWorld(s,f,0,pos,idx);}
+  const m=meshOf(pos,idx,secMat);m.renderOrder=4;world.add(m);}
+// the water line, carried round the section like a datum
+let datum;{const p=[],col=[];FACES.forEach(f=>{for(let u=-B;u<B;u+=0.42){if(((u+B)%3.4)>2.3)continue;const w=fw(f,u,0,0.14);p.push(w[0],0,w[2]);col.push(0.62,0.86,0.9);}});datum=glowAdd(glowPoints(p,col,0.75,0.75));}
+// surface glints (on the visible water only)
+const GL=1500,glPh=new Float32Array(GL);let glints,glCol,glB;
+{const p=[],col=[];for(let i=0;i<GL;i++){let x,z;if(i<600){const ax=rng()<0.5;const a=rand(-B,B),u=rand(-TW,TW);x=ax?a:XZ+u;z=ax?ZX+u:a;}else{x=rand(-B,B);z=rand(-B,B);}
+  p.push(x,0,z);const c=lerpC(PAL.glint,0xFFFFFF,rng()*0.3),b=0.4+0.6*rng();col.push(c.r*b,c.g*b,c.b*b);glPh[i]=rand(0,6.28);}
+  glints=overAdd(glowPoints(p,col,0.55,0.8));glCol=glints.geometry.attributes.color.array;glB=new Float32Array(glCol);}
+// ripple rings
+const RRN=30,RRP=26,{a:rpPos,g:rpGeo}=dynBuf(RRN*RRP),rpCol=dynCol(rpGeo,RRN*RRP),RIP=[];
+for(let i=0;i<RRN;i++)RIP.push({on:false,x:0,z:0,rr:0,max:1,spd:1.6,b:1});let ripNext=0;
+function ripple(x,z,max,b){const r=RIP[ripNext];ripNext=(ripNext+1)%RRN;r.on=true;r.x=x;r.z=z;r.rr=0.1;r.max=max;r.spd=rand(1.3,2.0);r.b=b||1;}
+const ripObj=overAdd(new THREE.Points(rpGeo,new THREE.PointsMaterial({size:0.45,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})));
+// foam where the water meets each tower
+let foam;{const p=[],col=[];for(const T of nearT)for(let u=0;u<T.P;u+=0.6){const q=T.at(u,rand(-.12,.12),rand(0.3,1.1));p.push(q[0],q[1],q[2]);const c=lerpC(PAL.foam,0xFFFFFF,rng()*0.3);col.push(c.r,c.g,c.b);}
+  for(let s=-B;s<B;s+=0.5)for(const [x,z] of [[s,-B+rand(0.2,0.9)],[s,B-rand(0.2,0.9)],[-B+rand(0.2,0.9),s],[B-rand(0.2,0.9),s]]){p.push(x,0,z);col.push(0.55,0.7,0.72);}
+  foam=overAdd(glowPoints(p,col,0.9,0.5));}
+// the far city stands in the same water: a sparse shimmer out to the fog
+let farWater;{const p=[],col=[];for(let i=0;i<900;i++){const a=rand(0,6.28),r=rand(250,620);p.push(r*Math.cos(a),0,r*Math.sin(a));const g=0.35+0.55*rng();col.push(0.7*g,0.85*g,0.9*g);}farWater=glowAdd(glowPoints(p,col,3.2,0.35));}
+// cistern light shaft (daylight through the grate) + its pool
+let shaftVol,shaftPool;{const p=[],col=[];for(let i=0;i<220;i++){const t=Math.pow(rng(),0.8),a=rand(0,6.28),r=MG0.r*Math.sqrt(rng())*(1+0.5*t);p.push(r*Math.cos(a),-t,r*Math.sin(a));const b=(1-t*0.75)*(0.6+0.4*rng());col.push(b,b,b);}
+  shaftVol=glowAdd(glowPoints(p,col,3.4,0.08));shaftVol.position.set(MG0.x,0,MG0.z);
+  const q=[],qc=[];for(let i=0;i<70;i++){const a=rand(0,6.28),r=MG0.r*1.6*Math.sqrt(rng());q.push(MG0.x+r*Math.cos(a),0.06,MG0.z+r*Math.sin(a));const b=1-r/(MG0.r*1.7);qc.push(b,b,b);}shaftPool=overAdd(glowPoints(q,qc,2.4,0.25));}
+
+/* ---------- fog: on the water, between the towers, a fog sea under the block, far banks ---------- */
+const fogLayers=[];
+function fogLayer(pts,size,op,spd,follow){const p=[],col=[];for(const q of pts){p.push(q[0],q[1],q[2]);const b=0.55+0.45*rng();col.push(b,b,b);}
+  const o=glowPoints(p,col,size,op);o.material.fog=false;o.renderOrder=3;world.add(o);fogLayers.push({o,op,spd,follow,ph:rand(0,6.28)});return o;}
+const ring=(n,r0,r1,y0,y1)=>{const a=[];for(let i=0;i<n;i++){const t=rand(0,6.28),r=r0+(r1-r0)*Math.sqrt(rng());a.push([r*Math.cos(t),rand(y0,y1),r*Math.sin(t)]);}return a;};
+const sq=(n,y0,y1)=>{const a=[];for(let i=0;i<n;i++)a.push([rand(-B+2,B-2),rand(y0,y1),rand(-B+2,B-2)]);return a;};
+fogLayer(sq(130,0.3,2.6),8,0.12,0,true);              // mist on the water (in the sewers when low)
+fogLayer(ring(90,8,70,24,58),15,0.07,-0.006,false);    // between the towers
+fogLayer(ring(150,0,240,-66,-50),40,0.15,0.004,false); // the fog sea the block floats on
+fogLayer(ring(140,300,430,-30,70),48,0.14,0.003,false);// among the far towers
+fogLayer(ring(130,470,620,-40,110),70,0.17,-0.002,false);// the far wall
+
+/* ---------- sky: dome, moon, sun, stars ---------- */
+const skyU={top:{value:new THREE.Color(0x101428)},bot:{value:new THREE.Color(PAL.fog)}};
+const dome=new THREE.Mesh(new THREE.SphereGeometry(1600,24,12),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,fog:false,
+  vertexShader:'varying float vh;void main(){vh=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 top;uniform vec3 bot;varying float vh;void main(){gl_FragColor=vec4(mix(bot,top,smoothstep(0.0,0.5,vh)),1.0);}'}));
+dome.renderOrder=-10;scene.add(dome);
+const MC=V(-160,430,-620);let moonMat,haloMat,sunMat,starMat,stars,starBase,starPh=[];
+{const R=30,p=[],col=[],n=MC.clone().normalize().negate(),e1=V(0,1,0).cross(n).normalize(),e2=n.clone().cross(e1);
+  for(let i=0;i<420;i++){const a=rand(0,6.28),r=R*Math.sqrt(rng()),x=r*Math.cos(a),y=r*Math.sin(a);const cr=0.5+0.5*Math.sin(x*0.13+1)*Math.cos(y*0.11)+0.25*Math.sin(x*0.4)*Math.sin(y*0.37);
+    const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.45+0.5*cr,0,1));p.push(MC.x+e1.x*x+e2.x*y,MC.y+e1.y*x+e2.y*y,MC.z+e1.z*x+e2.z*y);col.push(c.r,c.g,c.b);}
+  const m=glowPoints(p,col,20,0.7);m.material.fog=false;moonMat=m.material;world.add(m);
+  const h=glowPoints([MC.x,MC.y,MC.z],[0.9,0.92,1],320,0.2);h.material.fog=false;haloMat=h.material;world.add(h);
+  const s=glowPoints([560,190,380],[1,0.9,0.8],340,0);s.material.fog=false;sunMat=s.material;world.add(s);}
+{const p=[],col=[];for(let i=0;i<420;i++){const u=rand(0,6.28),v=Math.acos(rand(0.15,1)),R=1200;p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),cc=lerpC(PAL.mote,0xFFFFFF,rng());col.push(cc.r*b,cc.g*b,cc.b*b);starPh.push(rand(0,6.28));}
+  starBase=new Float32Array(col);stars=glowPoints(p,col,5,0.8);stars.material.fog=false;starMat=stars.material;world.add(stars);}
+
+/* ---------- drips ---------- */
+for(const [ax,cc] of [['x',ZX],['z',XZ]])for(let i=0;i<22;i++){const a=(rng()<0.5?-1:1)*(B-rand(0.8,18)),u=rand(-4.5,4.5),y=archTop(u)-0.15;if(Math.abs(a-(ax==='x'?XZ:ZX))<CR)continue;SRC.push(ax==='x'?{x:a,y,z:cc+u,fl:TF,out:false}:{x:cc+u,y,z:a,fl:TF,out:false});}
+for(let i=0;i<10;i++){const a=rand(0,6.28),r=rand(MG0.r+0.5,CR-1);SRC.push({x:XZ+r*Math.cos(a),y:CHC-0.15,z:ZX+r*Math.sin(a),fl:CHF,out:false});}
+for(const h of [M1,M2,MG0])for(let i=0;i<3;i++){const a=rand(0,6.28);SRC.push({x:h.x+h.r*0.85*Math.cos(a),y:-0.4,z:h.z+h.r*0.85*Math.sin(a),fl:h===MG0?CHF:TF,out:false});}
+for(let i=0;i<8;i++){const x=rand(-B+1,-B+12)*(rng()<0.5?1:-1);SRC.push({x,y:CXY+CXR-0.15,z:CXZ+rand(-1.2,1.2),fl:CXY-CXR+0.1,out:false});}
+FACES.forEach(f=>{for(let i=0;i<7;i++){const w=fw(f,rand(-B+2,B-2),0,0.35);SRC.push({x:w[0],y:-0.25,z:w[2],fl:-72,out:true});}
+  for(const h of f.h)if(h.t==='o'&&h.r>2){const w=fw(f,h.u+rand(-1,1),0,0.3);SRC.push({x:w[0],y:h.v-h.r-0.2,z:w[2],fl:-72,out:true});}});
+for(const T of nearT)for(let i=0;i<3;i++){const u=rand(0,T.P),q=T.at(u,T.top(u)*rand(0.3,0.8),0.6);SRC.push({x:q[0],y:q[1],z:q[2],fl:0,out:false});}
+const DN=84,DR=[];for(let i=0;i<DN;i++)DR.push({s:pick(SRC),y:0,vy:0,w:rand(0,4),f:false});
+const {a:drLn,g:drLnGeo}=dynBuf(DN*2);{const cc=dynCol(drLnGeo,DN*2),k=C(PAL.drip);for(let i=0;i<DN;i++){cc[i*6]=cc[i*6+1]=cc[i*6+2]=0.1;cc[i*6+3]=k.r;cc[i*6+4]=k.g;cc[i*6+5]=k.b;}}
+const dripLines=glowAdd(new THREE.LineSegments(drLnGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+const {a:drPos,g:drGeo}=dynBuf(DN),drCol=dynCol(drGeo,DN);
+const dripHeads=glowAdd(new THREE.Points(drGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false})));
+function reseed(d){for(let k=0;k<6;k++){d.s=pick(SRC);if(d.s.y>waterY+0.3)return true;}return false;}
+
+/* ---------- the outfall: pours off the south face into the fog sea, harder with the flood ---------- */
+const STN=260,ST=[],{a:stPos,g:stGeo}=dynBuf(STN);
+{const cc=dynCol(stGeo,STN);for(let i=0;i<STN;i++){ST.push({age:rand(0,2.6),j1:rand(-1,1),j2:rand(-1,1),v:rand(2.4,3.4)});const c=lerpC(PAL.drip,0xFFFFFF,rng()*0.3),b=0.5+0.5*rng();cc[i*3]=c.r*b;cc[i*3+1]=c.g*b;cc[i*3+2]=c.b*b;}}
+const stream=glowAdd(new THREE.Points(stGeo,new THREE.PointsMaterial({size:0.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false})));
+let splash;{const p=[],col=[];for(let i=0;i<40;i++){p.push(OX+rand(-4,4),-54+rand(-2,2),-B-14+rand(-5,5));col.push(0.8,0.9,0.92);}splash=glowAdd(glowPoints(p,col,9,0.15));}
+
+/* ---------- kodama spirit motes (abstract, no creatures) ---------- */
+const MN=5,MP=14,{a:moPos,g:moGeo}=dynBuf(MN*MP),moCol=dynCol(moGeo,MN*MP),moOff=[],MO=[];
+for(let m=0;m<MN;m++){MO.push({ph:rand(0,6.28),dir:rng()<0.5?-1:1});for(let k=0;k<MP;k++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=k===0?0:0.45*Math.cbrt(rng());moOff.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v),r*Math.sin(v)*Math.sin(u));}}
+const motes=glowAdd(new THREE.Points(moGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* ---------- TIME + FLOOD ---------- */
+const TK=[
+ {p:0.00,top:0x3C3E6A,bot:0x8E8AA6,dens:0.0032,amb:0.85,ambU:0.85,lamp:0.75,win:0.35,sunO:0.45,moonO:0.3,star:0.08,fogL:1.0,fogK:0.85,shaft:0.55,wat:0.5},
+ {p:0.25,top:0x5E7C9E,bot:0xAEBCCB,dens:0.0026,amb:1.0, ambU:1.0, lamp:0.45,win:0.05,sunO:1.0, moonO:0.1,star:0.0, fogL:0.75,fogK:0.6, shaft:1.0, wat:0.55},
+ {p:0.50,top:0x2C2254,bot:0x8A5E7E,dens:0.0032,amb:0.75,ambU:0.8, lamp:0.9, win:0.7, sunO:0.35,moonO:0.7,star:0.3, fogL:0.7, fogK:0.8, shaft:0.45,wat:0.45},
+ {p:0.75,top:0x090B18,bot:0x23283F,dens:0.0029,amb:0.55,ambU:0.7, lamp:1.0, win:1.0, sunO:0.0, moonO:1.0,star:1.0, fogL:0.55,fogK:1.0, shaft:0.1, wat:0.42}];
+const TKN=['dens','amb','ambU','lamp','win','sunO','moonO','star','fogL','fogK','shaft','wat'];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],Bk=TK[(i+1)%TK.length];let span=Bk.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of TKN)o[k2]=MU.lerp(A[k2],Bk[k2],f);o.top=lerpC(A.top,Bk.top,f);o.bot=lerpC(A.bot,Bk.bot,f);return o;}
+let P=0.55,timeAuto=true,targetP=0.55,F=0.4,floodAuto=true,targetF=0.4;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')timeAuto=true;else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto')floodAuto=true;else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera — orbiting the cut block from outside */
+const target=new THREE.Vector3(0,6,0);
+let camA=Math.PI*0.27,camR=182,camY=34,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,-6,120);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,150,240);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.lampA,'status lamps','still reporting below'],[PAL.lampR,'mast lamps','blinking on the crowns'],[PAL.glint,'the water line','one level, sewer to street'],[PAL.drip,'drips','and the rings they leave'],[PAL.vineHi,'overgrowth','over the cut edge']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+for(const s of [scene,mirrorScene,overScene])s.traverse(o=>{o.frustumCulled=false;});
+
+/* ---------- animate ---------- */
+const clock=new THREE.Clock();let last=0;const tmpC=new THREE.Color(),_wc=new THREE.Color();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(turntable&&!drag)camA+=0.0007;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);dome.position.copy(camera.position);
+  if(timeAuto)P=(P+dt/110)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto)F=0.5+0.5*Math.sin(t*0.045-0.4);else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);
+  skyU.top.value.copy(par.top);skyU.bot.value.copy(par.bot);scene.background.copy(par.bot);scene.fog.color.copy(par.bot);scene.fog.density=par.dens;
+  for(const A of AMB)A.m.color.copy(A.base).multiplyScalar(A.up?par.amb:par.ambU);
+  for(const M of MIR){M.m.color.copy(M.src.color).multiplyScalar(M.k);}
+  moonMat.opacity=0.32*par.moonO;haloMat.opacity=0.2*par.moonO;sunMat.opacity=0.55*par.sunO;starMat.opacity=0.8*par.star;
+  // one water level for sewer and street
+  waterY=MU.lerp(-25,12,F);clipBelow.constant=waterY;refl.position.y=2*waterY+0.04*Math.sin(t*1.1);
+  waterPlane.position.y=waterY;datum.position.y=waterY;glints.position.y=waterY+0.05;foam.position.y=waterY+0.08*Math.sin(t*1.3);farWater.position.y=waterY;shaftPool.position.y=waterY;
+  waterMat.color.copy(par.bot).multiplyScalar(par.wat).lerp(_wc.set(PAL.water),0.45);secMat.color.copy(waterMat.color).lerp(_wc.set(PAL.glint),0.08);
+  const above=waterY>0;foam.material.opacity=above?0.5:0.25;
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · flood '+Math.round(F*100)+'% · '+(above?'street under '+waterY.toFixed(1)+' m':'sewers '+Math.round(MU.clamp((waterY-TF)/(TW+TS-TF),0,1)*100)+'% full')+' —';
+  // light down the cistern shaft
+  shaftVol.visible=waterY<-1;shaftVol.scale.y=Math.max(0.01,-waterY);shaftVol.material.opacity=0.09*par.shaft;shaftPool.material.opacity=0.3*par.shaft*(above?0:1);
+  shaftVol.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.6);
+  // fog
+  for(const L of fogLayers){if(L.spd)L.o.rotation.y+=L.spd*dt;if(L.follow)L.o.position.y=waterY;L.o.material.opacity=L.op*par.fogL*(0.85+0.15*Math.sin(t*0.2+L.ph));L.o.material.color.copy(par.bot).lerp(tmpC.set(0xFFFFFF),0.2).multiplyScalar(par.fogK);}
+  datum.material.opacity=0.35+0.4*par.star+0.2*(1-par.sunO);farWater.material.opacity=0.2+0.2*par.moonO;
+  // lamps
+  const cx=camera.position.x,cy=camera.position.y,cz=camera.position.z;
+  for(let i=0;i<LN;i++){const L=LAMPS[i];let b;const ph=t*L.sp+L.ph;
+    if(L.mode===0)b=0.85+0.15*Math.sin(t*9+L.ph);else if(L.mode===1)b=Math.sin(ph*3.2)>0?1:0.06;else if(L.mode===2){const q=(ph*0.8)%2;b=(q<0.12||(q>0.3&&q<0.42))?1:0.08;}
+    else if(L.mode===3)b=0.25+0.75*Math.pow(0.5+0.5*Math.sin(ph*1.3),2);else b=(Math.sin(t*13.1+L.ph)*Math.sin(t*7.7+L.ph*2)>0.25)?0.15:0.9;
+    const k=b*(0.4+0.6*par.lamp)*(L.y<waterY?0.22:1);lmCol[i*3]=L.c.r*k;lmCol[i*3+1]=L.c.g*k;lmCol[i*3+2]=L.c.b*k;}
+  lmGeo.attributes.color.needsUpdate=true;
+  // windows: drowned floors go dark
+  for(let i=0;i<winN;i++){const wet=MU.clamp((winP[i*3+1]-waterY)/1.2,0,1),fl=winPh[i]>=0?(0.55+0.45*Math.sin(t*3.1+winPh[i])):1,k=par.win*wet*fl;winArr[i*3]=winBase[i*3]*k;winArr[i*3+1]=winBase[i*3+1]*k;winArr[i*3+2]=winBase[i*3+2]*k;}
+  winObj.geometry.attributes.color.needsUpdate=true;
+  // glints
+  glints.material.opacity=0.45+0.4*(par.moonO*0.5+par.sunO*0.5);
+  for(let i=0;i<GL;i++){const tw=0.2+0.8*Math.pow(Math.max(0,Math.sin(t*1.7+glPh[i])),3);glCol[i*3]=glB[i*3]*tw;glCol[i*3+1]=glB[i*3+1]*tw;glCol[i*3+2]=glB[i*3+2]*tw;}
+  glints.geometry.attributes.color.needsUpdate=true;
+  // drips
+  for(let i=0;i<DN;i++){const d=DR[i];let hx=d.s.x,hy,hz=d.s.z,bri;
+    if(!d.f){d.w-=dt;hy=d.s.y-0.08*(1-Math.max(0,d.w)/4);bri=0.35+0.4*(1-Math.max(0,Math.min(1,d.w)));if(d.s.y<waterY+0.3){if(!reseed(d))d.w=2;hx=d.s.x;hz=d.s.z;hy=d.s.y;bri=0;}else if(d.w<=0){d.f=true;d.y=d.s.y;d.vy=0;}}
+    else{d.vy+=30*dt;d.y-=d.vy*dt;hy=d.y;bri=1;const floor=d.s.out?d.s.fl:Math.max(d.s.fl,waterY);
+      if(d.y<=floor){if(!d.s.out&&floor===waterY)ripple(d.s.x,d.s.z,rand(1.4,3.2),1);d.f=false;reseed(d);d.w=rand(0.6,4.5);hx=d.s.x;hz=d.s.z;hy=d.s.y;bri=0.3;}}
+    drPos[i*3]=hx;drPos[i*3+1]=hy;drPos[i*3+2]=hz;drCol[i*3]=0.78*bri;drCol[i*3+1]=0.95*bri;drCol[i*3+2]=0.92*bri;
+    const len=d.f?Math.min(1.8,d.vy*0.06):0;drLn[i*6]=hx;drLn[i*6+1]=hy+len;drLn[i*6+2]=hz;drLn[i*6+3]=hx;drLn[i*6+4]=hy;drLn[i*6+5]=hz;}
+  drGeo.attributes.position.needsUpdate=true;drGeo.attributes.color.needsUpdate=true;drLnGeo.attributes.position.needsUpdate=true;
+  // ripples
+  {let idx=0;for(const r of RIP){if(r.on){r.rr+=r.spd*dt;if(r.rr>r.max)r.on=false;}const fade=r.on?Math.pow(1-r.rr/r.max,1.3)*r.b:0;
+    for(let k=0;k<RRP;k++){const a=k/RRP*Math.PI*2;rpPos[idx*3]=r.x+r.rr*Math.cos(a);rpPos[idx*3+1]=waterY+0.05;rpPos[idx*3+2]=r.z+r.rr*Math.sin(a);rpCol[idx*3]=0.55*fade;rpCol[idx*3+1]=0.85*fade;rpCol[idx*3+2]=0.8*fade;idx++;}}
+   rpGeo.attributes.position.needsUpdate=true;rpGeo.attributes.color.needsUpdate=true;}
+  // outfall stream
+  {const g=20,flow=0.45+0.9*F,Tf=Math.sqrt(2*(OY+72)/g);
+   for(let i=0;i<STN;i++){const s=ST[i];s.age+=dt;if(s.age>Tf)s.age-=Tf*(1+0.1*rng());const a=s.age,sp=0.15+a*0.3;
+     stPos[i*3]=OX+s.j1*sp*1.2;stPos[i*3+1]=OY-0.5*g*a*a+s.j2*sp*0.5-OR*0.4;stPos[i*3+2]=-B-4.2-s.v*flow*a;}
+   stGeo.attributes.position.needsUpdate=true;stream.material.opacity=0.35+0.5*F;splash.material.opacity=(0.04+0.09*F)*par.fogL;}
+  // dangling chains
+  for(const ch of chains){const th=ch.amp*Math.sin(t*0.9+ch.ph),ph2=ch.amp*0.6*Math.cos(t*0.7+ch.ph);for(let s=0;s<ch.n+3;s++){const l=Math.min(s,ch.n)*0.24,o=(ch.off+s)*3,hook=s>=ch.n?(s-ch.n+1):0;
+    chPos[o]=ch.ax+Math.sin(th)*l+(s%2?0.06:-0.06)+hook*0.12;chPos[o+1]=ch.ay-Math.cos(th)*l-hook*0.12;chPos[o+2]=ch.az+Math.sin(ph2)*l;}}
+  chGeo.attributes.position.needsUpdate=true;
+  // swaying cables
+  {let i=0;for(const cb of dCab){const sw=1.4*Math.sin(t*0.5+cb.ph),sg=cb.sag*(1+0.06*Math.sin(t*0.8+cb.ph));let p0=cb.a[0],p1=cb.a[1],p2=cb.a[2];
+    for(let s=1;s<=DCS;s++){const f=s/DCS,q=catP(cb.a,cb.b,sg,f),o=sw*4*f*(1-f),x=q[0]+cb.px*o,z=q[2]+cb.pz*o;
+      dcPos[i*6]=p0;dcPos[i*6+1]=p1;dcPos[i*6+2]=p2;dcPos[i*6+3]=x;dcPos[i*6+4]=q[1];dcPos[i*6+5]=z;p0=x;p1=q[1];p2=z;i++;}}dcGeo.attributes.position.needsUpdate=true;}
+  // vines + leaves
+  {let i=0,li=0;for(const v of vines){let x0=v.ax,y0=v.ay,z0=v.az;for(let s=1;s<=VS;s++){const f=s/VS,out=v.o*(0.3+f*(0.6+0.5*(0.5+0.5*Math.sin(t*0.6+v.ph)))),tg=v.sway*f*Math.sin(t*0.7+v.ph-f*1.4);
+      const x=v.ax+v.nx*out+v.tx*tg,y=v.ay-f*v.len,z=v.az+v.nz*out+v.tz*tg+(v.o?0:0.5*v.sway*f*Math.cos(t*0.5+v.ph));
+      vP[i*6]=x0;vP[i*6+1]=y0;vP[i*6+2]=z0;vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;x0=x;y0=y;z0=z;i++;
+      for(let q=0;q<LF;q++){lfPos[li*3]=x+lfJ[li*3];lfPos[li*3+1]=y+lfJ[li*3+1];lfPos[li*3+2]=z+lfJ[li*3+2];li++;}}}
+   vGeo.attributes.position.needsUpdate=true;lfGeo.attributes.position.needsUpdate=true;}
+  for(const cn of canopies){cn.o.rotation.z=0.025*Math.sin(t*0.9+cn.ph);cn.o.rotation.x=0.02*Math.sin(t*0.7+cn.ph*1.3);}
+  // spirit motes, over the water or the street, whichever is higher
+  {const base=Math.max(waterY,0);for(let m=0;m<MN;m++){const M=MO[m],ph=M.ph,th=ph+t*0.03*M.dir,rr=20+14*Math.sin(t*0.05+ph),y=base+3+10*(0.5+0.5*Math.sin(t*0.07+ph*2)),mx=rr*Math.cos(th),mz=rr*Math.sin(th),op=ss(Math.sin(t*0.11+ph*3)*1.6+0.4)*(0.35+0.65*par.star);
+    for(let k=0;k<MP;k++){const o=(m*MP+k)*3,b=op*(k===0?1:0.55)*(0.8+0.2*Math.sin(t*3+k));moPos[o]=mx+moOff[o];moPos[o+1]=y+moOff[o+1]+0.2*Math.sin(t*1.3+ph);moPos[o+2]=mz+moOff[o+2];moCol[o]=0.85*b;moCol[o+1]=0.94*b;moCol[o+2]=0.98*b;}}
+   moGeo.attributes.position.needsUpdate=true;moGeo.attributes.color.needsUpdate=true;}
+  if(par.star>0.01){const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  // pass 1: the world (the water surface marks the stencil); pass 2: reflections; pass 3: on the surface
+  renderer.autoClear=true;renderer.render(scene,camera);
+  renderer.autoClear=false;renderer.clearDepth();renderer.render(mirrorScene,camera);renderer.render(overScene,camera);renderer.autoClear=true;}
+animate();
+</script></body></html>

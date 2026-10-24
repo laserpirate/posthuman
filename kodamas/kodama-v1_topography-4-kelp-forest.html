@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA·NA · the kelp forest — moonlit shallows (study)</title>
+<style>
+  :root{
+    --bg:#04101F; --aqua:#3FA9C9; --lblue:#8FD0F0; --mag:#C94FD6; --pink:#F07AB8;
+    --gold:#F6C544; --moon:#F7F3D8; --cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;
+    --serif:Cambria,Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:64vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:clamp(19px,2.4vw,30px);line-height:1.15;margin:0;text-shadow:0 2px 34px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--lblue);opacity:.85;margin-top:10px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.88;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  #legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;
+    letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>she breathes with the swell, and never once lets go.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the kelp forest, moonlit, in the shallows</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to orbit · scroll to breathe closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   VA·NA — the kelp forest : an underwater, moonlit shallows.
+   Kelp sways to the swell; jellyfish pulse and drift; a school threads through;
+   the reef breaks the surface into foam; the whole water glows blue under a
+   full moon and its god-rays. Distinct blue/pink/magenta/yellow spectrum.
+   Series companion to kodama-v1_topography-1..3. Pure Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x04101F,deep:0x0A2E5C,aqua:0x3FA9C9,lblue:0x8FD0F0,
+  kelpD:0x0E4A3E,kelpM:0x1E6E6A,kelpL:0x46B39A,float:0xF2C14E,
+  pink:0xF07AB8,mag:0xC94FD6,hot:0xFF6FA8,yellow:0xF2D14E,gold:0xF6C544,
+  moon:0xF7F3D8,foam:0xDDF3FF,coral:0xFF8F6A,rock:0x233448,rockHi:0x4C6480};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260701);
+const rand=(a=0,b=1)=>a+(b-a)*rng();
+const pick=a=>a[(rng()*a.length)|0];
+const lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t);
+const MU=THREE.MathUtils;
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;
+  const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,
+    transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(PAL.bg);
+scene.fog=new THREE.FogExp2(0x0B3A66,0.0060);            // blue underwater haze
+const camera=new THREE.PerspectiveCamera(46,innerWidth/innerHeight,0.1,3000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();world.rotation.x=-0.10;scene.add(world);
+
+const SURFACE=56;                                       // underside of the sea surface
+
+/* ---------- seafloor + reef (rising toward shore, breaking the surface) ----- */
+function hR(x,z){
+  let b=6+x*0.34;                                        // slope up toward +x (shore)
+  b+=15*Math.exp(-((x-30)**2+(z-8)**2)/(2*10*10));       // reef outcrop (breaks surface)
+  b+=12*Math.exp(-((x-22)**2+(z+20)**2)/(2*8*8));        // second reef head
+  b+=1.6*Math.sin(x*0.2)*Math.cos(z*0.18);              // rock texture
+  return b;
+}
+function maskR(x,z){const d=Math.sqrt((x/46)**2+(z/44)**2);return MU.clamp((1.02-d)/0.2,0,1);}
+const tPos=[],tCol=[],surf=[],reefTops=[];let maxH=-99,minH=99;
+for(let x=-48;x<=48;x+=1.05)for(let z=-46;z<=46;z+=1.05){
+  const m=maskR(x,z);if(m<=0.02)continue;
+  const jx=x+rand(-.35,.35),jz=z+rand(-.35,.35),y=hR(jx,jz);
+  maxH=Math.max(maxH,y);minH=Math.min(minH,y);
+  const layers=1+(m>0.5?2:0);
+  for(let L=0;L<layers;L++){tPos.push(jx,y-L*rand(1.0,2.4),jz);tCol.push(0,0,0);
+    if(L===0){if(m>0.35&&y<34&&rng()<0.5)surf.push([jx,y,jz]); if(y>44&&rng()<0.4)reefTops.push([jx,y,jz]);}}
+}
+for(let i=0;i<tPos.length/3;i++){const y=tPos[i*3+1],t=MU.clamp((y-minH)/(maxH-minH),0,1);
+  const c=lerpC(PAL.rock,PAL.rockHi,t);tCol[i*3]=c.r;tCol[i*3+1]=c.g;tCol[i*3+2]=c.b;}
+const tg=new THREE.BufferGeometry();
+tg.setAttribute('position',new THREE.Float32BufferAttribute(tPos,3));
+tg.setAttribute('color',new THREE.Float32BufferAttribute(tCol,3));
+world.add(new THREE.Points(tg,new THREE.PointsMaterial({size:0.6,vertexColors:true,transparent:true,opacity:0.95})));
+
+/* coral / anemones on the reef — the pink/yellow/magenta pops -------------- */
+const cP=[],cC=[];
+for(const r of reefTops){for(let k=0;k<rand(4,10);k++){
+  cP.push(r[0]+rand(-2,2),r[1]+rand(0,3),r[2]+rand(-2,2));
+  const c=new THREE.Color(pick([PAL.pink,PAL.mag,PAL.yellow,PAL.coral,PAL.hot]));cC.push(c.r,c.g,c.b);}}
+world.add(glowPoints(cP,cC,1.6,0.9));
+
+/* ---------- KELP FOREST — swaying stipes + blades + gold floats ------------- */
+const MAXSEG=18, CURRENT=3.2;
+const kelps=[];
+for(const s of surf){
+  if(kelps.length>90)break;
+  if(rng()>0.6)continue;
+  const [x,y,z]=s;
+  const top=Math.min(y+rand(26,44), SURFACE-3);          // reach toward, not through, surface
+  const h=top-y; if(h<12)continue;
+  kelps.push({x,z,base:y,h,seg:(rand(12,MAXSEG))|0,phase:rand(0,6.28),sway:rand(2.6,5.2)});
+}
+let sCount=0,bCount=0;
+for(const k of kelps){sCount+=k.seg*2;bCount+=k.seg+1;}
+const stipePos=new Float32Array(sCount*3),stipeCol=new Float32Array(sCount*3);
+const bladePos=new Float32Array(bCount*3),bladeCol=new Float32Array(bCount*3);
+const _n=new Float32Array((MAXSEG+1)*3);
+function kelpNodes(k,t){
+  const cur=CURRENT*Math.sin(t*0.4+k.phase*0.2);
+  for(let i=0;i<=k.seg;i++){const f=i/k.seg;
+    const wx=k.sway*f*Math.sin(t*0.9+k.phase-f*2.4);
+    const wz=k.sway*0.6*f*Math.sin(t*0.7+k.phase*1.3-f*2.0);
+    _n[i*3]=k.x+wx+cur*f; _n[i*3+1]=k.base+f*k.h; _n[i*3+2]=k.z+wz;}
+}
+// colours (once)
+(function initKelpColors(){let si=0,bi=0;
+  for(const k of kelps){
+    for(let i=0;i<=k.seg;i++){const f=i/k.seg;
+      let c=lerpC(PAL.kelpD,PAL.kelpL,f);
+      if(i%3===0&&rng()<0.6)c=new THREE.Color(PAL.float);          // gold gas-bladder float
+      else if(f>0.55&&rng()<0.25)c=new THREE.Color(pick([PAL.pink,PAL.mag,PAL.aqua])); // biolum accent
+      bladeCol[bi*3]=c.r;bladeCol[bi*3+1]=c.g;bladeCol[bi*3+2]=c.b;bi++;}
+    for(let i=0;i<k.seg;i++){const f=i/k.seg;
+      const c0=lerpC(PAL.kelpD,PAL.kelpM,f),c1=lerpC(PAL.kelpM,PAL.kelpL,f);
+      stipeCol[si*3]=c0.r;stipeCol[si*3+1]=c0.g;stipeCol[si*3+2]=c0.b;si++;
+      stipeCol[si*3]=c1.r;stipeCol[si*3+1]=c1.g;stipeCol[si*3+2]=c1.b;si++;}
+  }
+})();
+const stipeGeo=new THREE.BufferGeometry();
+stipeGeo.setAttribute('position',new THREE.BufferAttribute(stipePos,3));
+stipeGeo.setAttribute('color',new THREE.BufferAttribute(stipeCol,3));
+world.add(new THREE.LineSegments(stipeGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.85})));
+const bladeGeo=new THREE.BufferGeometry();
+bladeGeo.setAttribute('position',new THREE.BufferAttribute(bladePos,3));
+bladeGeo.setAttribute('color',new THREE.BufferAttribute(bladeCol,3));
+const blades=new THREE.Points(bladeGeo,new THREE.PointsMaterial({size:1.7,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.92,blending:THREE.AdditiveBlending,depthWrite:false}));
+world.add(blades);
+function updateKelp(t){let si=0,bi=0;
+  for(const k of kelps){kelpNodes(k,t);
+    for(let i=0;i<=k.seg;i++){bladePos[bi*3]=_n[i*3];bladePos[bi*3+1]=_n[i*3+1];bladePos[bi*3+2]=_n[i*3+2];bi++;}
+    for(let i=0;i<k.seg;i++){
+      stipePos[si*3]=_n[i*3];stipePos[si*3+1]=_n[i*3+1];stipePos[si*3+2]=_n[i*3+2];si++;
+      stipePos[si*3]=_n[(i+1)*3];stipePos[si*3+1]=_n[(i+1)*3+1];stipePos[si*3+2]=_n[(i+1)*3+2];si++;}
+  }
+  stipeGeo.attributes.position.needsUpdate=true;bladeGeo.attributes.position.needsUpdate=true;
+}
+
+/* ---------- JELLYFISH — pulsing bells + drifting tentacles ------------------ */
+const jellies=[];
+function makeJelly(){
+  const g=new THREE.Group();
+  const rB=rand(2.4,4.2),col=pick([PAL.pink,PAL.mag,PAL.hot,PAL.lblue]);
+  // bell (dome) glow points
+  const bp=[],bc=[];
+  for(let ring=0;ring<7;ring++){const phi=(ring/6)*(Math.PI/2);
+    const rr=rB*Math.sin(phi),yy=rB*Math.cos(phi),n=6+ring*4;
+    for(let a=0;a<n;a++){const ang=(a/n)*Math.PI*2;
+      bp.push(rr*Math.cos(ang),yy,rr*Math.sin(ang));
+      const c=lerpC(col,PAL.foam,0.15+0.5*(1-ring/6));bc.push(c.r,c.g,c.b);}}
+  const bell=glowPoints(bp,bc,1.9,0.9);g.add(bell);
+  // tentacles (dotted, waved each frame)
+  const strands=[];const tp=[],tc=[];
+  const nStr=8,per=9;
+  for(let s=0;s<nStr;s++){const a=(s/nStr)*Math.PI*2;
+    strands.push({a,r:rB*0.8,ph:rand(0,6.28)});
+    for(let p=0;p<per;p++){tp.push(0,0,0);const c=lerpC(col,PAL.mag,rng()*0.5);tc.push(c.r,c.g,c.b);}}
+  const tent=glowPoints(tp,tc,1.2,0.75);g.add(tent);
+  g.userData={rB,ph:rand(0,6.28),drift:rand(0,6.28),baseY:rand(16,46),
+    cx:rand(-30,30),cz:rand(-34,34),bell,tent,strands,per,tpos:tent.geometry.attributes.position};
+  world.add(g);jellies.push(g);
+}
+for(let i=0;i<7;i++)makeJelly();
+function updateJelly(g,t){
+  const u=g.userData;
+  const pulse=0.82+0.22*Math.sin(t*1.6+u.ph);
+  g.scale.set(1/pulse,pulse,1/pulse);                    // squash/stretch bell
+  g.position.set(u.cx+6*Math.sin(t*0.18+u.drift), u.baseY+6*Math.sin(t*0.25+u.ph), u.cz+5*Math.cos(t*0.15+u.drift));
+  u.bell.material.opacity=0.75+0.2*Math.sin(t*1.6+u.ph);
+  const tp=u.tpos.array;let idx=0;
+  for(const st of u.strands){for(let p=0;p<u.per;p++){const f=p/(u.per-1);
+    const droop=-f*u.rB*3.2;
+    const wob=1.3*Math.sin(t*2.2+st.ph+p*0.6)*(0.3+f);
+    tp[idx*3]=Math.cos(st.a)*st.r + Math.cos(st.a)*wob;
+    tp[idx*3+1]=droop;
+    tp[idx*3+2]=Math.sin(st.a)*st.r + Math.sin(st.a)*wob;
+    idx++;}}
+  u.tpos.needsUpdate=true;
+}
+
+/* ---------- FISH SCHOOL — threads through the kelp -------------------------- */
+const FN=48,fish=[],fPos=new Float32Array(FN*3),fCol=new Float32Array(FN*3);
+for(let i=0;i<FN;i++){fish.push({ox:rand(-5,5),oy:rand(-4,4),oz:rand(-5,5),ph:rand(0,6.28)});
+  const c=lerpC(PAL.yellow,PAL.gold,rng());if(rng()<0.25){const p=new THREE.Color(PAL.pink);fCol[i*3]=p.r;fCol[i*3+1]=p.g;fCol[i*3+2]=p.b;}
+  else{fCol[i*3]=c.r;fCol[i*3+1]=c.g;fCol[i*3+2]=c.b;}}
+const fGeo=new THREE.BufferGeometry();
+fGeo.setAttribute('position',new THREE.BufferAttribute(fPos,3));
+fGeo.setAttribute('color',new THREE.BufferAttribute(fCol,3));
+world.add(new THREE.Points(fGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})));
+function updateFish(t){
+  const cx=26*Math.sin(t*0.12), cy=24+8*Math.sin(t*0.09), cz=30*Math.cos(t*0.10);
+  for(let i=0;i<FN;i++){const f=fish[i];
+    fPos[i*3]=cx+f.ox+2*Math.sin(t*2+f.ph);
+    fPos[i*3+1]=cy+f.oy+1.4*Math.sin(t*2.4+f.ph);
+    fPos[i*3+2]=cz+f.oz+2*Math.cos(t*2+f.ph);}
+  fGeo.attributes.position.needsUpdate=true;
+}
+
+/* ---------- FULL MOON — glowing orb + halo above the surface --------------- */
+const moonPos=new THREE.Vector3(58,94,42);
+(function moon(){const mp=[],mc=[];
+  for(let i=0;i<600;i++){const u=rand(0,Math.PI*2),v=Math.acos(rand(-1,1)),r=7*(0.85+rand(0,0.15));
+    mp.push(moonPos.x+r*Math.sin(v)*Math.cos(u),moonPos.y+r*Math.cos(v),moonPos.z+r*Math.sin(v)*Math.sin(u));
+    const c=lerpC(PAL.moon,PAL.lblue,rng()*0.3);mc.push(c.r,c.g,c.b);}
+  scene.add(glowPoints(mp,mc,1.8,0.95));
+  // halo
+  scene.add(glowPoints([moonPos.x,moonPos.y,moonPos.z],[new THREE.Color(PAL.moon).r,new THREE.Color(PAL.moon).g,new THREE.Color(PAL.moon).b],46,0.5));
+})();
+
+/* ---------- GOD-RAYS — billboarded light shafts from the surface ------------ */
+const shafts=[];
+for(let i=0;i<7;i++){
+  const m=new THREE.MeshBasicMaterial({color:pick([PAL.lblue,PAL.moon,PAL.aqua]),transparent:true,
+    opacity:0.05,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(rand(4,9),64),m);
+  sh.position.set(rand(-30,40),SURFACE-30,rand(-30,40));
+  sh.userData={ph:rand(0,6.28)};world.add(sh);shafts.push(sh);
+}
+
+/* ---------- WATER AURA + SURFACE CEILING + BUBBLES ------------------------- */
+// broad blue glow low in the water (the aura)
+world.add(glowPoints([0,20,0, -20,14,10, 24,18,-14],
+  [ ...new THREE.Color(PAL.deep).toArray(), ...new THREE.Color(PAL.aqua).toArray(), ...new THREE.Color(PAL.deep).toArray() ],120,0.22));
+// caustic ceiling — faint blue points at the surface underside
+const ceP=[],ceC=[];
+for(let x=-48;x<=48;x+=2.6)for(let z=-46;z<=46;z+=2.6){if(maskR(x,z)<=0.02)continue;
+  ceP.push(x,SURFACE,z);const c=lerpC(PAL.lblue,PAL.aqua,rng());ceC.push(c.r,c.g,c.b);}
+const ceiling=glowPoints(ceP,ceC,1.4,0.3);world.add(ceiling);
+const ceBase=ceP.slice();
+// crashing foam where reef breaks the surface
+const foamP=[],foamC=[];
+for(const r of reefTops){if(r[1]<48)continue;for(let k=0;k<rand(6,14);k++){
+  foamP.push(r[0]+rand(-3,3),SURFACE+rand(-2,2),r[2]+rand(-3,3));
+  const c=lerpC(PAL.foam,PAL.lblue,rng());foamC.push(c.r,c.g,c.b);}}
+const foam=glowPoints(foamP,foamC,2.0,0.55);world.add(foam);
+// rising bubbles
+const bubN=260,bub=[],bubPos=new Float32Array(bubN*3),bubCol=[];
+for(let i=0;i<bubN;i++){const x=rand(-40,40),z=rand(-40,40);
+  bub.push({x,z,y:rand(4,SURFACE),spd:rand(0.12,0.34),ph:rand(0,6.28)});
+  const c=lerpC(PAL.foam,PAL.lblue,rng());bubCol.push(c.r,c.g,c.b);}
+const bubGeo=new THREE.BufferGeometry();
+bubGeo.setAttribute('position',new THREE.BufferAttribute(bubPos,3));
+bubGeo.setAttribute('color',new THREE.Float32BufferAttribute(bubCol,3));
+world.add(new THREE.Points(bubGeo,new THREE.PointsMaterial({size:0.7,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false})));
+// drifting bioluminescent plankton
+const plN=500,plPos=new Float32Array(plN*3),plCol=[];
+for(let i=0;i<plN;i++){plPos[i*3]=rand(-60,60);plPos[i*3+1]=rand(2,SURFACE);plPos[i*3+2]=rand(-56,56);
+  const c=lerpC(PAL.aqua,pick([PAL.pink,PAL.lblue,PAL.mag]),rng()*0.5);plCol.push(c.r,c.g,c.b);}
+const plGeo=new THREE.BufferGeometry();
+plGeo.setAttribute('position',new THREE.BufferAttribute(plPos,3));
+plGeo.setAttribute('color',new THREE.Float32BufferAttribute(plCol,3));
+const plankton=new THREE.Points(plGeo,new THREE.PointsMaterial({size:0.55,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));
+scene.add(plankton);
+
+/* ---------- camera / input -------------------------------------------------- */
+const target=new THREE.Vector3(4,26,0);
+let camA=0.7,camR=124,camY=40,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;
+  camY=MU.clamp(camY-(e.clientY-py)*.35,6,104);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,64,220);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+document.getElementById('legend').innerHTML=[
+  [PAL.kelpL,'kelp forest','vana-core · swaying'],[PAL.lblue,'the water','aura + god-rays'],
+  [PAL.mag,'jellyfish · fish','drifting life'],[PAL.moon,'full moon','the only light'],
+].map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,3600);
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(autoSpin)camA+=0.0013;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+
+  updateKelp(t);
+  for(const g of jellies)updateJelly(g,t);
+  updateFish(t);
+
+  // god-rays: billboard about Y toward camera, shimmer opacity
+  for(const sh of shafts){sh.rotation.y=camA+Math.PI/2;
+    sh.material.opacity=0.035+0.03*Math.sin(t*0.8+sh.userData.ph);}
+  // caustic ceiling ripples + shimmer
+  const cp=ceiling.geometry.attributes.position;
+  for(let i=0;i<ceBase.length/3;i++){cp.array[i*3+1]=SURFACE+0.8*Math.sin(t*1.3+ceBase[i*3]*0.2+ceBase[i*3+2]*0.2);}
+  cp.needsUpdate=true;ceiling.material.opacity=0.24+0.1*Math.sin(t*0.7);
+  foam.material.opacity=0.4+0.25*Math.abs(Math.sin(t*1.7));  // crashing pulse
+  blades.material.opacity=0.8+0.15*Math.sin(t*1.2);
+
+  // bubbles rise
+  for(let i=0;i<bubN;i++){const b=bub[i];b.y+=b.spd;if(b.y>SURFACE){b.y=4;}
+    bubPos[i*3]=b.x+0.6*Math.sin(t*1.5+b.ph);bubPos[i*3+1]=b.y;bubPos[i*3+2]=b.z;}
+  bubGeo.attributes.position.needsUpdate=true;
+  // plankton drift
+  const pp=plankton.geometry.attributes.position;
+  for(let i=0;i<plN;i++){let x=pp.getX(i)+0.03*Math.sin(t*0.3+i);pp.setX(i,x);}pp.needsUpdate=true;
+  plankton.material.opacity=0.4+0.15*Math.sin(t*0.9);
+
+  world.rotation.z=Math.sin(t*0.2)*0.006;
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

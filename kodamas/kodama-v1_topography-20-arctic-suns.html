@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arctic Suns & Deserts Inclemencies (study)</title>
+<style>
+  :root{--bg:#0A0E14;--cream:#ECEAE0;--pale:#B7C6D2;--ice:#8FD8E8;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ice);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(18,22,30,.5);border:1px solid rgba(143,216,232,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Arctic Suns & Deserts Inclemencies.</h1><div class="sub">vana-kodama study · delivered up to the inclemencies of sun and winters</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const PAL={bg:0x0A0E14,white:0xF0F4F8,paleBlue:0xCFE0EA,grey:0xAEBCCA,ice:0x8FD8E8,crystal:0xB8E0F0,
+  duneLo:0x2A3644,duneHi:0xB7C6D2,sun:0xF6D9A0,sun2:0xE8845A,pale:0xB7C6D2,
+  aurA:0x74D6AE,aurB:0x9A6CE8,aurC:0x6FE0C0};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260721);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0xB9C6D4,0.0044);
+const camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,0.1,5000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* bright horizon glow */
+{const p=[],col=[];for(let i=0;i<1500;i++){const x=rand(-230,230),z=-190+rand(-8,8),y=rand(4,30);p.push(x,y,z);const c=lerpC(PAL.paleBlue,PAL.white,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.2,0.4));}
+
+/* wavy dunes (set 2) */
+function hf(x,z,t){let h=14*Math.sin(x*0.018+z*0.012)+9*Math.sin(x*0.011-z*0.02+1)+5*Math.sin(x*0.03+0.6);h+=3*Math.sin(x*0.025+t*0.22);return h;}
+const dP=[],dC=[],dXY=[];for(let x=-160;x<=160;x+=3.0)for(let z=-185;z<=10;z+=3.4){dP.push(x,0,z);dXY.push(x,z);const near=MU.clamp(1-(-z)/190,0,1);const c=lerpC(PAL.duneLo,PAL.duneHi,0.3+0.4*rng()).lerp(new THREE.Color(PAL.white),(1-near)*0.5);dC.push(c.r,c.g,c.b);}
+const dGeo=new THREE.BufferGeometry();dGeo.setAttribute('position',new THREE.Float32BufferAttribute(dP,3));dGeo.setAttribute('color',new THREE.Float32BufferAttribute(dC,3));
+const dune=new THREE.Points(dGeo,new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.85}));world.add(dune);
+const dPos=dGeo.attributes.position.array,dN=dXY.length/2;
+// a few crest contour lines
+const clines=[];for(let z=-160;z<=0;z+=20){const P=150,pos=new Float32Array(P*3),col=new Float32Array(P*3);const base=lerpC(PAL.grey,PAL.duneHi,MU.clamp(1-(-z)/185,0,1));for(let i=0;i<P;i++){col[i*3]=base.r;col[i*3+1]=base.g;col[i*3+2]=base.b;}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));world.add(new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.4})));clines.push({z,pos,geo:g,P});}
+
+/* wind streaks (blowing snow/sand) */
+const wN=340,wnd=[],wPos=new Float32Array(wN*2*3),wCol=new Float32Array(wN*2*3);
+for(let i=0;i<wN;i++){wnd.push({x:rand(-160,160),z:rand(-185,10),v:rand(1.5,3)});const c=lerpC(PAL.white,PAL.ice,rng());for(let e=0;e<2;e++){wCol[i*6+e*3]=c.r;wCol[i*6+e*3+1]=c.g;wCol[i*6+e*3+2]=c.b;}}
+const wGeo=new THREE.BufferGeometry();wGeo.setAttribute('position',new THREE.BufferAttribute(wPos,3));wGeo.setAttribute('color',new THREE.BufferAttribute(wCol,3));
+world.add(new THREE.LineSegments(wGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* sparse crystalline life (inclemencies) */
+{const p=[],col=[];for(let b=0;b<40;b++){const x=rand(-140,140),z=rand(-170,0),y=hf(x,z,0),spikes=4+((rng()*4)|0),hue=rng()<0.75?pick([PAL.ice,PAL.crystal,PAL.white]):pick([PAL.aurA,PAL.sun]);
+  for(let s=0;s<spikes;s++){const a=rand(0,6.28),ln=rand(2,6),tilt=rand(0.5,1);for(let k=0;k<6;k++){const f=k/5;p.push(x+Math.cos(a)*ln*f*(1-tilt*0.3),y+ln*f*tilt,z+Math.sin(a)*ln*f*(1-tilt*0.3));const c=lerpC(hue,0xFFFFFF,f*0.4);col.push(c.r,c.g,c.b);}}}
+  world.add(glowPoints(p,col,1.2,0.7));}
+
+/* DOUBLE SUN (eclipsing) + concentric halo rings on each orb, low on horizon */
+const SC=new THREE.Vector3(-14,30,-150),U=new THREE.Vector3(1,0,0),V=new THREE.Vector3(0,1,0.15).normalize();
+function sun(cx,cy,cz,color,R){const p=[],col=[];for(let i=0;i<(R*R*8|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1));p.push(cx+R*Math.sin(v)*Math.cos(u),cy+R*Math.cos(v),cz+R*Math.sin(v)*Math.sin(u));const c=lerpC(color,0xFFFFFF,rng()*0.4);col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,1.4,0.95));world.add(glowPoints([cx,cy,cz],[...new THREE.Color(color).toArray()],R*3.4,0.28));
+  for(let ri=0;ri<5;ri++){const RR=R*(1.5+ri*0.6),rp=[],rc=[];for(let k=0;k<160;k++){const a=k/160*Math.PI*2;const v=U.clone().multiplyScalar(RR*Math.cos(a)).add(V.clone().multiplyScalar(RR*Math.sin(a)));rp.push(cx+v.x,cy+v.y,cz+v.z);const c=lerpC(color,PAL.white,0.35+0.35*rng());rc.push(c.r,c.g,c.b);}world.add(glowPoints(rp,rc,0.7,0.36-ri*0.055));}}
+sun(SC.x,SC.y,SC.z,PAL.sun,10);sun(SC.x+13,SC.y+4,SC.z+6,PAL.sun2,6);
+
+/* AURORA curtains */
+const auroras=[];for(let c2=0;c2<3;c2++){const P=[],C=[],base=[PAL.aurA,PAL.aurB,PAL.aurC][c2],cz=-120-c2*18,cx0=rand(-80,20);
+  const cols=60,rows=16,meta=[];for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){const f=j/(rows-1);P.push(0,0,0);const c=lerpC(base,0x000010,f*0.9);C.push(c.r,c.g,c.b);meta.push({i,j,f});}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
+  const o=new THREE.Points(g,new THREE.PointsMaterial({size:1.6,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(o);
+  auroras.push({g,meta,cz,cx0,ph:rand(0,6.28),cols,rows});}
+
+/* stars */
+let stars,starBase,starPh;
+{const p=[],col=[],ph=[];for(let i=0;i<800;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.1,1)),R=rand(160,280);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.85+40,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,PAL.white,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,0.9,0.7);world.add(stars);}
+
+/* subtle color-breath + turntable */
+const tint=new THREE.Color(),CYC=44;
+function updTint(t){const p=(t%CYC)/CYC;let s,l;if(p<0.5){s=0;l=0.85;}else if(p<0.66){const k=ss((p-0.5)/0.16);s=k*0.6;l=0.85-0.15*k;}else if(p<0.8){s=0.6;l=0.7;}else{const k=ss((p-0.8)/0.2);s=0.6*(1-k);l=0.7+0.15*k;}tint.setHSL((0.55+p*0.4)%1,s,l);scene.traverse(o=>{if(o.material&&o.material.color&&o!==dune)o.material.color.copy(tint);});}
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+const target=new THREE.Vector3(0,8,-60);let camA=Math.PI*0.5,camR=120,camY=44,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.004;camY=MU.clamp(camY-(e.clientY-py)*.35,16,96);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,64,220);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.duneHi,'wavy dunes','sun and winters'],[PAL.sun,'a double sun','one eclipsing one'],[PAL.aurA,'the aurora','cold fire, waving'],[PAL.crystal,'crystalline life','sparse, insistent']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4400);
+
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+  if(turntable&&!drag)camA+=0.0006;camera.position.set(Math.cos(camA)*camR,camY,-60+Math.sin(camA)*camR);camera.lookAt(target);
+  for(let i=0;i<dN;i++){const x=dXY[i*2],z=dXY[i*2+1];dPos[i*3+1]=hf(x,z,t);}dGeo.attributes.position.needsUpdate=true;
+  for(const ln of clines){for(let i=0;i<ln.P;i++){const x=-150+(i/(ln.P-1))*300;ln.pos[i*3]=x;ln.pos[i*3+1]=hf(x,ln.z,t)+0.6;ln.pos[i*3+2]=ln.z;}ln.geo.attributes.position.needsUpdate=true;}
+  for(let i=0;i<wN;i++){const p=wnd[i];p.x+=p.v*1.4;if(p.x>160){p.x=-160;p.z=rand(-185,10);}const y=hf(p.x,p.z,t)+2;wPos[i*6]=p.x;wPos[i*6+1]=y;wPos[i*6+2]=p.z;wPos[i*6+3]=p.x-p.v*3;wPos[i*6+4]=y+0.6;wPos[i*6+5]=p.z;}wGeo.attributes.position.needsUpdate=true;
+  for(const A of auroras){const arr=A.g.attributes.position.array;for(let n=0;n<A.meta.length;n++){const m=A.meta[n];const x=A.cx0+m.i*3.0;const wav=8*Math.sin(m.i*0.2+t*0.5+A.ph)+4*Math.sin(m.i*0.4-t*0.3);arr[n*3]=x+wav;arr[n*3+1]=44+m.f*60;arr[n*3+2]=A.cz+3*Math.cos(m.i*0.3+t*0.4);}A.g.attributes.position.needsUpdate=true;}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  updTint(t);renderer.render(scene,camera);}
+animate();
+</script></body></html>

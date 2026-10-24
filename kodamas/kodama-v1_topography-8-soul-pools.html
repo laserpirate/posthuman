@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soul Pools — a forest of reflecting moons (study)</title>
+<style>
+  :root{--bg:#080B10;--silver:#D8DEE6;--moon:#F4F6F8;--pale:#AEC2D6;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.6vw,33px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(174,194,214,.25)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pale);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>Soul Pools — every well remembers a different moon.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; a forest of still water, a sky of many moons</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to look · scroll closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   Soul Pools — silver-monochrome forest of lunar reflecting pools.
+   Slender trees recede into a bright misty horizon; several moons drift overhead;
+   a cluster of circular pools each holds a rippling moon; kodama spirits among the
+   trunks. Animated water (ripples + reflection shimmer). Pure Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x080B10,silver:0xD8DEE6,moon:0xF4F6F8,moonLo:0x8A96A2,pale:0xAEC2D6,
+  trunk:0xC4CCD6,trunkLo:0x3A424C,water:0x141C26,waterHi:0xC8D6E4,mist:0xBFCEDC,spirit:0xE6ECF2,stone:0x6A747E};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260711);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils;
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0xAEBECC,0.0072);  // bright misty distance
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* ---------- bright horizon mist band (the glowing base of image 2) --------- */
+{const p=[],col=[];for(let i=0;i<2600;i++){const a=rand(0,Math.PI*2),r=rand(58,98),y=rand(2,14)*(1-(r-58)/60);
+  p.push(r*Math.cos(a),y,r*Math.sin(a));const c=lerpC(PAL.mist,PAL.moon,rng());col.push(c.r,c.g,c.b);}
+  world.add(glowPoints(p,col,1.4,0.5));}
+
+/* ---------- forest: slender trees receding into the light ------------------ */
+{const p=[],col=[];for(let i=0;i<150;i++){const a=rand(0,Math.PI*2),r=rand(16,92),x=r*Math.cos(a),z=r*Math.sin(a),h=rand(34,72);
+  for(let s=0;s<38;s++){const f=s/37;p.push(x+rand(-.5,.5),f*h,z+rand(-.5,.5));const c=lerpC(PAL.trunkLo,PAL.trunk,0.25+0.55*f);col.push(c.r,c.g,c.b);}
+  if(rng()<0.6)for(let s=0;s<26;s++){p.push(x+rand(-5,5),h*rand(0.6,1.0),z+rand(-5,5));const c=lerpC(PAL.trunkLo,PAL.silver,0.3+0.5*rng());col.push(c.r,c.g,c.b);}}  // sparse high foliage
+  world.add(glowPoints(p,col,0.8,0.85));}
+
+/* ---------- MOONS overhead (drifting) -------------------------------------- */
+const moons=[];
+function makeMoon(R){const p=[],col=[];const N=(R*R*7)|0;
+  for(let i=0;i<N;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u);
+    const crater=0.5+0.5*Math.sin(x*0.6)*Math.cos(y*0.4)*Math.sin(z*0.35);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*crater,0.35,1));p.push(x,y,z);col.push(c.r,c.g,c.b);}
+  const g=new THREE.Group();g.add(glowPoints(p,col,1.5,0.96));g.add(glowPoints([0,0,0],[...new THREE.Color(0xE8EEF4).toArray()],R*2.6,0.26));world.add(g);return g;}
+const bigMoon=makeMoon(14);bigMoon.position.set(-6,82,-30);moons.push({g:bigMoon,cx:-6,cz:-30,y:82,amp:rand(3,6),ph:rand(0,6.28),spd:rand(0.05,0.1)});
+for(let i=0;i<6;i++){const R=rand(3,7),g=makeMoon(R),x=rand(-40,40),z=rand(-45,-10),y=rand(64,92);g.position.set(x,y,z);moons.push({g,cx:x,cz:z,y,amp:rand(2,5),ph:rand(0,6.28),spd:rand(0.05,0.12)});}
+
+/* ---------- REFLECTING POOLS (cluster) ------------------------------------- */
+const pools=[];const cluster=[[0,-4,10],[14,-2,8],[-15,-6,7],[8,-20,9],[-10,-22,8],[22,-14,6],[-24,-16,6],[2,-34,7],[-6,4,6],[16,6,5],[-18,2,5]];
+const wP=[],wC=[],rimP=[],rimC=[],stP=[],stC=[];
+for(const [cx,cz,r] of cluster){pools.push({cx,cz,r});
+  for(let i=0;i<Math.floor(r*r*3);i++){const rr=r*Math.sqrt(rng()),a=rand(0,6.28),x=cx+rr*Math.cos(a),z=cz+rr*Math.sin(a);
+    wP.push(x,1.0,z);const c=lerpC(PAL.water,PAL.pale,0.1+0.2*rng());wC.push(c.r,c.g,c.b);}
+  for(let k=0;k<Math.floor(r*7);k++){const a=k/Math.floor(r*7)*Math.PI*2,x=cx+r*Math.cos(a),z=cz+r*Math.sin(a);rimP.push(x,1.2,z);const c=new THREE.Color(PAL.waterHi);rimC.push(c.r,c.g,c.b);}
+  for(let s=0;s<Math.floor(r*0.8);s++){const rr=r*0.7*Math.sqrt(rng()),a=rand(0,6.28);stP.push(cx+rr*Math.cos(a),1.1,cz+rr*Math.sin(a));const c=new THREE.Color(PAL.stone);stC.push(c.r,c.g,c.b);}}
+world.add(new THREE.Points((()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(wP,3));g.setAttribute('color',new THREE.Float32BufferAttribute(wC,3));return g;})(),
+  new THREE.PointsMaterial({size:1.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.42,blending:THREE.AdditiveBlending,depthWrite:false})));
+world.add(glowPoints(rimP,rimC,1.2,0.7));
+world.add(new THREE.Points((()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(stP,3));g.setAttribute('color',new THREE.Float32BufferAttribute(stC,3));return g;})(),
+  new THREE.PointsMaterial({size:0.9,vertexColors:true,transparent:true,opacity:0.9})));
+// per-pool moon reflection (shimmer blob) + ripple rings
+const refN=pools.length*30,rf=[],refPos=new Float32Array(refN*3),refCol=new Float32Array(refN*3);
+let ri=0;for(const P of pools){for(let i=0;i<30;i++){const rr=P.r*0.5*Math.sqrt(rng()),a=rand(0,6.28);rf.push({cx:P.cx,cz:P.cz,x0:rr*Math.cos(a),z0:rr*Math.sin(a),ph:rand(0,6.28)});const c=lerpC(PAL.waterHi,PAL.moon,rng());refCol[ri*3]=c.r;refCol[ri*3+1]=c.g;refCol[ri*3+2]=c.b;ri++;}}
+const refGeo=new THREE.BufferGeometry();refGeo.setAttribute('position',new THREE.BufferAttribute(refPos,3));refGeo.setAttribute('color',new THREE.BufferAttribute(refCol,3));
+const refl=new THREE.Points(refGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(refl);
+const RPP=40,ringPos=new Float32Array(pools.length*RPP*3),ringCol=new Float32Array(pools.length*RPP*3),ringState=pools.map(P=>({r:rand(0,P.r),spd:rand(0.03,0.07)}));
+const ringGeo=new THREE.BufferGeometry();ringGeo.setAttribute('position',new THREE.BufferAttribute(ringPos,3));ringGeo.setAttribute('color',new THREE.BufferAttribute(ringCol,3));
+world.add(new THREE.Points(ringGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* ---------- KODAMA SPIRITS among the trees --------------------------------- */
+const spirits=[];
+function makeSpirit(){const g=new THREE.Group();
+  const hp=[],hc=[];for(let i=0;i<80;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=2.2*(0.9+rand(0,0.1));hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v)+2.3,r*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.spirit);hc.push(c.r,c.g,c.b);}
+  const head=glowPoints(hp,hc,1.4,0);g.add(head);
+  const bp=[],bc=[];for(let i=0;i<22;i++){const y=rand(-2.5,2),rr=0.9*(1-Math.abs(y)/3.2),a=rand(0,6.28);bp.push(rr*Math.cos(a),y,rr*Math.sin(a));const c=new THREE.Color(PAL.spirit);bc.push(c.r,c.g,c.b);}
+  const body=glowPoints(bp,bc,1.1,0);g.add(body);
+  const fp=[-0.6,2.6,2.0,0.6,2.6,2.0,0,1.9,2.1],fc=[0.02,0.02,0.04,0.02,0.02,0.04,0.02,0.02,0.04];const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fg.setAttribute('color',new THREE.Float32BufferAttribute(fc,3));
+  const face=new THREE.Points(fg,new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0}));g.add(face);
+  g.visible=false;world.add(g);const sp={g,head,body,face,state:'wait',timer:rand(0,6),op:0};spirits.push(sp);reposition(sp);return sp;}
+function reposition(sp){const a=rand(0,Math.PI*2),r=rand(20,60);sp.g.position.set(r*Math.cos(a),1.5,r*Math.sin(a));}
+for(let i=0;i<6;i++)makeSpirit();
+function updateSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.4;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.4,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(3,6);}}
+  else if(sp.state==='hold'){if(sp.timer<=0){sp.state='out';sp.timer=1.6;}}
+  else if(sp.state==='out'){sp.op=MU.clamp(sp.op-dt/1.6,0,1);if(sp.timer<=0){sp.state='wait';sp.timer=rand(3,7);sp.g.visible=false;reposition(sp);}}
+  const o=sp.op;sp.head.material.opacity=0.85*o;sp.body.material.opacity=0.5*o;sp.face.material.opacity=0.9*o;sp.g.rotation.z=Math.sin(t*0.8+sp.g.position.x)*0.05;}}
+
+/* ---------- ambient mist ---------------------------------------------------- */
+const mN=340,mPos=new Float32Array(mN*3),mCol=[];for(let i=0;i<mN;i++){mPos[i*3]=rand(-70,70);mPos[i*3+1]=rand(1,50);mPos[i*3+2]=rand(-70,70);const c=lerpC(PAL.pale,PAL.mist,rng());mCol.push(c.r,c.g,c.b);}
+const mGeo=new THREE.BufferGeometry();mGeo.setAttribute('position',new THREE.BufferAttribute(mPos,3));mGeo.setAttribute('color',new THREE.Float32BufferAttribute(mCol,3));
+const mist=new THREE.Points(mGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(mist);
+
+/* ---------- camera ---------------------------------------------------------- */
+const target=new THREE.Vector3(0,9,-8);let camA=Math.PI*0.5,camR=62,camY=13,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.25,5,44);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,34,110);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.moon,'many moons','drifting overhead'],[PAL.waterHi,'reflecting pools','rippling reflections'],[PAL.trunk,'the forest','receding to light'],[PAL.spirit,'kodama spirits','among the trees']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4200);
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(autoSpin)camA+=0.0007;camera.position.set(Math.cos(camA)*camR,camY,-8+Math.sin(camA)*camR);camera.lookAt(target);
+  // moons drift
+  for(const m of moons){m.g.position.x=m.cx+Math.sin(t*m.spd+m.ph)*m.amp;m.g.position.y=m.y+Math.cos(t*m.spd*0.7+m.ph)*m.amp*0.4;}
+  updateSpirits(t,dt);
+  // pool reflections shimmer with ripples
+  for(let i=0;i<refN;i++){const p=rf[i],rip=Math.sin(t*2.2+p.ph)*0.8+Math.sin(t*1.1+p.x0)*0.5;
+    refPos[i*3]=p.cx+p.x0+rip;refPos[i*3+1]=1.05;refPos[i*3+2]=p.cz+p.z0+rip*0.5;}
+  refGeo.attributes.position.needsUpdate=true;refl.material.opacity=0.6+0.16*Math.sin(t*1.7);
+  // ripple rings per pool
+  let idx=0;for(let pi=0;pi<pools.length;pi++){const P=pools[pi],R=ringState[pi];R.r+=R.spd;if(R.r>P.r){R.r=rand(0,1.5);}const fade=1-R.r/P.r;
+    for(let k=0;k<RPP;k++){const a=k/RPP*Math.PI*2;ringPos[idx*3]=P.cx+R.r*Math.cos(a);ringPos[idx*3+1]=1.15;ringPos[idx*3+2]=P.cz+R.r*Math.sin(a);
+      const c=new THREE.Color(PAL.waterHi);ringCol[idx*3]=c.r*fade;ringCol[idx*3+1]=c.g*fade;ringCol[idx*3+2]=c.b*fade;idx++;}}
+  ringGeo.attributes.position.needsUpdate=true;ringGeo.attributes.color.needsUpdate=true;
+  const mp=mist.geometry.attributes.position;for(let i=0;i<mN;i++){let x=mp.getX(i)+0.02;if(x>70)x=-70;mp.setX(i,x);}mp.needsUpdate=true;
+  renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

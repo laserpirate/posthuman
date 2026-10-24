@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA·NA · the littoral edge — tidal wetland (study)</title>
+<style>
+  :root{
+    --bg:#060B10; --teal:#74D6AE; --gold:#C9A86A; --cream:#ECEAE0; --coral:#E8845A;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;
+    --serif:Cambria,Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:62vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:clamp(19px,2.4vw,30px);line-height:1.15;margin:0;text-shadow:0 2px 30px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--teal);opacity:.82;margin-top:10px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  #legend .v{opacity:.55}
+  #tide{bottom:24px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;opacity:.8;text-shadow:0 1px 12px #000}
+  #tide b{color:var(--teal)}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;
+    letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>the tide comes in, and she is still standing.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the littoral edge, measured at every water level</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="tide">tide&nbsp; <b id="tv">—</b></div>
+<div class="ui" id="hint">drag to orbit · scroll to breathe closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   VA·NA — the littoral edge : a Spartina mudflat under a rising/falling tide.
+   The tide is animated: it washes over the flat on a slow cycle, which makes the
+   demo double as the coastal-resilience / SLR argument, made visible.
+   Series companion to kodama-v1_topography-1 & 2. Pure Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x060B10,teal:0x74D6AE,gold:0xC9A86A,cream:0xECEAE0,coral:0xE8845A,
+  marsh:0x7FA84E,marshHi:0xC7D97A,mudT:0xA98A6E,mudM:0x836A56,mudL:0x53433A,
+  water:0x1E6BC0,waterHi:0x6FC6F0,foam:0xCFF0FF};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260630);
+const rand=(a=0,b=1)=>a+(b-a)*rng();
+const pick=a=>a[(rng()*a.length)|0];
+const lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t);
+const MU=THREE.MathUtils;
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;
+  const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,
+    transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(PAL.bg);
+scene.fog=new THREE.FogExp2(PAL.bg,0.0050);
+const camera=new THREE.PerspectiveCamera(46,innerWidth/innerHeight,0.1,2000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();world.rotation.x=-0.11;scene.add(world);
+
+/* ---------- terrain: low marsh dome, seaward slope, dendritic creeks -------- */
+function creekMask(x,z){
+  let m=Math.exp(-(z*z)/(2*4*4));                                        // main creek
+  m=Math.max(m,Math.exp(-(((z-14)+0.5*x)**2)/(2*3*3))*MU.clamp((x+22)/44,0,1)); // branch
+  m=Math.max(m,Math.exp(-(((z+16)+0.4*x)**2)/(2*3*3))*MU.clamp((x+22)/44,0,1)); // branch
+  return MU.clamp(m,0,1);
+}
+function h3(x,z){
+  let b=7*Math.exp(-((x+8)**2+z*z)/(2*26*26));   // broad low marsh dome
+  b+=-x*0.28;                                     // seaward slope (+x -> down/sea)
+  b-=3.2*creekMask(x,z);                          // carved tidal creeks
+  b+=0.6*Math.sin(x*0.4)*Math.sin(z*0.35);        // texture
+  return b;
+}
+function mask3(x,z){
+  const d=Math.sqrt((x/44)**2+(z/40)**2);
+  return MU.clamp((1.02-d)/0.2,0,1);
+}
+const tPos=[],tCol=[],surf=[];let maxH=-99,minH=99;
+for(let x=-46;x<=46;x+=1.05)for(let z=-42;z<=42;z+=1.05){
+  const m=mask3(x,z);if(m<=0.02)continue;
+  const jx=x+rand(-.35,.35),jz=z+rand(-.35,.35),y=h3(jx,jz);
+  maxH=Math.max(maxH,y);minH=Math.min(minH,y);
+  const layers=1+(m>0.5?2:0);
+  for(let L=0;L<layers;L++){tPos.push(jx,y-L*rand(1.0,2.2),jz);tCol.push(0,0,0);
+    if(L===0&&m>0.35&&rng()<0.55)surf.push([jx,y,jz,m]);}
+}
+for(let i=0;i<tPos.length/3;i++){const y=tPos[i*3+1],t=MU.clamp((y-minH)/(maxH-minH),0,1);
+  const c=t>0.5?lerpC(PAL.mudM,PAL.mudT,(t-0.5)/0.5):lerpC(PAL.mudL,PAL.mudM,t/0.5);
+  tCol[i*3]=c.r;tCol[i*3+1]=c.g;tCol[i*3+2]=c.b;}
+const tg=new THREE.BufferGeometry();
+tg.setAttribute('position',new THREE.Float32BufferAttribute(tPos,3));
+tg.setAttribute('color',new THREE.Float32BufferAttribute(tCol,3));
+world.add(new THREE.Points(tg,new THREE.PointsMaterial({size:0.6,vertexColors:true,transparent:true,opacity:0.95})));
+
+/* ---------- tide: a translucent water sheet that rises & falls -------------- */
+// built only over low ground (creeks + seaward), so it sits in the basins and climbs
+const wPos=[],wCol=[];
+for(let x=-46;x<=46;x+=1.4)for(let z=-42;z<=42;z+=1.4){
+  const m=mask3(x,z);if(m<=0.02)continue;
+  if(h3(x,z)>4.5)continue;                        // only low ground holds water
+  wPos.push(x,0,z);const c=lerpC(PAL.water,PAL.waterHi,rand(0,0.5));wCol.push(c.r,c.g,c.b);
+}
+const wGeo=new THREE.BufferGeometry();
+wGeo.setAttribute('position',new THREE.Float32BufferAttribute(wPos,3));
+wGeo.setAttribute('color',new THREE.Float32BufferAttribute(wCol,3));
+const waterMat=new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,transparent:true,
+  opacity:0.34,blending:THREE.AdditiveBlending,depthWrite:false});
+const water=new THREE.Points(wGeo,waterMat);world.add(water);
+
+// bioluminescent foam scatter that rides the surface at the tideline
+const FN=420,foam=[],foamPos=new Float32Array(FN*3),foamCol=new Float32Array(FN*3);
+for(let i=0;i<FN;i++){foam.push({x:rand(-46,46),z:rand(-42,42),ph:rand(0,6.28)});
+  const c=lerpC(PAL.foam,PAL.teal,rng());foamCol[i*3]=c.r;foamCol[i*3+1]=c.g;foamCol[i*3+2]=c.b;}
+const foamGeo=new THREE.BufferGeometry();
+foamGeo.setAttribute('position',new THREE.BufferAttribute(foamPos,3));
+foamGeo.setAttribute('color',new THREE.BufferAttribute(foamCol,3));
+world.add(new THREE.Points(foamGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* ---------- Spartina marsh grass (fibrous curtain), denser in the low wet ---- */
+const bPos=[],bCol=[];
+for(const s of surf){
+  const [x,y,z,m]=s;
+  const wet=MU.clamp((4-h3(x,z))/6,0,1);            // wetter/lower -> more grass
+  const n=1+((rng()<0.5+wet*0.4)?1:0)+((rng()<wet)?1:0);
+  for(let k=0;k<n;k++){
+    const hgt=rand(2.2,5.5)*(0.7+wet*0.7),sway=rand(-0.6,0.6);
+    const c=lerpC(PAL.marsh,PAL.marshHi,rng());
+    bPos.push(x,y,z, x+sway,y+hgt,z+rand(-0.4,0.4));
+    bCol.push(c.r*0.35,c.g*0.35,c.b*0.35, c.r,c.g,c.b);
+  }
+}
+const bGeo=new THREE.BufferGeometry();
+bGeo.setAttribute('position',new THREE.Float32BufferAttribute(bPos,3));
+bGeo.setAttribute('color',new THREE.Float32BufferAttribute(bCol,3));
+world.add(new THREE.LineSegments(bGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.82})));
+
+/* seed-head glow tips on some blades */
+const tipP=[],tipC=[];
+for(let i=0;i<bPos.length/6;i++){if(rng()>0.22)continue;
+  tipP.push(bPos[i*6+3],bPos[i*6+4],bPos[i*6+5]);const c=lerpC(PAL.gold,PAL.cream,rng());tipC.push(c.r,c.g,c.b);}
+world.add(glowPoints(tipP,tipC,1.3,0.9));
+
+/* ---------- FloodNet-style sensor nodes on stilts --------------------------- */
+const sensors=[];
+for(let i=0;i<9;i++){
+  const x=rand(-34,30),z=rand(-32,32),gy=h3(x,z),topy=Math.max(gy,4)+rand(6,11);
+  const box=new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.BoxGeometry(2.2,1.4,2.2)),
+    new THREE.LineBasicMaterial({color:PAL.teal,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));
+  box.position.set(x,topy,z);box.userData={blink:rand(0,6.28)};
+  world.add(box);sensors.push(box);
+  const legP=[x-0.8,gy,z, x-0.8,topy-0.7,z, x+0.8,gy,z, x+0.8,topy-0.7,z],lg=new THREE.BufferGeometry();
+  lg.setAttribute('position',new THREE.Float32BufferAttribute(legP,3));
+  world.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:PAL.cream,transparent:true,opacity:.4})));
+}
+
+/* ---------- shorebird agents (a couple of drifting wireframes) -------------- */
+const birds=[];
+for(let i=0;i<3;i++){
+  const b=new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.ConeGeometry(1.1,2.2,4)),
+    new THREE.LineBasicMaterial({color:PAL.coral,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+  b.userData={a:rand(0,6.28),r:rand(20,38),spd:rand(0.15,0.3),y:rand(10,20)};
+  world.add(b);birds.push(b);
+}
+
+/* ---------- ambient sea-mist ------------------------------------------------ */
+const dN=650,dPos=new Float32Array(dN*3),dCol=[];
+for(let i=0;i<dN;i++){dPos[i*3]=rand(-70,70);dPos[i*3+1]=rand(-4,40);dPos[i*3+2]=rand(-60,60);
+  const c=lerpC(PAL.teal,PAL.foam,rng());dCol.push(c.r,c.g,c.b);}
+const dGeo=new THREE.BufferGeometry();
+dGeo.setAttribute('position',new THREE.BufferAttribute(dPos,3));
+dGeo.setAttribute('color',new THREE.Float32BufferAttribute(dCol,3));
+const dust=new THREE.Points(dGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.45,blending:THREE.AdditiveBlending,depthWrite:false}));
+scene.add(dust);
+
+/* ---------- camera / input -------------------------------------------------- */
+const target=new THREE.Vector3(-4,2,0);
+let camA=0.5,camR=112,camY=40,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;
+  camY=MU.clamp(camY-(e.clientY-py)*.35,5,96);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,58,200);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+document.getElementById('legend').innerHTML=[
+  [PAL.mudT,'VVIM mudflat','xēn-gis terrain'],[PAL.marshHi,'Spartina curtain','vana-core · fibrous'],
+  [PAL.water,'the tide','SLR, made visible'],[PAL.teal,'FloodNet nodes','Band-3 · sensors'],
+].map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,3600);
+const tvEl=document.getElementById('tv');
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();
+const TIDE_A=3.4, TIDE_MID=-0.4;                    // amplitude / mean level
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(autoSpin)camA+=0.0014;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+
+  const tide=TIDE_MID+TIDE_A*Math.sin(t*0.24);      // slow flood/ebb
+  water.position.y=tide;
+  waterMat.opacity=0.3+0.06*Math.sin(t*1.1);
+  const rising=Math.cos(t*0.24)>0;
+  tvEl.textContent=(rising?'flooding':'ebbing')+' · '+(tide>=0?'+':'')+tide.toFixed(1)+' m';
+
+  // foam rides the tideline with a little chop
+  for(let i=0;i<FN;i++){const f=foam[i];
+    foamPos[i*3]=f.x;foamPos[i*3+1]=tide+0.5*Math.sin(t*2+f.ph)+0.3;foamPos[i*3+2]=f.z;}
+  foamGeo.attributes.position.needsUpdate=true;
+
+  for(const s of sensors){const b=0.5+0.5*Math.sin(t*2.2+s.userData.blink);s.material.opacity=0.4+0.5*b;}
+  for(const bd of birds){bd.userData.a+=0.004*bd.userData.spd*20;
+    const a=bd.userData.a,r=bd.userData.r;
+    bd.position.set(Math.cos(a)*r-6,bd.userData.y+Math.sin(t+a)*1.5,Math.sin(a)*r);
+    bd.rotation.y=-a;}
+  const dp=dust.geometry.attributes.position;
+  for(let i=0;i<dN;i++){let x=dp.getX(i)+0.04;if(x>70)x=-70;dp.setX(i,x);}dp.needsUpdate=true;
+  world.rotation.z=Math.sin(t*0.22)*0.008;
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

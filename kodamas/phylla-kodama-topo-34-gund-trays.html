@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<!-- engine: kodama (render engine, phylla biome) · phylla (sound, OSC) — kodama is NEVER vana-kodama; engine credit lives in this header comment only, per naming canon --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gund trays (study)</title>
+<style>
+  :root{--cream:#ECEAE0;--gold:#F6C544;--pale:#AEC2D6;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:#040A14;overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px}
+  #phase{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-top:6px}
+  #legend{bottom:76px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .grp{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+  .pill{pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);background:rgba(8,16,24,.55);border:1px solid rgba(174,194,214,.3);border-radius:18px;padding:7px 13px;backdrop-filter:blur(6px)}
+  .pill.on{border-color:var(--gold);color:var(--gold)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title" data-topo="34"><h1>gund trays</h1>
+  <div class="sub">phylla-kodama study · working title · draft</div>
+  <div id="phase">—</div></div>
+<div class="ui" id="legend"></div>
+<div id="bar">
+  <button class="pill on" id="tt">◉ turntable</button>
+  <span class="grp">time <button class="pill" data-t="auto">⟳</button><button class="pill" data-t="0">dawn</button><button class="pill" data-t="0.25">day</button><button class="pill" data-t="0.5">dusk</button><button class="pill on" data-t="0.75">night</button></span>
+  <span class="grp">flood <button class="pill on" data-f="auto">⟳</button><button class="pill" data-f="0">low</button><button class="pill" data-f="1">high</button></span>
+  <span class="grp">rain <button class="pill on" data-r="auto">⟳</button><button class="pill" data-r="0.3">light</button><button class="pill" data-r="1">heavy</button></span>
+</div>
+<div class="ui" id="foot">stylized after Gund Hall (John Andrews, 1972); not survey-accurate<br>SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* gund trays — a design-school studio long after the people left. Four open
+   terraces (the trays) step down under a cascading roof of sloping steel
+   trusses and glass, eight structural bays long: a truss, a row of concrete
+   columns, a fin at the east glass and a roof fin on every column line, and a
+   raised glazed roof unit over the top tray in every bay. About half the
+   glazing is gone and the rain comes through the holes. Desks, drafting stools, chipboard and foam models, rolled drawings,
+   saplings growing out of the desks, moss on the board-formed concrete, water
+   pooling on the lower trays. A few monitors still flicker, one laser cutter
+   still glows, one desk lamp was left on. Moon and stars through the broken roof.
+   Massing stylized after Gund Hall (John Andrews, 1972); not survey-accurate.
+   TIME = hour of the sky through the roof; FLOOD = water on the lower trays;
+   RAIN = how much comes through (auto follows the hour). r128.
+   Original artwork © Marko Manriquez, all rights reserved. */
+const PAL={sky:0x040A14,fog:0x0B1820,conc:0x7A807A,concLo:0x3A403E,concHi:0xA4AAA2,stain:0x2A2620,moss:0x1E4A30,mossHi:0x5E9A58,
+  floor:0x3A403C,floorHi:0x5A625C,desk:0x8A8270,deskLo:0x4A463C,stool:0x2E3A40,steel:0x34404A,steelHi:0x7A8C98,rust:0x5A3424,rustHi:0x8E5C3A,
+  chip:0xB8965E,foam:0xE2E4DC,foamB:0x7FA6C8,foamP:0xD098A8,paper:0xDCD6C4,mon:0x101418,
+  glass:0x3A5A68,mull:0x3A4A50,shard:0xC8E4EC,leaf:0x3E7A3A,leafHi:0x94C462,bark:0x4A3C2C,vine:0x2A5A2E,
+  water:0x081620,glint:0xA8D4DC,rain:0xB8CCDA,moon:0xF2F4F0,moonLo:0xC4CCD8,halo:0xB8CCE0,pale:0xAEC2D6,cloud:0x26323E,
+  scr:0x7FD8FF,scrW:0xCFE8FF,scrG:0x8CFFB0,laser:0xFF4A28,laserO:0xFF9A40,lamp:0xFFC070,mote:0xE4F6F0,tree:0x14261A,treeHi:0x2E4A2A,beam:0xB8D2F0};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20261034);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+const DOT=(()=>{const s=32,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d');g.fillStyle='#fff';g.beginPath();g.arc(s/2,s/2,s/2-1,0,Math.PI*2);g.fill();return new THREE.CanvasTexture(cv);})();
+function roundDots(o){o.material.map=DOT;o.material.alphaTest=0.5;o.material.needsUpdate=true;return o;}
+function mkGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+function glowPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size,op){return new THREE.Points(mkGeo(pos,col),new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:op||0.92}));}
+function dynBuf(n){const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));return {a,g};}
+function dynCol(g,n){const a=new Float32Array(n*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));return a;}
+const C=h=>new THREE.Color(h),V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const hash2=(a,b)=>{const s=Math.sin(a*12.9898+b*78.233)*43758.5453;return s-Math.floor(s);};
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.sky);scene.fog=new THREE.FogExp2(PAL.fog,0.019);
+const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,0.1,900);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+/* the building sits in `world`, shifted so the orbit centre (the origin) falls over tray 2, mid-bay in bay 3,
+   equidistant from the four nearest full-height columns */
+const OX=0.6,OZ=19.5,world=new THREE.Group();world.position.set(OX,0,OZ);scene.add(world);
+const AMB=[];function amb(m,k){AMB.push({m,base:m.color.clone().multiplyScalar(k||1)});return m;}
+function glowAdd(o,parent,fog){o.material.fog=!!fog;o.renderOrder=6;(parent||world).add(o);return o;}
+
+/* ---------- massing (local units ~ metres): four trays stepping down to the east (x), eight 13 m bays along z ---------- */
+const NT=4,DY=3.2,G=18,RS=0.1,TD=1.8,REC=4,NB=8,BAY=13,HW=NB*BAY/2;
+const XF=[25,11,0,-11,-22];              // XF[k] = east (front) edge of tray k, XF[k+1] = its west edge; tray 0 meets the east glass
+const CL=[];for(let i=0;i<=NB;i++)CL.push(-HW+i*BAY);   // the nine column lines: truss, columns, east fin and roof fin on each
+const yT=k=>k*DY;
+function bayAt(x){if(x>=XF[1])return 0;for(let k=1;k<NT;k++)if(x>=XF[k+1])return k;return NT-1;}   // tray index under x
+const floorAt=x=>yT(bayAt(x));
+const GK=k=>G-1.4*k;                    // headroom under the roof, tighter on the upper trays
+const roofBay=(k,x)=>yT(k)+GK(k)-RS*(x-XF[k+1]);
+const roofAt=x=>roofBay(bayAt(x),x);
+const chordT=x=>19.8-0.1636*x-0.15;      // sloping truss top chord, under the high (west) end of every roof step
+const TZ=CL;
+const SAG=[{z:-39,k:0,a:1.4},{z:13,k:0,a:1.0},{z:39,k:1,a:0.9},{z:26,k:2,a:0.8},{z:-52,k:1,a:0.6}];   // all clear of the orbit (bays 2-4)
+function sagAt(x,z){let s=0;for(const q of SAG){const x0=XF[q.k+1],x1=XF[q.k];if(x<x0||x>x1)continue;const w=1-Math.abs(z-q.z)/6;if(w<=0)continue;s+=q.a*Math.sin(Math.PI*(x-x0)/(x1-x0))*w;}return s;}
+const roofY=(k,x,z)=>roofBay(k,x)-sagAt(x,z);
+const MD=V(0.78,0.44,0.3).normalize();   // toward the moon: east, over the low end of the roof
+const MC=MD.clone().multiplyScalar(380);
+
+/* ---------- accumulators ---------- */
+const MG={p:[],c:[],i:[]},GQ={p:[],c:[],i:[]};
+const acc=()=>({p:[],c:[]});
+const RUL=acc(),RUG=acc(),RUS=acc(),ML=acc(),BR=acc(),RL=acc(),CS=acc(),FS=acc(),FL=acc(),LV=acc(),DRP=acc(),SH=acc(),FG=acc(),OT=acc(),TM=acc();
+function put(B,x,y,z,col){B.p.push(x,y,z);B.c.push(col.r,col.g,col.b);}
+function seg(B,A,Bv,c1,c2){c2=c2||c1;B.p.push(A.x,A.y,A.z,Bv.x,Bv.y,Bv.z);B.c.push(c1.r,c1.g,c1.b,c2.r,c2.g,c2.b);}
+const _m4=new THREE.Matrix4(),_eu=new THREE.Euler(),_v3=new THREE.Vector3(),_up=V(0,1,0);
+const BOXF=[[0,1,3,2],[4,5,7,6],[0,1,5,4],[2,3,7,6],[0,2,6,4],[1,3,7,5]];
+/* boxes that sit level drop their underside: the camera is always above them (keepBot for the roof fins) */
+function box(cx,cy,cz,sx,sy,sz,col,rx,ry,rz,kt,kb,keepBot){const skipBot=!keepBot&&Math.abs(rx||0)<0.2&&Math.abs(rz||0)<0.2;_m4.makeRotationFromEuler(_eu.set(rx||0,ry||0,rz||0));_m4.setPosition(cx,cy,cz);const b=MG.p.length/3,t=kt||1.2,bo=kb||0.65;
+  for(let i=0;i<8;i++){_v3.set((i&1?.5:-.5)*sx,(i&2?.5:-.5)*sy,(i&4?.5:-.5)*sz).applyMatrix4(_m4);MG.p.push(_v3.x,_v3.y,_v3.z);const k=i&2?t:bo;MG.c.push(col.r*k,col.g*k,col.b*k);}
+  for(const f of BOXF){if(skipBot&&f===BOXF[2])continue;MG.i.push(b+f[0],b+f[1],b+f[2],b+f[0],b+f[2],b+f[3]);}}
+function gquad(O,U,W2,nu,nv,colF){const b=MG.p.length/3;for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++){const u=i/nu,v=j/nv,x=O.x+U.x*u+W2.x*v,y=O.y+U.y*u+W2.y*v,z=O.z+U.z*u+W2.z*v;MG.p.push(x,y,z);const cc=colF(u,v,x,y,z);MG.c.push(cc.r,cc.g,cc.b);}
+  for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const a=b+j*(nu+1)+i,cc=a+nu+1;MG.i.push(a,a+1,cc+1,a,cc+1,cc);}}
+function tube(path,r,sg,colF){const base=MG.p.length/3,n=path.length;let N=null;
+  for(let k=0;k<n;k++){const T=new THREE.Vector3().subVectors(path[Math.min(n-1,k+1)],path[Math.max(0,k-1)]).normalize();
+    if(!N)N=Math.abs(T.y)>0.9?V(1,0,0):_up.clone();N.sub(T.clone().multiplyScalar(N.dot(T))).normalize();const B=new THREE.Vector3().crossVectors(T,N);
+    for(let j=0;j<sg;j++){const an=j/sg*Math.PI*2+Math.PI/4,dir=N.clone().multiplyScalar(Math.cos(an)).add(B.clone().multiplyScalar(Math.sin(an)));
+      const P=path[k].clone().addScaledVector(dir,r);MG.p.push(P.x,P.y,P.z);const cc=colF(k/((n-1)||1),dir.y,P);MG.c.push(cc.r,cc.g,cc.b);}}
+  for(let k=0;k<n-1;k++)for(let j=0;j<sg;j++){const a=base+k*sg+j,b=base+k*sg+(j+1)%sg;MG.i.push(a,a+sg,b,b,a+sg,b+sg);}}
+function gpush(A,B,Cc,D,col){const b=GQ.p.length/3;for(const q of [A,B,Cc,D]){GQ.p.push(q.x,q.y,q.z);GQ.c.push(col.r,col.g,col.b);}GQ.i.push(b,b+1,b+2,b,b+2,b+3);}
+
+const cConc=C(PAL.conc),cConcLo=C(PAL.concLo),cConcHi=C(PAL.concHi),cMoss=C(PAL.moss),cMossHi=C(PAL.mossHi),cStain=C(PAL.stain);
+const cSteel=C(PAL.steel),cSteelHi=C(PAL.steelHi),cRust=C(PAL.rust),cRustHi=C(PAL.rustHi),cMull=C(PAL.mull),cShard=C(PAL.shard);
+function concC(y){const cc=cConcLo.clone().lerp(cConc,0.35+0.45*rng());if(((y*2.6)%1+1)%1<0.08)cc.multiplyScalar(0.78);return cc;}
+
+/* ---------- roof glazing: which panes are gone ---------- */
+const PNZ=NB*6,PW=BAY/6,PNX=k=>k===0||k===NT-1?5:4,pwOf=k=>(XF[k]-XF[k+1])/PNX(k);
+/* roof units: over the top tray, in every bay, a glazed lantern RUH above the roof on pane columns 1-3 and the middle four pane rows */
+const RUK=NT-1,RUH=4.4,inRU=(k,ix,iz)=>k===RUK&&ix>=1&&ix<=3&&iz%6>=1&&iz%6<=4;
+const underRU=(x,z)=>{const pw=(XF[RUK]-XF[RUK+1])/5,ix=Math.floor((x-XF[RUK+1])/pw),iz=Math.floor((z+HW)/(BAY/6));return inRU(RUK,ix,iz);};
+const BRK=[],BROKEN=[];
+for(let k=0;k<NT;k++){const n=PNX(k),pw=pwOf(k),a=new Uint8Array(n*PNZ);
+  for(let ix=0;ix<n;ix++)for(let iz=0;iz<PNZ;iz++){const xc=XF[k+1]+(ix+.5)*pw,zc=-HW+(iz+.5)*PW,nz=Math.sin(xc*0.29+zc*0.21+1.3)+0.8*Math.sin(zc*0.47-xc*0.13+0.4),ru=inRU(k,ix,iz);
+    const b=rng()<(ru?0.3:0.47)+0.2*nz+(sagAt(xc,zc)>0.15?0.4:0)?1:0;a[ix*PNZ+iz]=b;if(b)BROKEN.push({k,ru,x0:XF[k+1]+ix*pw,x1:XF[k+1]+(ix+1)*pw,z0:-HW+iz*PW,z1:-HW+(iz+1)*PW});}
+  BRK.push(a);}
+function brokenAt(x,z){const k=bayAt(x),pw=pwOf(k),ix=MU.clamp(Math.floor((x-XF[k+1])/pw),0,PNX(k)-1),iz=MU.clamp(Math.floor((z+HW)/PW),0,PNZ-1);return BRK[k][ix*PNZ+iz];}
+/* how much moonlight reaches a floor point: ray toward the moon through the roof (or the east glass) */
+function litAt(x,y,z){const XE=XF[0];let t=(roofAt(x)-y)/MD.y;for(let i=0;i<3;i++)t=(roofAt(Math.min(XE-0.01,x+MD.x*t))-y)/MD.y;
+  const hx=x+MD.x*t,hz=z+MD.z*t;
+  if(hx>=XE){const te=(XE-x)/MD.x,ye=y+MD.y*te,ze=z+MD.z*te;if(Math.abs(ze)>HW)return 0.3;return hash2(Math.floor(ze/PW),Math.floor(ye/2))<0.45?1:0.3;}
+  if(Math.abs(hz)>HW)return 0.3;
+  let s=brokenAt(hx,hz)?1:0.3;for(const zt of TZ)if(Math.abs(hz-zt)<0.3)s=0.05;
+  const fz=(((hz+HW)/PW)%1+1)%1;if(fz<0.03||fz>0.97)s*=0.3;return s;}
+
+/* ---------- concrete: tray slabs, parapets, recesses under each tray, columns, west wall ---------- */
+for(let k=0;k<NT;k++){const y=yT(k),xa=k<NT-1?XF[k+1]-REC:XF[NT],xb=XF[k];
+  gquad(V(xa,y,-HW),V(xb-xa,0,0),V(0,0,2*HW),Math.ceil((xb-xa)/2),48,(u,v,x)=>{const cc=C(PAL.floor).lerp(C(PAL.floorHi),rng()*0.4);if(k<NT-1&&x<XF[k+1])cc.multiplyScalar(0.3+0.4*(x-xa)/REC);return cc.multiplyScalar(0.8);});
+  if(k>0){
+    gquad(V(xb,y-0.7,-HW),V(0,1.6,0),V(0,0,2*HW),3,48,(u,v,x,yy)=>concC(yy));
+    gquad(V(xb-0.25,y+0.9,-HW),V(0.25,0,0),V(0,0,2*HW),1,48,()=>cConcHi.clone().lerp(cMoss,0.35*rng()));
+    gquad(V(xb-0.25,y,-HW),V(0,0.9,0),V(0,0,2*HW),1,48,(u,v,x,yy)=>concC(yy).multiplyScalar(0.85));
+    gquad(V(xb-REC,y-0.7,-HW),V(REC,0,0),V(0,0,2*HW),2,16,u=>cConcLo.clone().multiplyScalar(0.3+0.5*u));
+    gquad(V(xb-REC,yT(k-1),-HW),V(0,DY-0.7,0),V(0,0,2*HW),2,16,()=>cConcLo.clone().multiplyScalar(0.22+0.1*rng()));
+    // columns on every column line: full height (floor below up to the truss) on the tray-1 and tray-3 edges, piers under the tray-2 slab
+    for(let i=1;i<NB;i++){const z=CL[i],cx=xb-0.6;
+      if(k%2){const top=chordT(cx)-TD-sagAt(cx,z),y0=yT(k-1);box(cx,(y0+top)/2,z,0.7,top-y0,0.7,cConc,0,0,0,0.95,0.4);
+        for(let q=0;q<70;q++){const yy=y0+rng()*(top-y0),cc=concC(yy);if(yy-y0<0.8)cc.lerp(cMoss,0.6);put(CS,cx+(rng()<0.5?0.37:-0.37),yy,z+rand(-.35,.35),cc);}}
+      else box(cx,yT(k-1)+(DY-0.7)/2,z,0.7,DY-0.7,0.7,cConc,0,0,0,0.8,0.35);}
+    // steel stair down to the tray below, off by the north glass
+    for(let s=0;s<16;s++){const sy=yT(k-1)+(s+1)*DY/16,sz=-HW+2+s*0.36;box(xb+0.7,sy-0.03,sz,1.2,0.05,0.34,cSteel,0,0,0,1.4,0.8);}
+    seg(RL,V(xb+0.1,yT(k-1)+0.9,-HW+1.8),V(xb+0.1,yT(k)+0.9,-HW+7.6),cSteelHi);seg(RL,V(xb+1.3,yT(k-1)+0.9,-HW+1.8),V(xb+1.3,yT(k)+0.9,-HW+7.6),cSteelHi);
+    // handrail on the parapet
+    for(let z=-HW;z<HW;z+=2){seg(RL,V(xb-0.12,y+0.9,z),V(xb-0.12,y+1.1,z),cSteel);}
+    seg(RL,V(xb-0.12,y+1.1,-HW),V(xb-0.12,y+1.1,HW),cSteelHi);}
+  // north + south walls under each tray
+  for(const sd of [-1,1])gquad(V(XF[k+1],-1,sd*HW),V(XF[k]-XF[k+1],0,0),V(0,y+1,0),4,3,(u,v,x,yy)=>concC(yy).multiplyScalar(0.7));}
+gquad(V(XF[NT],yT(NT-1),-HW),V(0,GK(NT-1)+0.4,0),V(0,0,2*HW),9,48,(u,v,x,yy)=>concC(yy));
+gquad(V(XF[0],-1,-HW),V(0,1,0),V(0,0,2*HW),1,16,(u,v,x,yy)=>concC(yy));
+// full-height fins at the east glass and pilasters on the west wall, one per column line
+for(const z of CL){const ft=roofBay(0,XF[0]);box(XF[0]-0.6,(ft-1)/2,z,1.2,ft+1,0.55,cConc,0,0,0,0.95,0.45);
+  box(XF[NT]+0.35,yT(NT-1)+(GK(NT-1)+0.4)/2,z,0.7,GK(NT-1)+0.4,0.9,cConc,0,0,0,0.9,0.45);}
+// roof fins: concrete blades rising through the roof between the roof units
+for(const z of CL){const xc=(XF[NT]+XF[NT-1])/2-0.5,len=XF[NT-1]-XF[NT]-1;box(xc,roofBay(RUK,xc)+2.4,z,len,5.2,0.6,cConc,0,0,-Math.atan(RS),1.0,0.55,true);}
+
+/* ---------- sloping tubular trusses, purlins, posts; some bays sagged ---------- */
+const stCol=(u,up,P)=>{const cc=cSteel.clone().lerp(cSteelHi,ss(up*0.5+0.5)*0.7);const n=Math.sin(P.x*0.37+P.z*0.11)+Math.sin(P.x*0.91+1.7);if(n>0.9)cc.lerp(up>0?cRustHi:cRust,0.55);if(up>0.6&&Math.sin(P.x*0.53+P.z)>0.6)cc.lerp(cMossHi,0.45);return cc;};
+const TRB=[];
+for(const zt of TZ){const top=[],bot=[];for(let x=XF[NT]+0.2;x<=XF[0]-0.19;x+=1.25){const s=sagAt(x,zt);top.push(V(x,chordT(x)-s,zt));bot.push(V(x,chordT(x)-TD-s,zt));}
+  tube(top,0.17,5,stCol);tube(bot,0.17,5,stCol);
+  for(let i=0;i+2<top.length;i+=2){tube([bot[i],top[i+1]],0.06,4,stCol);tube([top[i+1],bot[i+2]],0.06,4,stCol);}
+  for(const b of bot)TRB.push(b);
+  for(let i=0;i<70;i++){const x=rand(XF[NT]+0.5,XF[0]-0.5),s=sagAt(x,zt);put(TM,x,chordT(x)-s+0.17,zt+rand(-.13,.13),lerpC(PAL.moss,PAL.mossHi,rng()));}}
+for(let k=0;k<NT;k++){const n=PNX(k),pw=pwOf(k);
+  for(let ix=0;ix<=n;ix++){const x=XF[k+1]+ix*pw,path=[];for(let z=-HW;z<=HW+0.01;z+=BAY/2)path.push(V(x,roofY(k,x,z)-0.1,z));tube(path,0.09,4,stCol);
+    if(ix>0)for(const zt of TZ){const s=sagAt(x,zt),y0=chordT(x)-s,y1=roofY(k,x,zt)-0.1;if(y1-y0>0.2)tube([V(x,y0,zt),V(x,y1,zt)],0.06,4,stCol);}}}
+
+/* ---------- glass: roof panes, east clerestories, east + north/south curtain walls ---------- */
+function pane(A,B,Cc,D,broken,nShard,floorGlass,cx){
+  if(!broken){const g=C(PAL.glass).multiplyScalar(0.7+0.5*rng());if(rng()<0.15)g.lerp(cShard,0.35);gpush(A,B,Cc,D,g);}
+  else{const E=[[A,B],[B,Cc],[Cc,D],[D,A]],ctr=A.clone().add(B).add(Cc).add(D).multiplyScalar(0.25);
+    for(let i=0;i<nShard;i++){const e=pick(E),P=e[0].clone().lerp(e[1],rng());P.lerp(ctr,0.35*rng()*rng());put(SH,P.x,P.y,P.z,cShard.clone().multiplyScalar(0.5+0.5*rng()));}
+    if(floorGlass)for(let i=0;i<floorGlass;i++){const x=MU.clamp(ctr.x+rand(-2,2),XF[NT]+0.2,XF[0]-0.2),z=MU.clamp(ctr.z+rand(-2,2),-HW+0.2,HW-0.2);put(FG,x,floorAt(x)+0.03,z,cShard.clone().multiplyScalar(0.4+0.6*rng()));}}
+  seg(ML,A,B,cMull);seg(ML,B,Cc,cMull);}
+for(let k=0;k<NT;k++){const n=PNX(k),pw=pwOf(k);
+  for(let ix=0;ix<n;ix++)for(let iz=0;iz<PNZ;iz++){const x0=XF[k+1]+ix*pw,x1=x0+pw,z0=-HW+iz*PW,z1=z0+PW,e=0.04,lift=inRU(k,ix,iz)?RUH:0;
+    pane(V(x0+e,roofY(k,x0+e,z0+e)-0.05+lift,z0+e),V(x1-e,roofY(k,x1-e,z0+e)-0.05+lift,z0+e),V(x1-e,roofY(k,x1-e,z1-e)-0.05+lift,z1-e),V(x0+e,roofY(k,x0+e,z1-e)-0.05+lift,z1-e),BRK[k][ix*PNZ+iz],lift?8:12,lift?4:6);}
+  if(k>0){const xc=XF[k],yb=yT(k-1)+GK(k-1),yt=roofBay(k,XF[k]);for(let iz=0;iz<PNZ;iz++){const z0=-HW+iz*PW,z1=z0+PW;
+    pane(V(xc,yb,z0),V(xc,yb,z1),V(xc,yt,z1),V(xc,yt,z0),rng()<0.42,10,0);}}}
+// the roof units' glass walls (their tops are the lifted roof panes above) and a steel frame at every corner
+{const k=RUK,pw=pwOf(k),xa=XF[k+1]+pw,xb=XF[k+1]+4*pw,cF=cSteelHi;
+  for(let b=0;b<NB;b++){const za=CL[b]+PW,zb=CL[b]+5*PW;
+    for(const x of [xa,xb])for(let iz=0;iz<4;iz++)for(let j=0;j<2;j++){const z0=za+iz*PW,z1=z0+PW,r0=roofBay(k,x),y0=r0+j*RUH/2,y1=y0+RUH/2;
+      pane(V(x,y0,z0),V(x,y0,z1),V(x,y1,z1),V(x,y1,z0),hash2(x*0.3+b,iz+j*5)<0.35,8,0);}
+    for(const z of [za,zb])for(let ix=0;ix<3;ix++)for(let j=0;j<2;j++){const x0=xa+ix*pw,x1=x0+pw,a0=roofBay(k,x0)+j*RUH/2,a1=roofBay(k,x1)+j*RUH/2;
+      pane(V(x0,a0,z),V(x1,a1,z),V(x1,a1+RUH/2,z),V(x0,a0+RUH/2,z),hash2(z*0.7+ix,j+b)<0.35,8,0);}
+    for(const x of [xa,xb])for(const z of [za,zb])tube([V(x,roofBay(k,x)-0.1,z),V(x,roofBay(k,x)+RUH,z)],0.08,4,()=>cF);
+    // sky caught in the unit: its edges and a faint glow inside, so the row of eight reads from the trays below
+    const P=(x,z,h)=>V(x,roofBay(k,x)+h,z),cw=C(0xFFFFFF);for(const h of [0,RUH]){seg(RUL,P(xa,za,h),P(xb,za,h),cw);seg(RUL,P(xb,za,h),P(xb,zb,h),cw);seg(RUL,P(xb,zb,h),P(xa,zb,h),cw);seg(RUL,P(xa,zb,h),P(xa,za,h),cw);}
+    for(const x of [xa,xb])for(const z of [za,zb])seg(RUL,P(x,z,0),P(x,z,RUH),cw);
+    for(let i=0;i<18;i++){const x=rand(xa+1,xb-1),z=rand(za+1,zb-1),f=0.6+0.4*rng();put(RUG,x,roofBay(k,x)+rand(0.6,RUH-0.6),z,C(0xFFFFFF).multiplyScalar(f));}
+    // and the sky it lets down onto the top tray: a soft column of light under every unit
+    for(let i=0;i<34;i++){const u=Math.pow(rng(),0.7),x=rand(xa+0.6,xb-0.6),z=rand(za+0.6,zb-0.6),f=(0.25+0.75*u)*(0.7+0.3*rng());put(RUS,x,yT(k)+0.8+u*(roofBay(k,x)-yT(k)-1),z,C(0xFFFFFF).multiplyScalar(f));}}}
+{const XE=XF[0],top=roofBay(0,XE),nr=7,h=top/nr;for(let iz=0;iz<PNZ;iz++)for(let j=0;j<nr;j++){const z0=-HW+iz*PW,z1=z0+PW,y0=j*h,y1=y0+h;
+  pane(V(XE,y0,z0),V(XE,y0,z1),V(XE,y1,z1),V(XE,y1,z0),hash2(iz,j)<0.45,8,0);}}
+for(const sd of [-1,1])for(let k=0;k<NT;k++){const n=PNX(k),pw=pwOf(k),nr=Math.ceil(GK(k)/2),h=2.0;
+  for(let ix=0;ix<n;ix++){const xa=XF[k+1]+ix*pw,xb=xa+pw,ra=roofBay(k,xa),rb=roofBay(k,xb);
+    for(let j=0;j<nr;j++){const y0=yT(k)+j*h,y1=y0+h,ta=Math.min(y1,ra),tb=Math.min(y1,rb);if(y0>=Math.max(ta,tb)-0.05)continue;
+      pane(V(xa,y0,sd*HW),V(xb,y0,sd*HW),V(xb,Math.max(y0,tb),sd*HW),V(xa,Math.max(y0,ta),sd*HW),hash2(xa*0.7+sd,j*1.3)<0.5,10,0);}}}
+
+/* ---------- desks, drafting stools, models, rolled drawings, monitors ---------- */
+const cDesk=C(PAL.desk),cDeskLo=C(PAL.deskLo),cStool=C(PAL.stool),cPaper=C(PAL.paper),cMon=C(PAL.mon);
+const LAMP={x:-4.6,z:-21.5},LASER={x:3.9,z:-15.5};
+const DESKS=[],MONC=[];
+for(let k=0;k<NT;k++){const y=yT(k),xw=XF[k+1],xe=XF[k],rows=[];for(let x=xw+1.4;x<=xe-1.8;x+=2.5)rows.push({x,rec:false});if(k<NT-1)rows.push({x:xw-2.2,rec:true});
+  rows.forEach((r,ri)=>{const face=ri%2?1:-1;
+    for(let b=0;b<NB;b++)for(let j=0;j<5;j++){const z=CL[b]+2.5+j*2.0;if(rng()<(r.rec?0.5:0.3))continue;   // five desks per bay, aisles on the column lines
+      if(k===2&&Math.abs(r.x-LAMP.x)<1.4&&Math.abs(z-LAMP.z)<1.4)continue;if(k===1&&Math.abs(r.x-LASER.x)<1.6&&Math.abs(z-LASER.z)<1.8)continue;
+      const dx=r.x+rand(-.15,.15),dz=z+rand(-.1,.1),ry=rand(-.08,.08)+(rng()<0.1?rand(-.6,.6):0);
+      const cd=cDesk.clone().multiplyScalar(r.rec?0.4:0.75+0.3*rng()),cl=cDeskLo.clone().multiplyScalar(r.rec?0.45:1);
+      if(rng()<0.07){box(dx,y+0.46,dz,0.9,0.04,1.8,cd,0,ry,(rng()<0.5?1:-1)*rand(1.3,1.5));box(dx+0.3,y+0.03,dz,0.72,0.04,0.84,cl,0,ry+1.57,0);continue;}
+      box(dx,y+0.74,dz,0.9,0.04,1.8,cd,0,ry,0);box(dx,y+0.36,dz-0.86,0.84,0.72,0.04,cl,0,ry,0);box(dx,y+0.36,dz+0.86,0.84,0.72,0.04,cl,0,ry,0);
+      if(rng()<0.15)box(dx-face*0.47,y+1.05,dz,0.03,0.6,1.8,cl,0,ry,0);
+      DESKS.push({x:dx,y:y+0.76,z:dz,face,k,rec:r.rec});
+      if(rng()<0.55){const sx=dx+face*0.75+rand(-.2,.2),sz=dz+rand(-.5,.5);
+        if(rng()<0.14)box(sx,y+0.2,sz,0.38,0.6,0.38,cStool,0,rand(0,3),1.5);
+        else{box(sx,y+0.62,sz,0.38,0.05,0.38,cStool);box(sx,y+0.31,sz,0.05,0.6,0.05,cSteelHi);}}}});}
+const MODC=[C(PAL.chip),C(PAL.chip).multiplyScalar(0.8),C(PAL.foam),C(PAL.foamB),C(PAL.foamP)];
+for(const d of DESKS){if(d.rec){if(rng()<0.2)box(d.x,d.y+0.1,d.z,0.3,0.2,0.4,MODC[0].clone().multiplyScalar(0.4));continue;}
+  if(rng()<0.3){const n=1+(rng()*4|0),mx=d.x+rand(-.2,.2),mz=d.z+rand(-.5,.5),base=pick(MODC);let hy=0;
+    for(let i=0;i<n;i++){const sx=rand(.08,.32),sz=rand(.08,.32),sh=rand(.04,.38),stack=rng()<0.3;const cc=(rng()<0.3?pick(MODC):base).clone();if(rng()<0.2)cc.lerp(cMoss,0.4);
+      const yy=stack?hy:0;box(mx+rand(-.18,.18),d.y+yy+sh/2,mz+rand(-.35,.35),sx,sh,sz,cc,0,rand(-.3,.3),0,1.15,0.7);hy=yy+sh;}}
+  if(rng()<0.2){const n=1+(rng()*3|0);for(let i=0;i<n;i++)box(d.x+rand(-.25,.25),d.y+0.04+i*0.075,d.z+rand(-.4,.4),0.07,0.07,rand(.6,.9),cPaper.clone().multiplyScalar(0.7+0.3*rng()),0,rand(-.5,.5),0,1.1,0.8);}
+  if(rng()<0.1)box(d.x+rand(-.1,.1),d.y+0.01,d.z+rand(-.3,.3),0.6,0.01,0.45,cPaper.clone().multiplyScalar(0.8),0,rand(-.3,.3),0);
+  if(rng()<0.2&&d.k<NT-1){const mx=d.x-d.face*0.3;box(mx,d.y+0.32,d.z,0.04,0.38,0.58,cMon,0,0,0,1.4,1);box(mx,d.y+0.07,d.z,0.18,0.12,0.06,cMon);MONC.push({x:mx+d.face*0.03,y:d.y+0.32,z:d.z,f:d.face,k:d.k});}}
+// soaked sheets, rolled drawings and chipboard on the floors
+for(let i=0;i<230;i++){const k=(rng()*NT)|0,x=rand(XF[k+1]+0.3,XF[k]-0.3),z=rand(-HW+1,HW-1),y=yT(k);
+  if(rng()<0.7)box(x,y+0.012,z,rand(.4,.8),0.01,rand(.3,.6),cPaper.clone().multiplyScalar(0.45+0.3*rng()),0,rand(0,3),0);
+  else if(rng()<0.6)box(x,y+0.04,z,0.07,0.07,rand(.6,1.0),cPaper.clone().multiplyScalar(0.6),0,rand(0,3),0);
+  else box(x,y+0.02,z,rand(.6,1.2),0.02,rand(.4,.8),MODC[1].clone().multiplyScalar(0.7),0,rand(0,3),0);}
+// the laser cutter (tray 1) and the desk with the lamp (tray 2)
+box(LASER.x,yT(1)+0.42,LASER.z,1.0,0.84,1.7,C(0x2A2E30),0,0,0,1.1,0.6);box(LASER.x,yT(1)+0.88,LASER.z,1.04,0.08,1.74,C(0x3A2A26),0,0,0,1.2,0.8);
+box(LAMP.x,yT(2)+0.74,LAMP.z,0.9,0.04,1.8,cDesk.clone().multiplyScalar(0.9));box(LAMP.x,yT(2)+0.36,LAMP.z-0.86,0.84,0.72,0.04,cDeskLo);box(LAMP.x,yT(2)+0.36,LAMP.z+0.86,0.84,0.72,0.04,cDeskLo);
+box(LAMP.x+0.1,yT(2)+0.78,LAMP.z+0.3,0.5,0.03,0.4,cPaper.clone().multiplyScalar(0.85));
+const LH=V(LAMP.x+0.15,yT(2)+1.35,LAMP.z-0.15);
+{const b=V(LAMP.x-0.25,yT(2)+0.78,LAMP.z-0.55),e1=V(LAMP.x-0.35,yT(2)+1.3,LAMP.z-0.45);box(b.x,b.y,b.z,0.18,0.03,0.18,cSteel);seg(RL,b,e1,cSteelHi);seg(RL,e1,LH.clone().add(V(0,0.06,0)),cSteelHi);box(LH.x,LH.y+0.03,LH.z,0.16,0.08,0.16,cSteel,0.3,0,0.3);}
+
+/* ---------- surface stipple: floors (moonlit where the roof is open), concrete, moss ---------- */
+function floorCol(x,z,wet){const cc=C(PAL.floor).lerp(C(PAL.floorHi),rng()*0.6),n=Math.sin(x*0.45+z*0.31)+Math.sin(z*0.67-x*0.23+1.1);
+  if(n>1.05||(wet&&rng()<0.55))cc.lerp(rng()<0.5?cMoss:cMossHi,0.5+0.4*rng());
+  else if(rng()<0.06)cc.copy(pick(MODC)).multiplyScalar(0.55);else if(rng()<0.06)cc.lerp(C(0x6A5030),0.6);return cc;}
+for(let k=0;k<NT;k++){const y=yT(k),x0=XF[k+1],x1=XF[k],n=((x1-x0)*2*HW*2.7)|0;
+  for(let i=0;i<n;i++){const x=rand(x0,x1),z=rand(-HW,HW),wet=brokenAt(x,z),lt=k===RUK&&underRU(x,z)?1:litAt(x,y+0.02,z),cc=floorCol(x,z,wet);
+    if(lt>0.9){cc.lerp(C(0xFFFFFF),0.3);put(FL,x,y+0.025,z,cc);}else put(FS,x,y+0.025,z,cc.multiplyScalar(lt>0.2?1:0.75));}
+  if(k<NT-1)for(let i=0;i<300;i++){const x=rand(x0-REC,x0),z=rand(-HW,HW);put(FS,x,y+0.025,z,floorCol(x,z,false).multiplyScalar(0.3));}}
+// fascias: board-form bands, rain streaks under the parapet, moss along the top
+for(let k=1;k<NT;k++){const xb=XF[k],y=yT(k);
+  for(let i=0;i<1500;i++){const u=rng(),z=rand(-HW,HW),yy=y-0.7+u*1.6,cc=concC(yy);if(Math.sin(z*1.7)+Math.sin(z*0.53+k)>1.1)cc.lerp(cStain,0.6);if(u>0.85&&rng()<0.6)cc.lerp(rng()<0.5?cMoss:cMossHi,0.6);put(CS,xb+0.03,yy,z,cc);}
+  for(let i=0;i<850;i++)put(CS,xb-rand(0,0.25),y+0.93,rand(-HW,HW),lerpC(PAL.moss,PAL.mossHi,rng()).lerp(cConcHi,0.3*rng()));
+  for(let i=0;i<280;i++){const z=CL[1+((rng()*(NB-1))|0)]+rand(-.35,.35),yy=yT(k-1)+rng()*(DY-0.7);put(CS,xb-0.24,yy,z,concC(yy).multiplyScalar(0.55).lerp(cMoss,yy-yT(k-1)<0.6?0.6:0));}}
+for(let i=0;i<3300;i++){const yy=yT(NT-1)+rng()*(GK(NT-1)+0.2),z=rand(-HW,HW),cc=concC(yy);if(Math.sin(z*1.3)+Math.sin(z*0.41)>1.2)cc.lerp(cStain,0.55);if(yy<yT(NT-1)+1.4*rng()*2)cc.lerp(cMoss,0.6);if(yy>yT(NT-1)+10&&Math.sin(z*0.9+yy)>0.5)cc.lerp(cMossHi,0.4);put(CS,XF[NT]+0.03,yy,z,cc);}
+for(let b=0;b<18;b++){const z0=rand(-HW+2,HW-2),h=rand(3,13),w=rand(1.5,4);for(let i=0;i<150;i++){const v=Math.pow(rng(),0.7),yy=yT(NT-1)+v*h,z=z0+rand(-1,1)*w*(1-0.6*v)+0.4*Math.sin(yy*1.7+b);put(DRP,XF[NT]+0.06+rand(0,.08),yy,z,lerpC(PAL.vine,PAL.leafHi,rng()*rng()*1.2));}}
+for(let s=0;s<28;s++){const z=rand(-HW+1,HW-1),y0=rand(yT(NT-1)+9,yT(NT-1)+GK(NT-1)-0.4),len=rand(2,9),ph=rand(0,6.28);for(let d=0;d<len;d+=0.08)put(DRP,XF[NT]+0.08+0.05*Math.sin(d*4+ph),y0-d,z+0.12*Math.sin(d*2.5+ph),lerpC(PAL.vine,PAL.leafHi,rng()*0.7));}
+for(const zt of TZ)for(let i=0;i<70;i++){const yy=rng()*(roofBay(0,XF[0])+1)-1;put(CS,XF[0]-1.22,yy,zt+rand(-.25,.25),concC(yy).lerp(cMoss,yy<1.5?0.6:0));}
+
+/* ---------- overgrowth: saplings from the desks, vines over the parapets ---------- */
+const cBark=C(PAL.bark);
+function tree(x,y,z,h){const top=V(x+rand(-.2,.2)*h*0.4,y+h*0.55,z+rand(-.2,.2)*h*0.4);seg(BR,V(x,y,z),top,cBark);
+  const nb=3+((rng()*3)|0);for(let b=0;b<nb;b++){const a=rand(0,6.28),r=h*rand(0.18,0.38),tip=V(top.x+Math.cos(a)*r,y+h*rand(0.75,1.0),top.z+Math.sin(a)*r);seg(BR,top,tip,cBark,C(PAL.leaf));
+    const nl=(10+h*9)|0,rr=h*0.2;for(let i=0;i<nl;i++)put(LV,tip.x+rand(-1,1)*rr,tip.y+rand(-0.6,0.8)*rr,tip.z+rand(-1,1)*rr,lerpC(PAL.leaf,PAL.leafHi,rng()*rng()));}}
+{const H=[[3,9],[2,6],[1.5,4],[1.5,3]],N=[14,14,12,7];
+  for(let k=0;k<NT;k++)for(let i=0;i<N[k];i++){const onDesk=k<3&&rng()<0.6,ds=DESKS.filter(d=>d.k===k&&!d.rec);let x,z,y;
+    if(onDesk&&ds.length){const d=pick(ds);x=d.x;z=d.z;y=d.y;}else{x=rand(XF[k+1]+0.8,XF[k]-1);z=rand(-HW+2,HW-2);y=yT(k);}
+    if(k===NT-1)x=Math.min(x,-15.5);tree(x,y,z,rand(H[k][0],H[k][1]));}}
+for(let k=1;k<NT;k++)for(let s=0;s<18;s++){const z=rand(-HW+1,HW-1),len=rand(0.6,3.6),ph=rand(0,6.28);
+  for(let u=-0.3;u<0;u+=0.06)put(DRP,XF[k]+u,yT(k)+0.95,z+0.1*Math.sin(u*9+ph),lerpC(PAL.vine,PAL.leafHi,rng()*0.6));
+  for(let d=0;d<len;d+=0.06){const cc=lerpC(PAL.vine,PAL.leafHi,rng()*0.7);put(DRP,XF[k]+0.06+0.05*Math.sin(d*5+ph),yT(k)+0.9-d,z+0.15*Math.sin(d*3+ph),cc);if(rng()<0.5)put(DRP,XF[k]+0.06+rand(0,.15),yT(k)+0.9-d+rand(-.1,.1),z+rand(-.2,.2),lerpC(PAL.leaf,PAL.leafHi,rng()));}}
+// the overgrown grounds outside the glass
+for(let i=0;i<34;i++){let x,z;if(i<14){x=rand(35,72);z=rand(-85,85);}else{z=(i%2?1:-1)*rand(60,90);x=rand(-44,32);}
+  const cy=rand(5,13),r=rand(4,8);for(let j=0;j<100;j++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),rr=r*Math.cbrt(rng());put(OT,x+rr*Math.sin(v)*Math.cos(u),cy+rr*Math.cos(v)*0.8,z+rr*Math.sin(v)*Math.sin(u),lerpC(PAL.tree,PAL.treeHi,rng()));}}
+
+/* ---------- build merged static objects ---------- */
+const mgGeo=new THREE.BufferGeometry();mgGeo.setAttribute('position',new THREE.Float32BufferAttribute(MG.p,3));mgGeo.setAttribute('color',new THREE.Float32BufferAttribute(MG.c,3));mgGeo.setIndex(MG.i);
+const solid=new THREE.Mesh(mgGeo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));world.add(solid);amb(solid.material);
+const gqGeo=new THREE.BufferGeometry();gqGeo.setAttribute('position',new THREE.Float32BufferAttribute(GQ.p,3));gqGeo.setAttribute('color',new THREE.Float32BufferAttribute(GQ.c,3));gqGeo.setIndex(GQ.i);
+const glassMat=new THREE.MeshBasicMaterial({color:0x24384A,vertexColors:true,transparent:true,opacity:0.34,depthWrite:false,side:THREE.DoubleSide});
+const glassMesh=new THREE.Mesh(gqGeo,glassMat);glassMesh.renderOrder=3;world.add(glassMesh);
+const lines=new THREE.LineSegments(mkGeo(ML.p.concat(RL.p),ML.c.concat(RL.c)),new THREE.LineBasicMaterial({vertexColors:true}));world.add(lines);amb(lines.material);
+const branches=new THREE.LineSegments(mkGeo(BR.p,BR.c),new THREE.LineBasicMaterial({vertexColors:true}));world.add(branches);amb(branches.material);
+const concDots=roundDots(rockPoints(CS.p,CS.c,0.11));world.add(concDots);amb(concDots.material);
+const floorDots=roundDots(rockPoints(FS.p,FS.c,0.09));world.add(floorDots);amb(floorDots.material);
+const litFloor=roundDots(rockPoints(FL.p,FL.c,0.1));world.add(litFloor);
+const leaves=roundDots(rockPoints(LV.p,LV.c,0.13));world.add(leaves);amb(leaves.material);
+const drape=roundDots(rockPoints(DRP.p.concat(TM.p),DRP.c.concat(TM.c),0.1));world.add(drape);amb(drape.material);
+const outTrees=roundDots(rockPoints(OT.p,OT.c,0.75,0.85));world.add(outTrees);amb(outTrees.material);
+const shards=glowAdd(glowPoints(SH.p,SH.c,0.16,0.7),world,true);
+const floorGlass=glowAdd(glowPoints(FG.p,FG.c,0.12,0.6),world,true);
+const ruEdge=glowAdd(new THREE.LineSegments(mkGeo(RUL.p,RUL.c),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false})),world,false);
+const ruGlow=glowAdd(glowPoints(RUG.p,RUG.c,4.2,0.1),world,false),ruShaft=glowAdd(glowPoints(RUS.p,RUS.c,3.2,0.05),world,true);
+const ground=new THREE.Mesh(new THREE.CircleGeometry(420,48),new THREE.MeshBasicMaterial({color:0x0A1410}));ground.rotation.x=-Math.PI/2;ground.position.y=-1.05;world.add(ground);amb(ground.material);
+
+/* ---------- sky: moon, stars, clouds ---------- */
+let moonMat,haloMat,starMat,stars,starBase,starPh=[];
+{const R=11,p=[],col=[];for(let i=0;i<900;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=R*Math.sin(v)*Math.cos(u),y=R*Math.cos(v),z=R*Math.sin(v)*Math.sin(u),cr=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4);
+    const cc=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*cr,0.4,1));p.push(MC.x+x,MC.y+y,MC.z+z);col.push(cc.r,cc.g,cc.b);}
+  const m=glowAdd(glowPoints(p,col,1.6,0.95),scene);moonMat=m.material;m.renderOrder=0;
+  const h=glowAdd(glowPoints([MC.x,MC.y,MC.z],[...C(PAL.halo).toArray()],80,0.3),scene);haloMat=h.material;h.renderOrder=0;}
+{const p=[],col=[];for(let i=0;i<1100;i++){const u=rand(0,6.28),v=Math.acos(rand(0.1,1)),R=rand(320,430);p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),cc=lerpC(PAL.pale,0xFFF6E8,rng());col.push(cc.r*b,cc.g*b,cc.b*b);starPh.push(rand(0,6.28));}
+  starBase=new Float32Array(col);stars=glowAdd(glowPoints(p,col,2.4,0.9),scene);starMat=stars.material;stars.renderOrder=0;}
+const clouds=new THREE.Group();scene.add(clouds);let cloudMat;
+{const right=new THREE.Vector3().crossVectors(MD,_up).normalize(),upv=new THREE.Vector3().crossVectors(right,MD).normalize(),p=[],col=[];
+  for(let b=0;b<5;b++){const off=rand(-90,90),uo=rand(-40,30),w=rand(30,60);for(let i=0;i<50;i++){const Q=MC.clone().multiplyScalar(0.92).addScaledVector(right,off+rand(-w,w)).addScaledVector(upv,uo+rand(-5,5));p.push(Q.x,Q.y,Q.z);const cc=lerpC(PAL.cloud,0x6A7A8A,rng()*(b<2?1:0.5));col.push(cc.r,cc.g,cc.b);}}
+  const o=glowAdd(glowPoints(p,col,16,0.4),clouds);cloudMat=o.material;o.renderOrder=1;}
+
+/* ---------- water on the lower trays ---------- */
+let W=1;
+const waterMat=new THREE.MeshBasicMaterial({color:PAL.water,transparent:true,opacity:0.66,depthWrite:false,side:THREE.DoubleSide});
+const waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(XF[0]-XF[NT],2*HW),waterMat);waterPlane.rotation.x=-Math.PI/2;waterPlane.position.x=(XF[0]+XF[NT])/2;waterPlane.renderOrder=2;world.add(waterPlane);
+const wg=new THREE.Group();world.add(wg);
+function glintSet(n,x0,x1){const p=[],col=[],ph=new Float32Array(n);for(let i=0;i<n;i++){p.push(rand(x0,x1),0.03,rand(-HW+0.2,HW-0.2));const cc=lerpC(PAL.glint,0xFFFFFF,rng()*0.3),b=0.4+0.6*rng();col.push(cc.r*b,cc.g*b,cc.b*b);ph[i]=rand(0,6.28);}
+  const o=glowAdd(glowPoints(p,col,0.2,0.75),wg,true);return {o,ph,base:new Float32Array(col),arr:o.geometry.attributes.color.array,n};}
+const GL0=glintSet(1700,XF[1]-REC+0.2,XF[0]-0.2),GL1=glintSet(1100,XF[2]-REC+0.2,XF[1]-0.2);
+const refN=90,{a:refPos,g:refGeo}=dynBuf(refN),refCol=dynCol(refGeo,refN),refItems=[];
+for(let i=0;i<refN;i++){refItems.push({m:0.45+1.6*rng()*rng(),xj:rand(-1,1),ph:rand(0,6.28)});const cc=lerpC(PAL.glint,PAL.moon,rng());refCol[i*3]=cc.r;refCol[i*3+1]=cc.g;refCol[i*3+2]=cc.b;}
+const moonRef=glowAdd(new THREE.Points(refGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false})),world,true);
+const RRN=60,RRP=14,{a:rpPos,g:rpGeo}=dynBuf(RRN*RRP),rpCol=dynCol(rpGeo,RRN*RRP),RIP=[];let ripNext=0;
+for(let i=0;i<RRN;i++)RIP.push({on:false,x:0,y:-50,z:0,rr:0,max:1,spd:1,b:1});
+function ripple(x,y,z,max,b){const r=RIP[ripNext];ripNext=(ripNext+1)%RRN;r.on=true;r.x=x;r.y=y;r.z=z;r.rr=0.04;r.max=max;r.spd=max*rand(1.1,1.6);r.b=b;}
+const ripObj=glowAdd(new THREE.Points(rpGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})),world,true);
+
+/* ---------- rain through the broken panes (and outside the glass) ---------- */
+const RIN=820,ROUT=220,RN=RIN+ROUT,RD=[],{a:raPos,g:raGeo}=dynBuf(RN*2),raCol=dynCol(raGeo,RN*2);
+function spawn(d,init){if(!d.out){const b=pick(BROKEN);d.x=rand(b.x0,b.x1);d.z=rand(b.z0,b.z1);d.top=roofY(b.k,d.x,d.z)+(b.ru?RUH:0)-0.06;d.g=floorAt(d.x-0.4);}
+  else{do{d.x=rand(-70,75);d.z=rand(-95,95);}while(d.x>XF[NT]-2&&d.x<XF[0]+2&&Math.abs(d.z)<HW+2);d.top=42;d.g=-1;}d.y=init?rand(d.g,d.top):d.top;}
+for(let i=0;i<RN;i++){const d={out:i>=RIN,v:rand(15,21)};spawn(d,true);RD.push(d);const cc=C(PAL.rain),b=0.5+0.5*rng();for(let e=0;e<2;e++){const f=e?b:b*0.25;raCol[i*6+e*3]=cc.r*f;raCol[i*6+e*3+1]=cc.g*f;raCol[i*6+e*3+2]=cc.b*f;}}
+const rainObj=glowAdd(new THREE.LineSegments(raGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})),world,true);
+
+/* ---------- moonbeams through the larger holes + dust in them ---------- */
+const BEAMS=[];{const cand=BROKEN.filter(b=>!b.ru&&b.k>=1&&Math.abs((b.z0+b.z1)/2+OZ)<22);for(let i=0;i<7&&cand.length;i++){const b=cand.splice((rng()*cand.length)|0,1)[0];BEAMS.push(b);}}
+const SHV=42,SHD=26,BN=BEAMS.length;let beamVol,beamDust;const bdSeed=[],bL=[];
+{const p=[],col=[];for(const b of BEAMS){const xc=(b.x0+b.x1)/2,yc=roofY(b.k,xc,(b.z0+b.z1)/2);let L=(yc-floorAt(xc))/MD.y;L=(yc-floorAt(xc-MD.x*L))/MD.y;bL.push(L);
+    for(let i=0;i<SHV;i++){const s=Math.pow(rng(),0.85),x=rand(b.x0,b.x1),z=rand(b.z0,b.z1),y=roofY(b.k,x,z);p.push(x-MD.x*L*s,y-MD.y*L*s,z-MD.z*L*s);const f=(1-0.7*s)*(0.6+0.4*rng());col.push(f,f,f);}
+    for(let i=0;i<SHD;i++)bdSeed.push(rand(0,1),rand(0,1),rng(),rand(0.4,1.4),rand(0,6.28));}
+  beamVol=glowAdd(glowPoints(p,col,2.6,0.05),world);}
+const {a:bdPos,g:bdGeo}=dynBuf(Math.max(1,BN*SHD));{const cc=dynCol(bdGeo,Math.max(1,BN*SHD));for(let i=0;i<BN*SHD;i++){const b=0.6+0.4*rng();cc[i*3]=cc[i*3+1]=cc[i*3+2]=b;}}
+beamDust=glowAdd(new THREE.Points(bdGeo,new THREE.PointsMaterial({size:0.07,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false})),world);
+// mist: low over the water, high haze under the roof
+const mists=[];function mistLayer(n,fx,fy,size,op){const p=[],col=[];for(let i=0;i<n;i++){const x=fx(),z=rand(-HW+1,HW-1);p.push(x,fy(x),z);const cc=lerpC(0x9EB8C8,0xFFFFFF,rng()*0.2);col.push(cc.r,cc.g,cc.b);}const o=glowAdd(glowPoints(p,col,size,op),world,true);mists.push({o,op});return o;}
+const mistLo=mistLayer(110,()=>rand(XF[1]-REC,XF[0]-1),()=>0.6+rand(-.3,.3),6,0.08);
+mistLayer(76,()=>rand(XF[NT]+2,XF[0]-2),x=>floorAt(x)+rand(9,15),7,0.055);
+
+/* ---------- hanging vines off the bottom chords (sway) ---------- */
+const vines=[];
+for(let k=0;k<96;k++){const b=pick(TRB),inWin=Math.abs(b.x+OX)<13&&Math.abs(b.z+OZ)<14;const mx=inWin?b.y-0.3-14.7:Math.min(9,b.y-floorAt(b.x)-1.5);if(mx<0.4)continue;
+  vines.push({ax:b.x,ay:b.y-0.2,az:b.z,len:rand(0.4,1)*mx,ph:rand(0,6.28),sway:rand(0.15,0.5)});}
+const VS=8,vN=vines.length,vP=new Float32Array(vN*VS*2*3),vGeo=new THREE.BufferGeometry();vGeo.setAttribute('position',new THREE.BufferAttribute(vP,3));
+{const col=[];for(const v of vines)for(let s=0;s<VS;s++){const cc=lerpC(PAL.vine,PAL.mossHi,0.2+0.6*s/VS);for(let e=0;e<2;e++)col.push(cc.r,cc.g,cc.b);}vGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));}
+const vineObj=new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.85}));world.add(vineObj);amb(vineObj.material);
+const LF=3,{a:lfPos,g:lfGeo}=dynBuf(vN*VS*LF),lfJ=new Float32Array(vN*VS*LF*3);
+{const cc=dynCol(lfGeo,vN*VS*LF);for(let i=0;i<vN*VS*LF;i++){const q=lerpC(PAL.leaf,PAL.leafHi,rng());cc[i*3]=q.r;cc[i*3+1]=q.g;cc[i*3+2]=q.b;lfJ[i*3]=rand(-.2,.2);lfJ[i*3+1]=rand(-.15,.1);lfJ[i*3+2]=rand(-.2,.2);}}
+const leafObj=roundDots(new THREE.Points(lfGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,transparent:true,opacity:0.92})));world.add(leafObj);amb(leafObj.material);
+
+/* ---------- what still has power: monitors, the laser cutter, one desk lamp ---------- */
+const MONS=[];{const near=MONC.filter(m=>Math.abs(m.z+OZ)<26),far=MONC.filter(m=>Math.abs(m.z+OZ)>=26);for(let i=0;i<11;i++){const pool=i<8?near:far;if(!pool.length)continue;const m=pool.splice((rng()*pool.length)|0,1)[0];m.mode=i%4;m.ph=rand(0,6.28);m.c=C(pick([PAL.scr,PAL.scr,PAL.scrW,PAL.scrG]));MONS.push(m);}}
+const MP=12,MNn=MONS.length,{a:msPos,g:msGeo}=dynBuf(Math.max(1,MNn*MP)),msCol=dynCol(msGeo,Math.max(1,MNn*MP));
+const {a:mhPos,g:mhGeo}=dynBuf(Math.max(1,MNn)),mhCol=dynCol(mhGeo,Math.max(1,MNn));
+MONS.forEach((m,i)=>{for(let j=0;j<MP;j++){const o=(i*MP+j)*3;msPos[o]=m.x+m.f*0.002;msPos[o+1]=m.y-0.12+(j/4|0)*0.12;msPos[o+2]=m.z-0.21+(j%4)*0.14;}mhPos[i*3]=m.x+m.f*0.25;mhPos[i*3+1]=m.y;mhPos[i*3+2]=m.z;});
+const monScr=glowAdd(new THREE.Points(msGeo,new THREE.PointsMaterial({size:0.2,vertexColors:true,map:GLOW,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false})));
+const monHalo=glowAdd(new THREE.Points(mhGeo,new THREE.PointsMaterial({size:2.4,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false})));
+const LY=yT(1)+0.93;let laserLid,laserHead,laserHalo;
+{const p=[],col=[];for(let i=0;i<6;i++)for(let j=0;j<10;j++){p.push(LASER.x-0.4+i*0.16,LY,LASER.z-0.72+j*0.16);const cc=lerpC(PAL.laser,PAL.laserO,rng()*0.5);col.push(cc.r,cc.g,cc.b);}
+  laserLid=glowAdd(glowPoints(p,col,0.35,0.5));laserHead=glowAdd(glowPoints([LASER.x,LY+0.02,LASER.z],[1,0.55,0.35],0.5,1));laserHalo=glowAdd(glowPoints([LASER.x,LY+0.3,LASER.z],[...C(PAL.laser).toArray()],5,0.35));}
+let lampHead,lampPool,lampHalo;
+{lampHead=glowAdd(glowPoints([LH.x,LH.y-0.03,LH.z],[...C(PAL.lamp).toArray()],0.6,1));
+  const p=[],col=[];for(let i=0;i<40;i++){const a=rand(0,6.28),r=0.45*Math.sqrt(rng());p.push(LH.x+r*Math.cos(a),yT(2)+0.8,LH.z+r*Math.sin(a));const f=(1-r/0.5)*0.7;const cc=C(PAL.lamp);col.push(cc.r*f,cc.g*f,cc.b*f);}
+  lampPool=glowAdd(glowPoints(p,col,0.5,0.6));lampHalo=glowAdd(glowPoints([LH.x,LH.y-0.2,LH.z],[...C(PAL.lamp).toArray()],5.5,0.3));}
+// kodama spirit motes (abstract; no creatures)
+const MN=4,MQ=14,{a:moPos,g:moGeo}=dynBuf(MN*MQ),moCol=dynCol(moGeo,MN*MQ),moOff=[],MO=[];
+for(let m=0;m<MN;m++){MO.push({ph:rand(0,6.28),dir:rng()<0.5?-1:1});for(let k=0;k<MQ;k++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=k===0?0:0.22*Math.cbrt(rng());moOff.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v),r*Math.sin(v)*Math.sin(u));}}
+const motes=glowAdd(new THREE.Points(moGeo,new THREE.PointsMaterial({size:0.18,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* ---------- TIME (sky through the roof) + FLOOD + RAIN ---------- */
+const TK=[
+ {p:0.00,sky:0x3A3A56,fog:0x26303C,fd:0.018,amb:0.8, moon:0.3,star:0.25,bc:0xF2B890,bi:0.75,gl:0x5A5A70,wat:0x18222E,rain:0.4,mon:0.8},
+ {p:0.25,sky:0x8C9CA6,fog:0x56666C,fd:0.013,amb:1.05,moon:0.0,star:0.0, bc:0xEAF2F0,bi:1.0, gl:0x8A9AA0,wat:0x2A3C42,rain:0.25,mon:0.45},
+ {p:0.50,sky:0x3C2440,fog:0x2C2632,fd:0.017,amb:0.74,moon:0.45,star:0.3,bc:0xFF9A62,bi:0.8, gl:0x5A4458,wat:0x1C1822,rain:0.7,mon:0.85},
+ {p:0.75,sky:0x040A14,fog:0x0B1820,fd:0.019,amb:0.5, moon:1.0,star:1.0, bc:0xB8D2F0,bi:0.85,gl:0x24384A,wat:0x081620,rain:1.0,mon:1.0}];
+function tparams(p){p=((p%1)+1)%1;let i=0;for(let k=0;k<TK.length;k++)if(TK[k].p<=p)i=k;const A=TK[i],B=TK[(i+1)%TK.length];let span=B.p-A.p;if(span<=0)span+=1;let f=(p-A.p);if(f<0)f+=1;f=ss(f/span);
+  const o={};for(const k2 of ['fd','amb','moon','star','bi','rain','mon'])o[k2]=MU.lerp(A[k2],B[k2],f);for(const k2 of ['sky','fog','bc','gl','wat'])o[k2]=lerpC(A[k2],B[k2],f);return o;}
+let P=0.75,timeAuto=false,targetP=0.75,F=0.4,floodAuto=true,targetF=0.4,RLv=1,rainAuto=true,targetR=1;
+const NAMES=['dawn','day','dusk','night'];
+function grpSet(sel,btn){document.querySelectorAll(sel).forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-t]',b);if(b.dataset.t==='auto')timeAuto=true;else{timeAuto=false;targetP=parseFloat(b.dataset.t);}}));
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-f]',b);if(b.dataset.f==='auto')floodAuto=true;else{floodAuto=false;targetF=parseFloat(b.dataset.f);}}));
+document.querySelectorAll('[data-r]').forEach(b=>b.addEventListener('click',()=>{grpSet('[data-r]',b);if(b.dataset.r==='auto')rainAuto=true;else{rainAuto=false;targetR=parseFloat(b.dataset.r);}}));
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('on',turntable);});
+const phaseEl=document.getElementById('phase');
+
+/* camera — orbiting inside the studio over tray 2, mid-bay in bay 3, looking up the long axis by default:
+   the circle (radius + a horizontal pan of 3) stays inside the four nearest full-height columns, above the
+   tray-3 parapet and saplings, and below the bottom chords (no sagged truss near it) */
+const target=new THREE.Vector3(0,13.6,0);
+let camA=Math.PI*1.59,camR=7.5,camY=13.2,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.1,12,14.2);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.02,6,8.2);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.scr,'monitors','a few still flicker'],[PAL.laser,'laser cutter','one job never finished'],[PAL.lamp,'desk lamp','left on'],[PAL.beam,'moonlight','through the missing panes'],[PAL.leafHi,'overgrowth','saplings in the desks'],[PAL.glint,'standing water','rises with the flood']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${C(r[0]).getHexString()};box-shadow:0 0 10px #${C(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+scene.traverse(o=>{o.frustumCulled=false;});
+
+/* ---------- animate ---------- */
+const clock=new THREE.Clock();let last=0,frame=0;const _c1=new THREE.Color();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;frame++;
+  if(turntable&&!drag)camA+=0.0007;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  const lcx=camera.position.x-OX,lcy=camera.position.y,lcz=camera.position.z-OZ;
+  if(timeAuto)P=(P+dt/110)%1;else{let d=((targetP-P+0.5)%1+1)%1-0.5;P=((P+d*Math.min(1,dt*1.4))%1+1)%1;}
+  if(floodAuto)F=0.5+0.5*Math.sin(t*0.045-0.4);else F+=(targetF-F)*Math.min(1,dt*1.2);
+  const par=tparams(P);
+  RLv+=((rainAuto?par.rain:targetR)-RLv)*Math.min(1,dt*1.5);
+  scene.background.copy(par.sky);scene.fog.color.copy(par.fog);scene.fog.density=par.fd;
+  for(const A of AMB)A.m.color.copy(A.base).multiplyScalar(par.amb);
+  W=0.25+F*4.6;waterPlane.position.y=W;wg.position.y=W;waterMat.color.copy(par.wat);
+  glassMat.color.copy(par.gl);
+  litFloor.material.color.copy(par.bc).multiplyScalar(par.bi*(0.45+0.55*par.amb));
+  ruEdge.material.color.copy(par.bc).multiplyScalar(0.5+0.5*Math.max(par.moon,1-par.star));ruGlow.material.color.copy(par.bc);ruGlow.material.opacity=0.07+0.09*Math.max(par.moon,1-par.star);ruShaft.material.color.copy(par.bc);ruShaft.material.opacity=0.09*par.bi*(0.5+0.5*Math.max(par.moon,1-par.star));
+  shards.material.color.copy(par.bc);shards.material.opacity=0.3+0.5*par.bi;floorGlass.material.color.copy(par.bc);floorGlass.material.opacity=(0.25+0.5*par.moon)*(0.6+0.4*Math.sin(t*0.7));
+  beamVol.material.color.copy(par.bc);beamVol.material.opacity=0.055*par.bi*(0.5+0.5*Math.max(par.moon,1-par.star));beamDust.material.color.copy(par.bc);beamDust.material.opacity=0.8*par.bi;
+  moonMat.opacity=0.95*par.moon;haloMat.opacity=0.3*par.moon;starMat.opacity=0.9*par.star;cloudMat.opacity=0.25+0.2*par.moon;
+  clouds.rotation.y=0.12*Math.sin(t*0.01);
+  for(const m of mists)m.o.material.opacity=m.op*(0.6+0.4*par.amb);mistLo.position.y=W;
+  phaseEl.textContent='— '+NAMES[Math.round(P*4)%4]+' · water '+((F*100)|0)+'% · rain '+((RLv*100)|0)+'% —';
+  // glints on the flooded trays
+  GL0.o.material.opacity=0.75*(0.5+0.5*par.bi);GL1.o.material.opacity=0.75*ss((W-3.25)/0.3);
+  for(const S of [GL0,GL1]){if(S.o.material.opacity<0.01)continue;const a=S.arr,bb=S.base;for(let i=0;i<S.n;i++){const tw=0.2+0.8*Math.pow(Math.max(0,Math.sin(t*1.7+S.ph[i])),3);a[i*3]=bb[i*3]*tw;a[i*3+1]=bb[i*3+1]*tw;a[i*3+2]=bb[i*3+2]*tw;}S.o.geometry.attributes.color.needsUpdate=true;}
+  // moon glitter: where the moon's image meets the water, stretched toward the camera
+  {const h1=Math.max(0.5,lcy-W),h2=MC.y-W,lx=MC.x-OX-lcx,lz=MC.z-OZ-lcz,f0=h1/(h1+h2),ll=Math.hypot(lx,lz),nx=-lz/ll,nz=lx/ll,mo=par.moon;
+    for(let i=0;i<refN;i++){const r=refItems[i],u=f0*r.m,w=(0.3+u*ll*0.08)*r.xj+0.25*Math.sin(t*2+r.ph);let x=lcx+lx*u+nx*w,z=lcz+lz*u+nz*w,y=W+0.04;if(x>XF[0]-0.2||Math.abs(z)>HW-0.2||mo<0.02)y=-60;refPos[i*3]=x;refPos[i*3+1]=y;refPos[i*3+2]=z;}
+    refGeo.attributes.position.needsUpdate=true;moonRef.material.opacity=0.8*mo;}
+  // rain
+  {const nIn=RIN*RLv,nOut=ROUT*RLv;for(let i=0;i<RN;i++){const d=RD[i],o=i*6,on=d.out?(i-RIN)<nOut:i<nIn;
+      if(!on){raPos[o]=raPos[o+3]=0;raPos[o+1]=raPos[o+4]=-200;raPos[o+2]=raPos[o+5]=0;continue;}
+      d.y-=d.v*dt;d.x-=0.5*dt;const gr=d.out?-1:Math.max(d.g,W);
+      if(d.y<=gr){if(!d.out&&rng()<0.55)ripple(d.x,gr+0.03,d.z,gr===W?rand(0.4,1.1):rand(0.12,0.3),gr===W?1:0.55);spawn(d,false);}
+      raPos[o]=d.x+0.03;raPos[o+1]=d.y+0.6;raPos[o+2]=d.z;raPos[o+3]=d.x;raPos[o+4]=d.y;raPos[o+5]=d.z;}
+    raGeo.attributes.position.needsUpdate=true;rainObj.material.opacity=0.25+0.3*RLv;}
+  // ripples + splashes
+  {let idx=0;for(const r of RIP){if(r.on){r.rr+=r.spd*dt;if(r.rr>r.max)r.on=false;}const fade=r.on?Math.pow(1-r.rr/r.max,1.3)*r.b:0;
+    for(let k=0;k<RRP;k++){const a=k/RRP*Math.PI*2;rpPos[idx*3]=r.x+r.rr*Math.cos(a);rpPos[idx*3+1]=r.on?r.y:-60;rpPos[idx*3+2]=r.z+r.rr*Math.sin(a);rpCol[idx*3]=0.6*fade;rpCol[idx*3+1]=0.8*fade;rpCol[idx*3+2]=0.85*fade;idx++;}}
+    rpGeo.attributes.position.needsUpdate=true;rpGeo.attributes.color.needsUpdate=true;}
+  // dust drifting down the moonbeams
+  for(let b=0;b<BN;b++){const B=BEAMS[b],L=bL[b];for(let i=0;i<SHD;i++){const k=b*SHD+i,q=k*5,s=(bdSeed[q+2]+t*0.01*bdSeed[q+3])%1,x=B.x0+(B.x1-B.x0)*bdSeed[q]+0.2*Math.sin(t*0.5+bdSeed[q+4]),z=B.z0+(B.z1-B.z0)*bdSeed[q+1]+0.2*Math.cos(t*0.4+bdSeed[q+4]),y=roofBay(B.k,x);
+      bdPos[k*3]=x-MD.x*L*s;bdPos[k*3+1]=y-MD.y*L*s;bdPos[k*3+2]=z-MD.z*L*s;}}
+  if(BN)bdGeo.attributes.position.needsUpdate=true;
+  // monitors
+  for(let i=0;i<MNn;i++){const m=MONS[i],ph=t+m.ph;let b;
+    if(m.mode===0)b=0.8+0.2*Math.sin(t*31+m.ph)*Math.sin(t*7);else if(m.mode===1)b=(Math.sin(ph*2.3)*Math.sin(ph*5.1)>0.3)?0.08:0.9;else if(m.mode===2)b=0.55;else b=(ph%6)<0.25?1:0.04;
+    b*=par.mon;for(let j=0;j<MP;j++){const o=(i*MP+j)*3;let bj=b;if(m.mode===2){const row=j/4|0;bj=b*(0.35+0.65*(((t*1.6+m.ph)%3|0)===row?1:0.25));}msCol[o]=m.c.r*bj;msCol[o+1]=m.c.g*bj;msCol[o+2]=m.c.b*bj;}
+    mhCol[i*3]=m.c.r*b*0.6;mhCol[i*3+1]=m.c.g*b*0.6;mhCol[i*3+2]=m.c.b*b*0.6;}
+  if(MNn){msGeo.attributes.color.needsUpdate=true;mhGeo.attributes.color.needsUpdate=true;}
+  // laser cutter: the head rasters the lid, the glow breathes
+  {const u=(t*0.9)%1,row=((t*0.9)|0)%9,hp=laserHead.geometry.attributes.position.array;hp[0]=LASER.x-0.4+0.8*(row%2?1-u:u);hp[2]=LASER.z-0.7+row*0.16;laserHead.geometry.attributes.position.needsUpdate=true;
+    const br=0.75+0.25*Math.sin(t*2.1);laserHead.material.opacity=Math.sin(t*40)>-0.3?1:0.3;laserLid.material.opacity=0.35*br;laserHalo.material.opacity=0.28*br;}
+  // the desk lamp, bulb going
+  {const fl=(Math.sin(t*0.37)>0.9&&Math.sin(t*23)>0)?0.3:1;lampHead.material.opacity=fl;lampPool.material.opacity=0.6*fl;lampHalo.material.opacity=0.3*fl;}
+  // vines + leaves
+  {let i=0,li=0;for(const v of vines){let x0=v.ax,y0=v.ay,z0=v.az;for(let s=1;s<=VS;s++){const f=s/VS,x=v.ax+v.sway*f*Math.sin(t*0.6+v.ph-f*1.4),y=v.ay-f*v.len,z=v.az+v.sway*0.5*f*Math.cos(t*0.5+v.ph);
+      vP[i*6]=x0;vP[i*6+1]=y0;vP[i*6+2]=z0;vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;x0=x;y0=y;z0=z;i++;
+      for(let q=0;q<LF;q++){lfPos[li*3]=x+lfJ[li*3];lfPos[li*3+1]=y+lfJ[li*3+1];lfPos[li*3+2]=z+lfJ[li*3+2];li++;}}}
+    vGeo.attributes.position.needsUpdate=true;lfGeo.attributes.position.needsUpdate=true;}
+  // spirit motes over the trays
+  for(let m=0;m<MN;m++){const M=MO[m],ph=M.ph,mx=2+18*Math.sin(t*0.021*M.dir+ph),mz=-OZ+30*Math.sin(t*0.017+ph*2),my=Math.max(floorAt(mx),W)+1.6+1.2*Math.sin(t*0.07+ph),op=ss(Math.sin(t*0.11+ph*3)*1.6+0.4)*(0.4+0.6*par.star);
+    for(let k=0;k<MQ;k++){const o=(m*MQ+k)*3,b=op*(k===0?1:0.55)*(0.8+0.2*Math.sin(t*3+k));moPos[o]=mx+moOff[o];moPos[o+1]=my+moOff[o+1]+0.15*Math.sin(t*1.3+ph);moPos[o+2]=mz+moOff[o+2];moCol[o]=0.85*b;moCol[o+1]=0.96*b;moCol[o+2]=0.92*b;}}
+  moGeo.attributes.position.needsUpdate=true;moGeo.attributes.color.needsUpdate=true;
+  // stars twinkle (every other frame)
+  if(par.star>0.01&&frame%2===0){const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.55+0.45*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>

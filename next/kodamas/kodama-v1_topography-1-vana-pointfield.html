@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA·NA · animated topography — study</title>
+<style>
+  :root{
+    --bg:#090E08; --teal:#74D6AE; --gold:#C9A86A; --cream:#ECEAE0; --coral:#E8845A;
+    --mag:#D66AC9; --mono:'DM Mono','Courier New',ui-monospace,monospace;
+    --serif:Cambria,Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}
+  #c:active{cursor:grabbing}
+
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:60vw}
+  #title h1{
+    font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:clamp(19px,2.4vw,30px);line-height:1.15;margin:0;
+    color:var(--cream);text-shadow:0 2px 30px #000;
+  }
+  #title .sub{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--teal);opacity:.8;margin-top:10px;
+  }
+  #legend{
+    bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;
+    color:var(--cream);opacity:.86;text-shadow:0 1px 12px #000;
+  }
+  #legend .row{display:flex;align-items:center;gap:10px}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  #legend .k{color:var(--cream)}
+  #legend .v{opacity:.55}
+  #foot{
+    bottom:22px;right:26px;text-align:right;font-family:var(--mono);
+    font-size:10px;letter-spacing:.08em;color:var(--cream);opacity:.4;
+  }
+  #hint{
+    top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);
+    font-size:12px;letter-spacing:.1em;color:var(--cream);opacity:0;transition:opacity .6s;
+    text-align:center;text-transform:uppercase;
+  }
+  .tag{color:var(--teal)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ui" id="title">
+  <h1>she is assembled from every point we ever measured.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; VVIM point-field over an xēn-gis surface</div>
+</div>
+
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to orbit · scroll to breathe closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, not a deliverable</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   VA·NA — animated isometric topography (study)
+   A floating VVIM point-cloud island (the xēn-gis "ground"), planted with live
+   L-system VA·NA flora, populated by ecosystem-service agent nodes.
+   Reverse-engineered from oio.studio's "mur mur", re-grounded in SymbiOS assets.
+   Pure Three.js r128, no post-processing — glow is additive blending on near-black.
+   ============================================================================= */
+
+const PAL = {
+  bg:0x090E08, teal:0x74D6AE, gold:0xC9A86A, cream:0xECEAE0,
+  coral:0xE8845A, mag:0xD66AC9, grass:0x5FA64B, grassHi:0xB6D96A,
+  soilTop:0xCBA98F, soilMid:0xA9836B, soilLow:0x6E5347,
+};
+
+// ---- seeded RNG (mulberry32) so the world is stable between reloads ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng = mulberry32(20260705);
+const rand=(a=0,b=1)=>a+(b-a)*rng();
+const pick=arr=>arr[(rng()*arr.length)|0];
+const lerpC=(c1,c2,t)=>{const a=new THREE.Color(c1),b=new THREE.Color(c2);return a.lerp(b,t);};
+
+// ---- scene / camera / renderer ----------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(PAL.bg);
+scene.fog = new THREE.FogExp2(PAL.bg, 0.0055);   // far points melt into black
+
+const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({canvas:document.getElementById('c'), antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+
+const world = new THREE.Group();          // everything that floats, tilted isometric
+world.rotation.x = -0.10;
+scene.add(world);
+
+// =============================================================================
+// 1 · THE GROUND — VVIM point-cloud island (stands in for an xēn-gis DEM tile)
+// =============================================================================
+// Heightfield: a lumpy mound masked to an island. Swap terrainHeight() for a
+// real DEM sample and this becomes a measured site instead of an invented one.
+const ISLAND_R = 34;
+function terrainHeight(x,z){
+  const d2=x*x+z*z;
+  let h = 15*Math.exp(-d2/(2*20*20));           // primary mound
+  h += 6*Math.exp(-((x-12)**2+(z+9)**2)/(2*10*10)); // secondary shoulder
+  h += 1.7*Math.sin(x*0.22+z*0.11)*Math.cos(z*0.19); // ripple / texture
+  h += 0.9*Math.sin(x*0.6)*Math.sin(z*0.55);
+  return h;
+}
+function islandMask(x,z){
+  const r=Math.hypot(x,z);
+  const edge=ISLAND_R + 3.2*Math.sin(Math.atan2(z,x)*5.0) + 2.0*Math.sin(Math.atan2(z,x)*11.0);
+  return THREE.MathUtils.clamp((edge-r)/7.0, 0, 1); // soft blobby coastline
+}
+
+const terrPos=[], terrCol=[], surfaceSamples=[];
+const GRID=1.05;
+let maxH=1;
+for(let x=-ISLAND_R-6;x<=ISLAND_R+6;x+=GRID){
+  for(let z=-ISLAND_R-6;z<=ISLAND_R+6;z+=GRID){
+    const m=islandMask(x,z);
+    if(m<=0.02) continue;
+    const jx=x+rand(-0.35,0.35), jz=z+rand(-0.35,0.35);
+    const h=terrainHeight(jx,jz)*m;
+    if(h>maxH) maxH=h;
+    // top skin + a little vertical thickness so the island reads as a solid chunk
+    const layers = 1 + (m>0.5?2:0);
+    for(let L=0;L<layers;L++){
+      const yy = h - L*rand(1.2,2.6);
+      terrPos.push(jx, yy, jz);
+      terrCol.push(0,0,0); // filled after maxH known
+      if(L===0 && m>0.35 && rng()<0.5) surfaceSamples.push([jx,h,jz,m]);
+    }
+  }
+}
+// colour by normalised height (soil ramp)
+for(let i=0;i<terrPos.length/3;i++){
+  const y=terrPos[i*3+1], t=THREE.MathUtils.clamp(y/maxH,0,1);
+  let c = t>0.55 ? lerpC(PAL.soilMid,PAL.soilTop,(t-0.55)/0.45)
+                 : lerpC(PAL.soilLow,PAL.soilMid,t/0.55);
+  terrCol[i*3]=c.r; terrCol[i*3+1]=c.g; terrCol[i*3+2]=c.b;
+}
+const terrGeo=new THREE.BufferGeometry();
+terrGeo.setAttribute('position',new THREE.Float32BufferAttribute(terrPos,3));
+terrGeo.setAttribute('color',new THREE.Float32BufferAttribute(terrCol,3));
+const terrain=new THREE.Points(terrGeo,new THREE.PointsMaterial({
+  size:0.62, vertexColors:true, sizeAttenuation:true,
+  transparent:true, opacity:0.95, depthWrite:true,
+}));
+world.add(terrain);
+
+// bioluminescent coastline halo (the blue rim in the reference) ---------------
+const rimPos=[],rimCol=[];
+for(let a=0;a<Math.PI*2;a+=0.012){
+  const rr=ISLAND_R+ rand(-1,3.5);
+  const x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+  const y=terrainHeight(x,z)*islandMask(x,z) - rand(0.5,3.5);
+  rimPos.push(x,y,z);
+  const c=lerpC(PAL.teal,0x2E6BE0,rng());
+  rimCol.push(c.r,c.g,c.b);
+}
+const rimGeo=new THREE.BufferGeometry();
+rimGeo.setAttribute('position',new THREE.Float32BufferAttribute(rimPos,3));
+rimGeo.setAttribute('color',new THREE.Float32BufferAttribute(rimCol,3));
+world.add(new THREE.Points(rimGeo,new THREE.PointsMaterial({
+  size:0.9,vertexColors:true,transparent:true,opacity:0.8,
+  blending:THREE.AdditiveBlending,depthWrite:false,
+})));
+
+// grass blades around the base -------------------------------------------------
+const bladePos=[],bladeCol=[];
+for(let i=0;i<1400;i++){
+  const a=rand(0,Math.PI*2), rr=rand(ISLAND_R-8,ISLAND_R+4);
+  const x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+  const m=islandMask(x,z); if(m<=0) continue;
+  const base=terrainHeight(x,z)*m;
+  const hgt=rand(1.4,4.2);
+  const c=lerpC(PAL.grass,PAL.grassHi,rng());
+  bladePos.push(x,base,z, x+rand(-0.4,0.4),base+hgt,z+rand(-0.4,0.4));
+  bladeCol.push(c.r*0.4,c.g*0.4,c.b*0.4, c.r,c.g,c.b);
+}
+const bladeGeo=new THREE.BufferGeometry();
+bladeGeo.setAttribute('position',new THREE.Float32BufferAttribute(bladePos,3));
+bladeGeo.setAttribute('color',new THREE.Float32BufferAttribute(bladeCol,3));
+world.add(new THREE.LineSegments(bladeGeo,new THREE.LineBasicMaterial({
+  vertexColors:true,transparent:true,opacity:0.75,
+  blending:THREE.AdditiveBlending,depthWrite:false,
+})));
+
+// =============================================================================
+// 2 · THE LIFE — VA·NA L-system flora (this is your vana-core, in miniature)
+// =============================================================================
+// A stochastic 3D L-system, rule ~ F -> F[+F][-F][/F], turtle-interpreted.
+// Stems accumulate into ONE LineSegments; flowers into ONE Points -> cheap.
+const stemPos=[],stemCol=[], flowPos=[],flowCol=[];
+const FLOWER_COLORS=[PAL.gold,PAL.coral,PAL.mag,PAL.teal,PAL.cream];
+
+function grow(origin, dir, len, radius, depth, hue){
+  if(depth<=0 || len<0.4){
+    // terminal -> a glowing flower/seed head (the ball tops in the reference)
+    flowPos.push(origin.x,origin.y,origin.z);
+    const c=new THREE.Color(hue); flowCol.push(c.r,c.g,c.b);
+    return;
+  }
+  const end=origin.clone().addScaledVector(dir,len);
+  const c0=lerpC(PAL.soilMid,PAL.cream,0.3), c1=lerpC(PAL.cream,PAL.gold,0.4);
+  stemPos.push(origin.x,origin.y,origin.z, end.x,end.y,end.z);
+  stemCol.push(c0.r,c0.g,c0.b, c1.r,c1.g,c1.b);
+
+  const branches = depth>3 ? 1 : (rng()<0.72?2:3);
+  for(let b=0;b<branches;b++){
+    // rotate dir by a jittered branch angle around a random roll axis
+    const roll=rand(0,Math.PI*2);
+    const axis=new THREE.Vector3(Math.cos(roll),0,Math.sin(roll)).normalize();
+    const ang=THREE.MathUtils.degToRad(rand(18,38));
+    const nd=dir.clone().applyAxisAngle(axis,ang);
+    nd.y += rand(0.05,0.28);         // gentle phototropism (reach for light)
+    nd.normalize();
+    grow(end, nd, len*rand(0.68,0.82), radius*0.7, depth-1, hue);
+  }
+}
+
+const PLANT_COUNT=46;
+for(let i=0;i<PLANT_COUNT && i<surfaceSamples.length;i++){
+  const s=pick(surfaceSamples);
+  const [x,y,z] = s;
+  const scale=rand(0.7,1.5);
+  grow(new THREE.Vector3(x,y,z), new THREE.Vector3(rand(-0.15,0.15),1,rand(-0.15,0.15)).normalize(),
+       rand(3.2,5.4)*scale, 1, 4, pick(FLOWER_COLORS));
+}
+const stemGeo=new THREE.BufferGeometry();
+stemGeo.setAttribute('position',new THREE.Float32BufferAttribute(stemPos,3));
+stemGeo.setAttribute('color',new THREE.Float32BufferAttribute(stemCol,3));
+world.add(new THREE.LineSegments(stemGeo,new THREE.LineBasicMaterial({
+  vertexColors:true,transparent:true,opacity:0.9,
+})));
+const flowGeo=new THREE.BufferGeometry();
+flowGeo.setAttribute('position',new THREE.Float32BufferAttribute(flowPos,3));
+flowGeo.setAttribute('color',new THREE.Float32BufferAttribute(flowCol,3));
+const flowers=new THREE.Points(flowGeo,new THREE.PointsMaterial({
+  size:1.5,vertexColors:true,transparent:true,opacity:0.95,
+  blending:THREE.AdditiveBlending,depthWrite:false,
+}));
+world.add(flowers);
+
+// =============================================================================
+// 3 · THE AGENTS — ecosystem-service nodes (oio's decorative agents, made to MEAN)
+// =============================================================================
+// Each wireframe primitive = a Band-3 service reading or a citizen-IoT sensor.
+const agents=[];
+const AGENT_GEO=[
+  ()=>new THREE.BoxGeometry(2,2,2),
+  ()=>new THREE.ConeGeometry(1.4,2.6,4),
+  ()=>new THREE.IcosahedronGeometry(1.5,0),
+  ()=>new THREE.OctahedronGeometry(1.6,0),
+  ()=>new THREE.TorusGeometry(1.3,0.28,6,10),
+];
+const AGENT_COL=[PAL.teal,PAL.mag,PAL.gold,PAL.coral,PAL.cream];
+for(let i=0;i<20;i++){
+  const a=rand(0,Math.PI*2), rr=rand(6,ISLAND_R-2);
+  const x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+  const y=terrainHeight(x,z)*islandMask(x,z)+rand(4,14);
+  const geo=pick(AGENT_GEO)();
+  const wire=new THREE.WireframeGeometry(geo);
+  const line=new THREE.LineSegments(wire,new THREE.LineBasicMaterial({
+    color:pick(AGENT_COL),transparent:true,opacity:0.85,
+    blending:THREE.AdditiveBlending,depthWrite:false,
+  }));
+  line.position.set(x,y,z);
+  line.userData={spin:rand(-0.5,0.5),bob:rand(0,Math.PI*2),baseY:y,amp:rand(0.6,1.8)};
+  world.add(line); agents.push(line);
+  // thin tether down to the ground it reports on
+  const tp=[x,y,z, x,terrainHeight(x,z)*islandMask(x,z),z];
+  const tg=new THREE.BufferGeometry();
+  tg.setAttribute('position',new THREE.Float32BufferAttribute(tp,3));
+  world.add(new THREE.LineSegments(tg,new THREE.LineBasicMaterial({
+    color:pick(AGENT_COL),transparent:true,opacity:0.25,
+    blending:THREE.AdditiveBlending,depthWrite:false,
+  })));
+}
+
+// =============================================================================
+// 4 · AMBIENT — drifting particle field (pollen / spores / ambient life)
+// =============================================================================
+const dustN=800, dustPos=[],dustCol=[];
+for(let i=0;i<dustN;i++){
+  dustPos.push(rand(-70,70),rand(-10,60),rand(-70,70));
+  const c=lerpC(PAL.teal,PAL.cream,rng()); dustCol.push(c.r,c.g,c.b);
+}
+const dustGeo=new THREE.BufferGeometry();
+dustGeo.setAttribute('position',new THREE.Float32BufferAttribute(dustPos,3));
+dustGeo.setAttribute('color',new THREE.Float32BufferAttribute(dustCol,3));
+const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({
+  size:0.5,vertexColors:true,transparent:true,opacity:0.55,
+  blending:THREE.AdditiveBlending,depthWrite:false,
+}));
+scene.add(dust);
+
+// =============================================================================
+// 5 · CAMERA — slow orbit + drag + scroll, looking at the mound
+// =============================================================================
+const target=new THREE.Vector3(0,7,0);
+let camA=0.7, camR=104, camY=44, autoSpin=true;
+let dragging=false, px=0, py=0;
+const cv=document.getElementById('c');
+cv.addEventListener('pointerdown',e=>{dragging=true;autoSpin=false;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  camA -= (e.clientX-px)*0.005;
+  camY = THREE.MathUtils.clamp(camY-(e.clientY-py)*0.35, 6, 96);
+  px=e.clientX; py=e.clientY;
+});
+addEventListener('wheel',e=>{camR=THREE.MathUtils.clamp(camR+e.deltaY*0.05,55,190);},{passive:true});
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+// legend + hint ---------------------------------------------------------------
+const legendRows=[
+  [PAL.soilTop,'VVIM point-field','the xēn-gis ground'],
+  [PAL.gold,'L-system flora','vana-core, live'],
+  [PAL.teal,'service nodes','Band-3 · sensors'],
+  [0x2E6BE0,'coastline halo','tidal edge'],
+];
+document.getElementById('legend').innerHTML = legendRows.map(r=>
+  `<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span class="k">${r[1]}</span><span class="v">${r[2]}</span></div>`
+).join('');
+const hintEl=document.getElementById('hint');
+hintEl.style.opacity=1; setTimeout(()=>hintEl.style.opacity=0,3600);
+
+// =============================================================================
+// 6 · ANIMATE
+// =============================================================================
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(autoSpin) camA+=0.0016;
+
+  camera.position.set(Math.cos(camA)*camR, camY, Math.sin(camA)*camR);
+  camera.lookAt(target);
+
+  // agents bob + spin — the world stays quietly alive
+  for(const a of agents){
+    a.rotation.y += a.userData.spin*0.01;
+    a.rotation.x += a.userData.spin*0.006;
+    a.position.y = a.userData.baseY + Math.sin(t*0.8+a.userData.bob)*a.userData.amp;
+  }
+  // flowers shimmer
+  flowers.material.opacity = 0.78 + 0.22*Math.sin(t*1.6);
+  // dust drifts up and wraps
+  const dp=dust.geometry.attributes.position;
+  for(let i=0;i<dustN;i++){
+    let y=dp.getY(i)+0.03; if(y>60)y=-10; dp.setY(i,y);
+  }
+  dp.needsUpdate=true;
+  // the whole island breathes a half-degree
+  world.rotation.z = Math.sin(t*0.25)*0.01;
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

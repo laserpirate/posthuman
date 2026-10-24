@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA·NA · the cenote — oculus & pool (study)</title>
+<style>
+  :root{
+    --bg:#070A08; --emerald:#1FB9A6; --aqua:#7FF0D8; --sun:#FFE39A; --moss:#6FB24A;
+    --vine:#8FC46A; --morpho:#3FA9F0; --cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;
+    --serif:Cambria,Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:64vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:clamp(19px,2.4vw,30px);line-height:1.15;margin:0;text-shadow:0 2px 34px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--emerald);opacity:.88;margin-top:10px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.88;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  #legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;
+    letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>she keeps one eye open to the sky, and pours the light down whole.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; the cenote — oculus, pool, and the swaying dark</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to orbit · scroll to breathe closer</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   VA·NA — the cenote : an enclosed limestone chamber lit by a single oculus.
+   A god-ray shaft drops through the roof into an emerald pool; a waterfall feeds
+   it; stalactites hang, stalagmites rise; vines and Spanish moss dangle and sway;
+   butterflies flutter in the beam. Warm-shaft / jewel-water palette.
+   Series companion to kodama-v1_topography-1..4. Pure Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x070A08,
+  rockLit:0xC9B79A,rockShadow:0x232826,limestone:0xB7A488,
+  water:0x1FB9A6,waterHi:0x7FF0D8,waterDeep:0x0E6E6A,
+  mossD:0x2E5A2A,mossL:0x6FB24A,vine:0x3E6B34,vineL:0x8FC46A,span:0x9FB39A,
+  sun:0xFFF3C8,sunWarm:0xFFE39A,glow:0xF6E7B0,
+  bMorpho:0x3FA9F0,bBlue:0x7FD8FF,bOrange:0xFF8C3A,bYellow:0xF6D24E,bWhite:0xF0F0E0};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260702);
+const rand=(a=0,b=1)=>a+(b-a)*rng();
+const pick=a=>a[(rng()*a.length)|0];
+const lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t);
+const MU=THREE.MathUtils;
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;
+  const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,
+    transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:0.95}));}
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(PAL.bg);
+scene.fog=new THREE.FogExp2(0x080C0A,0.0058);
+const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,0.1,3000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();world.rotation.x=-0.05;scene.add(world);
+
+/* ---------- chamber dimensions --------------------------------------------- */
+const APEX=82, WALL_TOP=58, R_TOP=50, R_OC=13, R_POOL=30, R_FLOOR=50, WATER_Y=3;
+
+/* chiaroscuro: brighter near the central beam and low (bounce off the pool) */
+function lit(x,y,z){const ax=Math.hypot(x,z);
+  const beam=MU.clamp(1-ax/22,0,1), low=MU.clamp(1-(y-WATER_Y)/56,0,1);
+  return MU.clamp(0.16+0.55*beam+0.32*low*low,0,1);}
+function rockColor(x,y,z){const L=lit(x,y,z);let c=lerpC(PAL.rockShadow,PAL.rockLit,L);
+  if(L>0.6)c=lerpC(c,new THREE.Color(PAL.sunWarm),(L-0.6)*0.55);return c;}
+
+/* ---------- WALLS ----------------------------------------------------------- */
+{const p=[],col=[];
+ for(let a=0;a<Math.PI*2;a+=0.075){for(let y=1;y<WALL_TOP;y+=1.4){
+   const R=46+6*Math.sin(Math.PI*(y/WALL_TOP))+2.4*Math.sin(a*6+y*0.2)+rand(-1,1);
+   const x=R*Math.cos(a),z=R*Math.sin(a),yy=y+rand(-.4,.4);
+   p.push(x,yy,z);const c=rockColor(x,yy,z);col.push(c.r,c.g,c.b);}}
+ world.add(rockPoints(p,col,0.7));}
+
+/* ---------- CEILING DOME (with the oculus hole) ----------------------------- */
+{const p=[],col=[];
+ for(let r=R_TOP;r>=R_OC;r-=1.4){const pr=(r-R_OC)/(R_TOP-R_OC);
+   const y=WALL_TOP+(APEX-WALL_TOP)*(1-Math.sqrt(pr));
+   const n=Math.max(10,(2*Math.PI*r/2.0)|0);
+   for(let k=0;k<n;k++){const a=k/n*Math.PI*2;const x=r*Math.cos(a),z=r*Math.sin(a),yy=y+rand(-.5,.5);
+     p.push(x,yy,z);const c=rockColor(x,yy,z);col.push(c.r,c.g,c.b);}}
+ world.add(rockPoints(p,col,0.7));}
+const OCULUS_Y=APEX; // rim height ~ apex
+
+/* bright sky disk seen through the oculus (the light source) ----------------- */
+{const p=[],col=[];
+ for(let i=0;i<420;i++){const r=R_OC*Math.sqrt(rand()),a=rand(0,Math.PI*2);
+   p.push(r*Math.cos(a),OCULUS_Y+rand(-1,2),r*Math.sin(a));
+   const c=lerpC(PAL.sun,PAL.bBlue,rng()*0.25);col.push(c.r,c.g,c.b);}
+ world.add(glowPoints(p,col,2.2,0.95));}
+
+/* ---------- FLOOR RIM + submerged floor ------------------------------------ */
+{const p=[],col=[];
+ for(let r=R_POOL-5;r<=R_FLOOR;r+=1.3){const n=Math.max(12,(2*Math.PI*r/1.6)|0);
+   for(let k=0;k<n;k++){const a=k/n*Math.PI*2;
+     const y=WATER_Y-1 + Math.max(0,(r-R_POOL))*0.5 + 1.2*Math.sin(a*5+r*0.2)+rand(-.4,.4);
+     const x=r*Math.cos(a),z=r*Math.sin(a);p.push(x,y,z);const c=rockColor(x,y,z);col.push(c.r,c.g,c.b);}}
+ world.add(rockPoints(p,col,0.7));}
+
+/* ---------- POOL (emerald, brightest under the beam) ------------------------ */
+const poolPts=[],poolCol=[];
+for(let r=0;r<R_POOL;r+=1.05){const n=Math.max(8,(2*Math.PI*r/1.4)|0);
+  for(let k=0;k<Math.max(1,n);k++){const a=k/Math.max(1,n)*Math.PI*2;
+    const x=r*Math.cos(a),z=r*Math.sin(a);const near=MU.clamp(1-r/18,0,1);
+    poolPts.push(x,WATER_Y,z);
+    const c=lerpC(PAL.waterDeep,PAL.waterHi,0.3+0.6*near);poolCol.push(c.r,c.g,c.b);}}
+const poolGeo=new THREE.BufferGeometry();
+poolGeo.setAttribute('position',new THREE.Float32BufferAttribute(poolPts,3));
+poolGeo.setAttribute('color',new THREE.Float32BufferAttribute(poolCol,3));
+const pool=new THREE.Points(poolGeo,new THREE.PointsMaterial({size:1.4,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+world.add(pool);
+const poolBaseY=poolPts.filter((_,i)=>i%3===1).length; // (unused guard)
+
+/* ---------- STALACTITES (hang) + STALAGMITES (rise) ------------------------- */
+function spire(cx,cy,cz,len,down,rad){const p=[],col=[];
+  for(let i=0;i<70;i++){const f=i/69,rr=rad*(1-f)*(0.6+rand(0,0.4));const a=rand(0,Math.PI*2);
+    const y=down?cy-f*len:cy+f*len;
+    p.push(cx+rr*Math.cos(a),y,cz+rr*Math.sin(a));const c=rockColor(cx,y,cz);col.push(c.r,c.g,c.b);}
+  world.add(rockPoints(p,col,0.62));}
+for(let i=0;i<22;i++){const a=rand(0,Math.PI*2),r=rand(R_OC+6,R_TOP-6);
+  const x=r*Math.cos(a),z=r*Math.sin(a);const pr=(r-R_OC)/(R_TOP-R_OC);
+  const y=WALL_TOP+(APEX-WALL_TOP)*(1-Math.sqrt(pr));spire(x,y,z,rand(6,18),true,rand(1.4,3.2));}
+for(let i=0;i<18;i++){const a=rand(0,Math.PI*2),r=rand(R_POOL+2,R_FLOOR-4);
+  const x=r*Math.cos(a),z=r*Math.sin(a);spire(x,WATER_Y-1,z,rand(5,15),false,rand(1.6,3.4));}
+
+/* ---------- MOSS on the lit, low rock -------------------------------------- */
+{const p=[],col=[];
+ for(let i=0;i<900;i++){const a=rand(0,Math.PI*2),r=rand(R_POOL-2,R_FLOOR-6);
+   const x=r*Math.cos(a),z=r*Math.sin(a),y=WATER_Y-1+Math.max(0,(r-R_POOL))*0.5+rand(0,3);
+   if(lit(x,y,z)<0.4&&rng()<0.7)continue;                     // moss favours light
+   p.push(x,y,z);const c=lerpC(PAL.mossD,PAL.mossL,rng());col.push(c.r,c.g,c.b);}
+ world.add(glowPoints(p,col,1.1,0.7));}
+
+/* ---------- HANGING VINES + SPANISH MOSS (sway) ---------------------------- */
+const MAXSEG=16,_n=new Float32Array((MAXSEG+1)*3);
+const strands=[];
+function addStrand(x0,y0,z0,kind){const a=Math.atan2(z0,x0);
+  strands.push({x0,y0,z0,dx:Math.cos(a)*(kind==='vine'?1:0.5),dz:Math.sin(a)*(kind==='vine'?1:0.5),
+    seg:(kind==='vine'?rand(11,MAXSEG):rand(6,12))|0,
+    len:kind==='vine'?rand(24,48):rand(8,26),
+    sway:kind==='vine'?rand(2,4):rand(1,2),phase:rand(0,6.28),kind});}
+// from the oculus rim
+for(let k=0;k<26;k++){const a=k/26*Math.PI*2;const r=R_OC+rand(-1,2);
+  addStrand(r*Math.cos(a),OCULUS_Y-2,r*Math.sin(a),'vine');}
+for(let k=0;k<70;k++){const a=rand(0,Math.PI*2);const r=rand(R_OC,R_TOP*0.7);
+  const pr=(r-R_OC)/(R_TOP-R_OC),y=WALL_TOP+(APEX-WALL_TOP)*(1-Math.sqrt(pr));
+  addStrand(r*Math.cos(a),y-1,r*Math.sin(a),'span');}
+let sC=0,bC=0;for(const s of strands){sC+=s.seg*2;bC+=s.seg+1;}
+const stPos=new Float32Array(sC*3),stCol=new Float32Array(sC*3);
+const lfPos=new Float32Array(bC*3),lfCol=new Float32Array(bC*3);
+(function initStrandCols(){let si=0,bi=0;for(const s of strands){
+  for(let i=0;i<=s.seg;i++){const f=i/s.seg;
+    let c=s.kind==='vine'?lerpC(PAL.vine,PAL.vineL,f):lerpC(PAL.span,PAL.mossL,f*0.4);
+    if(s.kind==='vine'&&f>0.6&&rng()<0.15)c=new THREE.Color(pick([PAL.bYellow,PAL.bOrange]));// flower
+    lfCol[bi*3]=c.r;lfCol[bi*3+1]=c.g;lfCol[bi*3+2]=c.b;bi++;}
+  for(let i=0;i<s.seg;i++){const f=i/s.seg;
+    const c0=s.kind==='vine'?lerpC(PAL.vine,PAL.vineL,f):new THREE.Color(PAL.span);
+    stCol[si*3]=c0.r;stCol[si*3+1]=c0.g;stCol[si*3+2]=c0.b;si++;
+    stCol[si*3]=c0.r;stCol[si*3+1]=c0.g;stCol[si*3+2]=c0.b;si++;}
+}})();
+const stGeo=new THREE.BufferGeometry();
+stGeo.setAttribute('position',new THREE.BufferAttribute(stPos,3));
+stGeo.setAttribute('color',new THREE.BufferAttribute(stCol,3));
+world.add(new THREE.LineSegments(stGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.7})));
+const lfGeo=new THREE.BufferGeometry();
+lfGeo.setAttribute('position',new THREE.BufferAttribute(lfPos,3));
+lfGeo.setAttribute('color',new THREE.BufferAttribute(lfCol,3));
+const leaves=new THREE.Points(lfGeo,new THREE.PointsMaterial({size:1.5,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.82,blending:THREE.AdditiveBlending,depthWrite:false}));
+world.add(leaves);
+function updateStrands(t){let si=0,bi=0;
+  for(const s of strands){
+    for(let i=0;i<=s.seg;i++){const f=i/s.seg;
+      const sw=s.sway*f*Math.sin(t*(s.kind==='span'?0.5:0.7)+s.phase-f*1.8);
+      _n[i*3]=s.x0+sw*s.dx;_n[i*3+1]=s.y0-f*s.len;_n[i*3+2]=s.z0+sw*s.dz;}
+    for(let i=0;i<=s.seg;i++){lfPos[bi*3]=_n[i*3];lfPos[bi*3+1]=_n[i*3+1];lfPos[bi*3+2]=_n[i*3+2];bi++;}
+    for(let i=0;i<s.seg;i++){
+      stPos[si*3]=_n[i*3];stPos[si*3+1]=_n[i*3+1];stPos[si*3+2]=_n[i*3+2];si++;
+      stPos[si*3]=_n[(i+1)*3];stPos[si*3+1]=_n[(i+1)*3+1];stPos[si*3+2]=_n[(i+1)*3+2];si++;}}
+  stGeo.attributes.position.needsUpdate=true;lfGeo.attributes.position.needsUpdate=true;
+}
+
+/* ---------- OCULUS LIGHT SHAFT (the hero) ---------------------------------- */
+const beamMat=new THREE.MeshBasicMaterial({color:PAL.sunWarm,transparent:true,opacity:0.06,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+const beam=new THREE.Mesh(new THREE.CylinderGeometry(8,16,APEX-WATER_Y,28,1,true),beamMat);
+beam.position.set(0,(APEX+WATER_Y)/2,0);world.add(beam);
+const beamCoreMat=new THREE.MeshBasicMaterial({color:PAL.sun,transparent:true,opacity:0.05,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+const beamCore=new THREE.Mesh(new THREE.CylinderGeometry(4,9,APEX-WATER_Y,24,1,true),beamCoreMat);
+beamCore.position.copy(beam.position);world.add(beamCore);
+// bright pool of light where the beam lands
+world.add(glowPoints([0,WATER_Y+0.5,0],[...new THREE.Color(PAL.aqua||0x7FF0D8).toArray()],60,0.4));
+// dust motes drifting inside the shaft
+const dmN=340,dm=[],dmPos=new Float32Array(dmN*3),dmCol=[];
+for(let i=0;i<dmN;i++){const r=rand(0,15),a=rand(0,Math.PI*2);
+  dm.push({r,a,y:rand(WATER_Y,APEX),spd:rand(0.05,0.16),ph:rand(0,6.28)});
+  const c=lerpC(PAL.sun,PAL.glow,rng());dmCol.push(c.r,c.g,c.b);}
+const dmGeo=new THREE.BufferGeometry();
+dmGeo.setAttribute('position',new THREE.BufferAttribute(dmPos,3));
+dmGeo.setAttribute('color',new THREE.Float32BufferAttribute(dmCol,3));
+const motes=new THREE.Points(dmGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+world.add(motes);
+
+/* ---------- WATERFALL into the pool ---------------------------------------- */
+const wfA=rand(0,Math.PI*2),wfR=R_POOL-4,wfX=wfR*Math.cos(wfA),wfZ=wfR*Math.sin(wfA),wfTop=44;
+const wfN=420,wf=[],wfPos=new Float32Array(wfN*3),wfCol=new Float32Array(wfN*3);
+for(let i=0;i<wfN;i++){wf.push({x:wfX+rand(-3,3),z:wfZ+rand(-2,2),y:rand(WATER_Y,wfTop),vy:rand(0.4,0.8)});
+  const c=lerpC(PAL.waterHi,PAL.sun,rng()*0.4);wfCol[i*3]=c.r;wfCol[i*3+1]=c.g;wfCol[i*3+2]=c.b;}
+const wfGeo=new THREE.BufferGeometry();
+wfGeo.setAttribute('position',new THREE.BufferAttribute(wfPos,3));
+wfGeo.setAttribute('color',new THREE.BufferAttribute(wfCol,3));
+world.add(new THREE.Points(wfGeo,new THREE.PointsMaterial({size:1.0,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false})));
+// splash mist at the base
+const splash=glowPoints((()=>{const a=[];for(let i=0;i<120;i++)a.push(wfX+rand(-4,4),WATER_Y+rand(0,4),wfZ+rand(-4,4));return a;})(),
+  (()=>{const a=[];for(let i=0;i<120;i++){const c=lerpC(PAL.waterHi,PAL.aqua,rng());a.push(c.r,c.g,c.b);}return a;})(),2.2,0.4);
+world.add(splash);
+
+/* ---------- BUTTERFLIES (flutter, jitter, love the beam) ------------------- */
+const flutter=[];
+function triWing(col){const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0, 2.4,0.6,0, 1.8,-1.8,0],3));
+  return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.9,
+    blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));}
+for(let i=0;i<14;i++){
+  const col=pick([PAL.bMorpho,PAL.bBlue,PAL.bOrange,PAL.bYellow,PAL.bWhite,PAL.morpho||PAL.bMorpho]);
+  const g=new THREE.Group();
+  const wl=triWing(col),wr=triWing(col);wr.scale.x=-1;g.add(wl);g.add(wr);
+  g.position.set(rand(-16,16),rand(8,44),rand(-16,16));
+  g.userData={wl,wr,vx:rand(-.3,.3),vy:rand(-.2,.2),vz:rand(-.3,.3),
+    flap:rand(0,6.28),tx:rand(-10,10),ty:rand(12,40),tz:rand(-10,10),retarget:rand(0,3)};
+  world.add(g);flutter.push(g);}
+function updateFlutter(t,dt){
+  for(const g of flutter){const u=g.userData;
+    u.retarget-=dt;
+    if(u.retarget<=0){u.tx=rand(-14,14);u.ty=rand(8,46);u.tz=rand(-14,14);u.retarget=rand(1.2,3.5);
+      // bias targets toward the beam
+      if(rng()<0.5){u.tx*=0.4;u.tz*=0.4;}}
+    // seek target + jitter
+    u.vx+=(u.tx-g.position.x)*0.002+rand(-.06,.06);
+    u.vy+=(u.ty-g.position.y)*0.002+rand(-.05,.05);
+    u.vz+=(u.tz-g.position.z)*0.002+rand(-.06,.06);
+    u.vx*=0.92;u.vy*=0.92;u.vz*=0.92;
+    g.position.x+=u.vx;g.position.y+=u.vy;g.position.z+=u.vz;
+    g.position.y=MU.clamp(g.position.y,6,52);
+    // face travel direction
+    if(Math.abs(u.vx)+Math.abs(u.vz)>0.01)g.rotation.y=Math.atan2(u.vz,u.vx);
+    // flap
+    u.flap+=dt*16;const fl=0.5+0.9*Math.abs(Math.sin(u.flap));
+    u.wl.rotation.y=-fl;u.wr.rotation.y=fl;
+  }
+}
+
+/* ---------- ambient spores -------------------------------------------------- */
+const spN=380,spPos=new Float32Array(spN*3),spCol=[];
+for(let i=0;i<spN;i++){spPos[i*3]=rand(-46,46);spPos[i*3+1]=rand(4,APEX-6);spPos[i*3+2]=rand(-46,46);
+  const c=lerpC(PAL.mossL,PAL.glow,rng());spCol.push(c.r,c.g,c.b);}
+const spGeo=new THREE.BufferGeometry();
+spGeo.setAttribute('position',new THREE.BufferAttribute(spPos,3));
+spGeo.setAttribute('color',new THREE.Float32BufferAttribute(spCol,3));
+const spores=new THREE.Points(spGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,
+  transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));
+scene.add(spores);
+
+/* ---------- camera / input -------------------------------------------------- */
+const target=new THREE.Vector3(0,20,0);
+let camA=0.6,camR=44,camY=26,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;
+  camY=MU.clamp(camY-(e.clientY-py)*.3,8,52);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.04,22,60);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+document.getElementById('legend').innerHTML=[
+  [PAL.sunWarm,'the oculus','the only light'],[PAL.water,'cenote pool','emerald water'],
+  [PAL.vineL,'vines · moss','vana-core flora'],[PAL.bMorpho,'butterflies','fluttering agents'],
+].map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,3600);
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();let last=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(autoSpin)camA+=0.0012;
+  camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+
+  updateStrands(t);
+  updateFlutter(t,dt);
+
+  // beam breathes
+  beamMat.opacity=0.05+0.025*Math.sin(t*0.6);
+  beamCoreMat.opacity=0.045+0.02*Math.sin(t*0.9+1);
+  pool.material.opacity=0.5+0.12*Math.sin(t*1.1);
+  leaves.material.opacity=0.72+0.12*Math.sin(t*1.3);
+
+  // dust motes drift down the shaft, swirl, respawn at top
+  for(let i=0;i<dmN;i++){const m=dm[i];m.y-=m.spd;m.a+=0.004;if(m.y<WATER_Y){m.y=APEX;m.r=rand(0,15);}
+    const rr=m.r*(0.6+0.4*(m.y/APEX));
+    dmPos[i*3]=rr*Math.cos(m.a);dmPos[i*3+1]=m.y;dmPos[i*3+2]=rr*Math.sin(m.a);}
+  dmGeo.attributes.position.needsUpdate=true;
+  motes.material.opacity=0.6+0.3*Math.sin(t*2);
+
+  // waterfall
+  for(let i=0;i<wfN;i++){const p=wf[i];p.y-=p.vy;if(p.y<WATER_Y){p.y=wfTop;p.x=wfX+rand(-3,3);}
+    wfPos[i*3]=p.x;wfPos[i*3+1]=p.y;wfPos[i*3+2]=p.z;}
+  wfGeo.attributes.position.needsUpdate=true;
+  splash.material.opacity=0.3+0.2*Math.abs(Math.sin(t*2.4));
+
+  // spores drift
+  const sp=spores.geometry.attributes.position;
+  for(let i=0;i<spN;i++){let y=sp.getY(i)+0.02;if(y>APEX-6)y=4;sp.setY(i,y);}sp.needsUpdate=true;
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

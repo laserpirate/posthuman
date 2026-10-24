@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whisper Well — lunar reflecting pool (study)</title>
+<style>
+  :root{--bg:#05070C;--silver:#D8DEE6;--moon:#F4F6F8;--pale:#AEC2D6;--cream:#ECEAE0;
+    --mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.6vw,33px);
+    line-height:1.12;margin:0;text-shadow:0 2px 40px #000,0 0 60px rgba(174,194,214,.25)}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pale);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #hint{top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">
+  <h1>Whisper Well — the moon comes down to drink.</h1>
+  <div class="sub">VA·NA · vana-kodama study &nbsp;·&nbsp; a lunar reflecting pool, roots for walls, spirits for company</div>
+</div>
+<div class="ui" id="legend"></div>
+<div class="ui" id="hint">drag to orbit · scroll closer · the near wall opens for you</div>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============================================================================
+   Whisper Well — silver-monochrome lunar reflecting pool, cross-section.
+   Great moon above; still pool below holds its rippling reflection; roots cascade
+   the cavern walls (plexus + descenders + feeder fuzz); kodama spirits on the rim.
+   Camera-following cutaway opens the near shell. Pure Three.js r128.
+   ============================================================================= */
+const PAL={bg:0x05070C,rockLit:0xC4CCD6,rockShadow:0x161B24,moon:0xF4F6F8,moonLo:0x8A96A2,
+  silver:0xD8DEE6,pale:0xAEC2D6,water:0x1A2430,waterHi:0xC8D6E4,rootLit:0xB6BEC8,rootDk:0x2A323C,
+  spirit:0xE6ECF2,leaf:0x9AA6B2};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260710);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils;
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');grd.addColorStop(.28,'rgba(255,255,255,.55)');grd.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grd;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return new THREE.Points(geo,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x070A12,0.0040);
+const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* ---------- dimensions ------------------------------------------------------ */
+const GROUND_Y=48,WATER_Y=4,R_RIM=46,R_POOL=26,R_SURF=92,MOON_Y=88,MOON_R=17;
+function radiusAt(y){const p=MU.clamp((y-WATER_Y)/(GROUND_Y-WATER_Y),0,1);return R_POOL+(R_RIM-R_POOL)*Math.sqrt(p);}
+function lit(x,y,z){const ax=Math.hypot(x,z);const top=MU.clamp((y-WATER_Y)/(GROUND_Y-WATER_Y),0,1);
+  const pool=MU.clamp(1-ax/22,0,1)*MU.clamp(1-(y-WATER_Y)/28,0,1);
+  return MU.clamp(0.16+0.5*top+0.4*pool,0,1);}   // moonlight from above + pool bounce
+function rockColor(x,y,z){const L=lit(x,y,z);return lerpC(PAL.rockShadow,PAL.rockLit,L);}
+
+/* ---------- SECTORED SHELL (walls+surface) + ROOTS + FUZZ, camera cutaway --- */
+const SECTORS=22,SA=Math.PI*2/SECTORS,CUT=1.0;
+const rockP=[],rockC=[],rootP=[],rootC=[],glowP=[],glowC=[];
+for(let i=0;i<SECTORS;i++){rockP.push([]);rockC.push([]);rootP.push([]);rootC.push([]);glowP.push([]);glowC.push([]);}
+function secOf(x,z){let a=Math.atan2(z,x);if(a<0)a+=Math.PI*2;return Math.floor(a/SA)%SECTORS;}
+// walls
+for(let y=WATER_Y+1;y<GROUND_Y;y+=1.3){const R=radiusAt(y),n=Math.max(18,(2*Math.PI*R/1.8)|0);
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=R+2*Math.sin(a*6+y*0.25)+rand(-1,1),x=rr*Math.cos(a),z=rr*Math.sin(a);
+    const i=secOf(x,z),c=rockColor(x,y,z);rockP[i].push(x,y+rand(-.4,.4),z);rockC[i].push(c.r,c.g,c.b);}}
+// surface forest floor
+for(let r=R_RIM;r<R_SURF;r+=1.6){const n=Math.max(24,(2*Math.PI*r/2.1)|0);
+  for(let k=0;k<n;k++){const a=k/n*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a),y=GROUND_Y+1.2*Math.sin(x*0.05)*Math.cos(z*0.05)+rand(-.5,.5);
+    const i=secOf(x,z),c=lerpC(0x2C333C,PAL.silver,0.25+0.3*rng());rockP[i].push(x,y,z);rockC[i].push(c.r,c.g,c.b);}}
+// ROOTS cascading the walls (plexus at rim -> descenders hugging wall -> feeder fuzz)
+function growRoot(a0){const steps=12+(rand(0,8)|0);let y=GROUND_Y-1,a=a0;const i=secOf(R_RIM*Math.cos(a0),R_RIM*Math.sin(a0));
+  let prev=null;
+  for(let s=0;s<steps;s++){const R=radiusAt(y)+rand(-1.5,0.3),x=R*Math.cos(a),z=R*Math.sin(a);
+    const L=lit(x,y,z),c=lerpC(PAL.rootDk,PAL.rootLit,0.3+0.6*L);
+    if(prev){rootP[i].push(prev[0],prev[1],prev[2],x,y,z);rootC[i].push(prev[3].r,prev[3].g,prev[3].b,c.r,c.g,c.b);}
+    prev=[x,y,z,c];
+    // feeder fuzz along the whole length
+    for(let f=0;f<3;f++){glowP[i].push(x+rand(-1.2,1.2),y+rand(-1,1),z+rand(-1.2,1.2));const fc=lerpC(PAL.rootDk,PAL.silver,0.4+0.4*L);glowC[i].push(fc.r,fc.g,fc.b);}
+    y-=(GROUND_Y-WATER_Y)/steps*rand(0.7,1.05);a+=rand(-0.05,0.05);
+    if(s===((steps/2)|0)&&rng()<0.5){const b=Math.max(4,(steps-s)),bb=[];let by=y,ba=a+rand(-0.2,0.2),bp=prev; // one branch
+      for(let q=0;q<b;q++){const BR=radiusAt(by)+rand(-1.5,0.3),bx=BR*Math.cos(ba),bz=BR*Math.sin(ba),bl=lit(bx,by,bz),bc=lerpC(PAL.rootDk,PAL.rootLit,0.3+0.6*bl);
+        rootP[i].push(bp[0],bp[1],bp[2],bx,by,bz);rootC[i].push(bp[3].r,bp[3].g,bp[3].b,bc.r,bc.g,bc.b);bp=[bx,by,bz,bc];
+        for(let f=0;f<2;f++){glowP[i].push(bx+rand(-1,1),by+rand(-1,1),bz+rand(-1,1));glowC[i].push(bc.r,bc.g,bc.b);}
+        by-=(GROUND_Y-WATER_Y)/steps*rand(0.7,1.05);ba+=rand(-0.06,0.06);if(by<WATER_Y+2)break;}}
+    if(y<WATER_Y+2)break;}}
+for(let s=0;s<130;s++)growRoot(rand(0,Math.PI*2));
+// build + register sectors for cull
+const cull=[];
+for(let i=0;i<SECTORS;i++){const center=(i+0.5)*SA;
+  const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.Float32BufferAttribute(rockP[i],3));rg.setAttribute('color',new THREE.Float32BufferAttribute(rockC[i],3));
+  const ro=new THREE.Points(rg,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.95}));ro.userData.center=center;world.add(ro);cull.push(ro);
+  const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(rootP[i],3));tg.setAttribute('color',new THREE.Float32BufferAttribute(rootC[i],3));
+  const to=new THREE.LineSegments(tg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.78}));to.userData.center=center;world.add(to);cull.push(to);
+  const go=glowPoints(glowP[i],glowC[i],1.0,0.5);go.userData.center=center;world.add(go);cull.push(go);}
+function angDiff(a,b){let d=Math.abs(a-b)%(Math.PI*2);return d>Math.PI?Math.PI*2-d:d;}
+
+/* ---------- MOON (sphere shell, cratered) + halo --------------------------- */
+(function(){const p=[],col=[];const N=(MOON_R*MOON_R*7)|0;
+  for(let i=0;i<N;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),x=MOON_R*Math.sin(v)*Math.cos(u),y=MOON_R*Math.cos(v),z=MOON_R*Math.sin(v)*Math.sin(u);
+    const crater=0.5+0.5*Math.sin(x*0.5)*Math.cos(y*0.4)*Math.sin(z*0.35);const c=lerpC(PAL.moonLo,PAL.moon,MU.clamp(0.55+0.45*crater,0.35,1));
+    p.push(x,MOON_Y+y,-8+z);col.push(c.r,c.g,c.b);}
+  world.add(glowPoints(p,col,1.5,0.96));
+  world.add(glowPoints([0,MOON_Y,-8],[...new THREE.Color(0xE8EEF4).toArray()],MOON_R*2.7,0.28));})();
+
+/* ---------- POOL + rippling moon reflection -------------------------------- */
+const poolP=[],poolC=[];
+for(let r=0;r<R_POOL;r+=1.05){const n=Math.max(6,(2*Math.PI*r/1.5)|0);for(let k=0;k<Math.max(1,n);k++){const a=k/Math.max(1,n)*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a);
+  poolP.push(x,WATER_Y,z);const c=lerpC(PAL.water,PAL.pale,0.15+0.25*rng());poolC.push(c.r,c.g,c.b);}}
+const poolGeo=new THREE.BufferGeometry();poolGeo.setAttribute('position',new THREE.Float32BufferAttribute(poolP,3));poolGeo.setAttribute('color',new THREE.Float32BufferAttribute(poolC,3));
+const pool=new THREE.Points(poolGeo,new THREE.PointsMaterial({size:1.4,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(pool);
+// reflection: a bright shimmer column + inverted moon just under the surface, jittered by ripples
+const rfN=520,rf=[],rfPos=new Float32Array(rfN*3),rfCol=new Float32Array(rfN*3);
+for(let i=0;i<rfN;i++){const col=i<220;                    // column vs inverted-moon
+  if(col){rf.push({kind:'col',x0:rand(-2.5,2.5),y:WATER_Y-rand(0,22),z0:rand(-2.5,2.5)});}
+  else{const a=rand(0,6.28),r=MOON_R*0.4*Math.sqrt(rng());rf.push({kind:'moon',x0:r*Math.cos(a),y:WATER_Y-0.3-r*0.15,z0:r*Math.sin(a)});}
+  const c=lerpC(PAL.waterHi,PAL.moon,rng());rfCol[i*3]=c.r;rfCol[i*3+1]=c.g;rfCol[i*3+2]=c.b;}
+const rfGeo=new THREE.BufferGeometry();rfGeo.setAttribute('position',new THREE.BufferAttribute(rfPos,3));rfGeo.setAttribute('color',new THREE.BufferAttribute(rfCol,3));
+const refl=new THREE.Points(rfGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(refl);
+// expanding ripple rings on the surface
+const RINGS=6,RPP=54,rgPos=new Float32Array(RINGS*RPP*3),rgCol=new Float32Array(RINGS*RPP*3),rings=[];
+for(let i=0;i<RINGS;i++)rings.push({r:rand(0,R_POOL),spd:rand(0.06,0.14)});
+const rgGeo=new THREE.BufferGeometry();rgGeo.setAttribute('position',new THREE.BufferAttribute(rgPos,3));rgGeo.setAttribute('color',new THREE.BufferAttribute(rgCol,3));
+world.add(new THREE.Points(rgGeo,new THREE.PointsMaterial({size:1.1,vertexColors:true,map:GLOW,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* ---------- boulders at the pool edge -------------------------------------- */
+for(let b=0;b<10;b++){const a=rand(0,Math.PI*2),r=rand(R_POOL-2,R_POOL+5),cx=r*Math.cos(a),cz=r*Math.sin(a),R=rand(2,4),p=[],col=[];
+  for(let i=0;i<180;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),rr=R*(0.7+rand(0,0.3));p.push(cx+rr*Math.sin(v)*Math.cos(u),WATER_Y+rr*0.5*Math.cos(v)+R*0.3,cz+rr*Math.sin(v)*Math.sin(u));
+    const c=rockColor(cx,WATER_Y,cz);col.push(c.r,c.g,c.b);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  const o=new THREE.Points(g,new THREE.PointsMaterial({size:0.65,vertexColors:true,transparent:true,opacity:0.95}));o.userData.center=(secOf(cx,cz)+0.5)*SA;world.add(o);cull.push(o);}
+
+/* ---------- forest above (silver trunks + a canopy ring framing the moon) --- */
+const props=[];
+for(let i=0;i<16;i++){const a=rand(0,Math.PI*2),r=rand(R_RIM+8,R_SURF-8),x=r*Math.cos(a),z=r*Math.sin(a),h=rand(30,60),p=[],col=[];
+  for(let s=0;s<40;s++){const f=s/39;p.push(x+rand(-.6,.6),GROUND_Y+f*h,z+rand(-.6,.6));const c=lerpC(0x3A424C,PAL.silver,0.3+0.5*f);col.push(c.r,c.g,c.b);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  const o=new THREE.Points(g,new THREE.PointsMaterial({size:0.7,vertexColors:true,transparent:true,opacity:0.9}));world.add(o);props.push({obj:o,center:(secOf(x,z)+0.5)*SA});}
+// canopy foliage ring around the moon opening
+{const p=[],col=[];for(let i=0;i<1400;i++){const a=rand(0,Math.PI*2),r=R_RIM+rand(6,30),y=GROUND_Y+rand(20,52);
+  p.push(r*Math.cos(a),y,-8+r*Math.sin(a)*0.5+rand(-4,4));const c=lerpC(0x3A424C,PAL.silver,0.2+0.5*rng());col.push(c.r,c.g,c.b);}
+  world.add(glowPoints(p,col,1.3,0.6));}
+
+/* ---------- KODAMA SPIRITS on the rim -------------------------------------- */
+const spirits=[];
+function makeSpirit(){const g=new THREE.Group();
+  const hp=[],hc=[];for(let i=0;i<80;i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1)),r=2.2*(0.9+rand(0,0.1));hp.push(r*Math.sin(v)*Math.cos(u),r*Math.cos(v)+2.3,r*Math.sin(v)*Math.sin(u));const c=new THREE.Color(PAL.spirit);hc.push(c.r,c.g,c.b);}
+  const head=glowPoints(hp,hc,1.4,0);g.add(head);
+  const bp=[],bc=[];for(let i=0;i<22;i++){const y=rand(-2,2),rr=0.9*(1-Math.abs(y)/3),a=rand(0,6.28);bp.push(rr*Math.cos(a),y,rr*Math.sin(a));const c=new THREE.Color(PAL.spirit);bc.push(c.r,c.g,c.b);}
+  const body=glowPoints(bp,bc,1.1,0);g.add(body);
+  const fp=[-0.6,2.6,2.0,0.6,2.6,2.0,0,1.9,2.1],fc=[0.02,0.02,0.04,0.02,0.02,0.04,0.02,0.02,0.04];
+  const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));fg.setAttribute('color',new THREE.Float32BufferAttribute(fc,3));
+  const face=new THREE.Points(fg,new THREE.PointsMaterial({size:1.0,vertexColors:true,transparent:true,opacity:0}));g.add(face);
+  g.visible=false;world.add(g);const sp={g,head,body,face,state:'wait',timer:rand(0,5),op:0,center:0};spirits.push(sp);reposition(sp);return sp;}
+function reposition(sp){const a=rand(0,Math.PI*2),r=R_RIM+rand(-4,10),y=GROUND_Y+rand(0,2);sp.g.position.set(r*Math.cos(a),y,r*Math.sin(a));sp.center=(secOf(sp.g.position.x,sp.g.position.z)+0.5)*SA;}
+for(let i=0;i<5;i++)makeSpirit();
+function updateSpirits(t,dt){for(const sp of spirits){sp.timer-=dt;
+  if(sp.state==='wait'){if(sp.timer<=0){sp.state='in';sp.timer=1.4;sp.g.visible=true;}}
+  else if(sp.state==='in'){sp.op=MU.clamp(sp.op+dt/1.4,0,1);if(sp.timer<=0){sp.state='hold';sp.timer=rand(2.5,5);}}
+  else if(sp.state==='hold'){if(sp.timer<=0){sp.state='out';sp.timer=1.6;}}
+  else if(sp.state==='out'){sp.op=MU.clamp(sp.op-dt/1.6,0,1);if(sp.timer<=0){sp.state='wait';sp.timer=rand(2,6);sp.g.visible=false;reposition(sp);}}
+  const o=sp.op;sp.head.material.opacity=0.85*o;sp.body.material.opacity=0.5*o;sp.face.material.opacity=0.9*o;
+  sp.g.rotation.z=Math.sin(t*0.8+sp.center)*0.06;}}
+
+/* ---------- ambient motes --------------------------------------------------- */
+const mN=300,mPos=new Float32Array(mN*3),mCol=[];for(let i=0;i<mN;i++){mPos[i*3]=rand(-60,60);mPos[i*3+1]=rand(4,GROUND_Y+40);mPos[i*3+2]=rand(-60,60);const c=lerpC(PAL.pale,PAL.silver,rng());mCol.push(c.r,c.g,c.b);}
+const mGeo=new THREE.BufferGeometry();mGeo.setAttribute('position',new THREE.BufferAttribute(mPos,3));mGeo.setAttribute('color',new THREE.Float32BufferAttribute(mCol,3));
+const motes=new THREE.Points(mGeo,new THREE.PointsMaterial({size:0.5,vertexColors:true,map:GLOW,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(motes);
+
+/* ---------- camera ---------------------------------------------------------- */
+const target=new THREE.Vector3(0,26,0);let camA=Math.PI*0.5,camR=118,camY=58,autoSpin=true,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;autoSpin=false;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,34,100);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,80,190);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.moon,'the moon','and its reflection'],[PAL.rootLit,'roots for walls','vana-roots'],[PAL.waterHi,'still water','ripples + shimmer'],[PAL.spirit,'kodama spirits','fade in & out']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4200);
+
+/* ---------- animate --------------------------------------------------------- */
+const clock=new THREE.Clock();let last=0;
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(0.05,t-last);last=t;
+  if(autoSpin)camA+=0.0010;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  const camAz=(Math.atan2(camera.position.z,camera.position.x)+Math.PI*2)%(Math.PI*2);
+  for(const o of cull)o.visible=angDiff(o.userData.center,camAz)>CUT;
+  for(const p of props)p.obj.visible=angDiff(p.center,camAz)>CUT*0.85;
+  for(const sp of spirits)if(sp.g.visible)sp.g.visible=angDiff(sp.center,camAz)>0.7;
+  updateSpirits(t,dt);
+  pool.material.opacity=0.44+0.1*Math.sin(t*1.1);
+  // reflection ripples: jitter x/z by depth+time
+  for(let i=0;i<rfN;i++){const p=rf[i],rip=Math.sin(t*2.4+p.y*0.6+p.x0)*1.1+Math.sin(t*1.3+p.z0)*0.6;
+    rfPos[i*3]=p.x0+rip;rfPos[i*3+1]=p.y;rfPos[i*3+2]=p.z0+rip*0.5;}
+  rfGeo.attributes.position.needsUpdate=true;refl.material.opacity=0.6+0.18*Math.sin(t*1.8);
+  // ripple rings
+  let idx=0;for(let ri=0;ri<RINGS;ri++){const R=rings[ri];R.r+=R.spd;if(R.r>R_POOL){R.r=rand(0,3);}
+    const fade=1-R.r/R_POOL;for(let k=0;k<RPP;k++){const a=k/RPP*Math.PI*2;rgPos[idx*3]=R.r*Math.cos(a);rgPos[idx*3+1]=WATER_Y+0.2;rgPos[idx*3+2]=R.r*Math.sin(a);
+      const c=new THREE.Color(PAL.waterHi);rgCol[idx*3]=c.r*fade;rgCol[idx*3+1]=c.g*fade;rgCol[idx*3+2]=c.b*fade;idx++;}}
+  rgGeo.attributes.position.needsUpdate=true;rgGeo.attributes.color.needsUpdate=true;
+  const mp=motes.geometry.attributes.position;for(let i=0;i<mN;i++){let y=mp.getY(i)+0.015;if(y>GROUND_Y+40)y=4;mp.setY(i,y);}mp.needsUpdate=true;
+  renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>

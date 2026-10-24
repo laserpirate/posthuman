@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tropics of Cancer & Capricorn (study)</title>
+<style>
+  :root{--bg:#0A0E08;--cream:#ECEAE0;--pale:#C6C0A8;--gold:#F6C544;--mono:'DM Mono','Courier New',ui-monospace,monospace;--serif:Cambria,Georgia,'Times New Roman',serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--cream)}
+  #c{display:block;width:100vw;height:100vh;cursor:grab}#c:active{cursor:grabbing}
+  .ui{position:fixed;pointer-events:none;user-select:none;z-index:10}
+  #title{top:26px;left:28px;max-width:66vw}
+  #title h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(20px,2.5vw,32px);line-height:1.12;margin:0;text-shadow:0 2px 40px #000}
+  #title .sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.9;margin-top:11px}
+  #legend{bottom:24px;left:28px;font-family:var(--mono);font-size:11px;line-height:1.9;opacity:.86;text-shadow:0 1px 12px #000}
+  #legend .row{display:flex;align-items:center;gap:10px}#legend .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}#legend .v{opacity:.55}
+  #foot{bottom:22px;right:26px;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.08em;opacity:.4}
+  #tt{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream);background:rgba(24,22,14,.5);border:1px solid rgba(246,197,68,.35);border-radius:20px;padding:8px 16px;backdrop-filter:blur(6px)}
+  #tt.off{opacity:.5}
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;letter-spacing:.1em;opacity:0;transition:opacity .6s;text-transform:uppercase;pointer-events:none}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui" id="title"><h1>Tropics of Cancer & Capricorn.</h1><div class="sub">vana-kodama study · a Wat collapsing back into jungle, year 3000, two suns keeping their latitudes</div></div>
+<div class="ui" id="legend"></div><div id="hint">drag to look · scroll closer</div>
+<button id="tt">◉ turntable</button>
+<div class="ui" id="foot">SymbiOS™ | Inflorescence Intelligence™ · study, provisional name</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const PAL={bg:0x0A0E08,green:0x2E7D6B,greenHi:0x4EA36A,teal:0x3FA9C9,gold:0xC9A86A,goldHi:0xF6C544,
+  mag:0xC94FD6,coral:0xE8845A,stone:0xB0A088,stoneLo:0x4A4234,water:0x2E8BE0,waterHi:0x7FF0D8,
+  sun:0xFFD98A,sun2:0xF0925A,pale:0xC6C0A8,fire:0xF6E06A,vine:0x3E6B34,vineHi:0x8FC46A};
+const CAN=[0x2E7D6B,0x4EA36A,0x3FA9C9,0xC9A86A,0xF6C544,0xC94FD6,0xE8845A];
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(20260720);
+const rand=(a=0,b=1)=>a+(b-a)*rng(),pick=a=>a[(rng()*a.length)|0],lerpC=(c1,c2,t)=>new THREE.Color(c1).lerp(new THREE.Color(c2),t),MU=THREE.MathUtils,ss=x=>{x=MU.clamp(x,0,1);return x*x*(3-2*x);};
+function glowSprite(){const s=64,cv=document.createElement('canvas');cv.width=cv.height=s;const g=cv.getContext('2d'),gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.28,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);return new THREE.CanvasTexture(cv);}
+const GLOW=glowSprite();
+function glowPoints(pos,col,size,op){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,map:GLOW,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));}
+function rockPoints(pos,col,size){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,transparent:true,opacity:0.92}));}
+const scene=new THREE.Scene();scene.background=new THREE.Color(PAL.bg);scene.fog=new THREE.FogExp2(0x0C1008,0.0058);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,4000);
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+const world=new THREE.Group();scene.add(world);
+
+/* wavy jungle floor */
+function hf(x,z,t){return 2.2*Math.sin(x*0.04+z*0.03)+1.4*Math.sin(x*0.07-z*0.05)+0.8*Math.sin(x*0.11+t*0.3);}
+{const p=[],col=[];for(let x=-90;x<=90;x+=2.6)for(let z=-90;z<=90;z+=2.8){const r=Math.hypot(x,z);if(r<12)continue;p.push(x,hf(x,z,0),z);const c=lerpC(0x1A241C,PAL.greenHi,0.15+0.4*rng());col.push(c.r,c.g,c.b);}world.add(rockPoints(p,col,0.7));}
+
+/* DECAYING RELIC — a collapsed, overgrown ruin (not a tower) */
+const TILT=0.11;
+function relicR(h){return Math.max(3.5,13-h*0.44);}
+(function relic(){const p=[],col=[];
+  for(let y=1;y<21;y+=0.6){const r0=relicR(y),n=Math.max(14,(2*Math.PI*r0/0.9)|0),tier=Math.floor(y/5);
+    for(let k=0;k<n;k++){const a=k/n*Math.PI*2;
+      if(Math.sin(a*3+tier*2.1)>0.55 && rng()<0.12+tier*0.14)continue;                 // missing chunks, more up top
+      const crumble=1-0.18*Math.max(0,Math.sin(a*5+y*0.7))*rng();
+      const rr=r0*crumble+rand(-.5,.5),x=rr*Math.cos(a)+TILT*y,z=rr*Math.sin(a);
+      const green=rng()<(0.18+0.34*(y/21));                                            // more overgrown higher
+      const c=green?lerpC(PAL.green,PAL.greenHi,rng()):lerpC(PAL.stoneLo,PAL.stone,0.35+0.45*rng());
+      p.push(x,y,z);col.push(c.r,c.g,c.b);}}
+  // broken top — jagged remnant, a wedge fallen away (no finial)
+  for(let i=0;i<80;i++){const a=rand(0,6.28);if(a>2.1&&a<3.7)continue;const rr=rand(0,4);p.push(rr*Math.cos(a)+TILT*20,20+rand(-1.5,2),rr*Math.sin(a));const c=(rng()<0.45)?lerpC(PAL.green,PAL.greenHi,rng()):lerpC(PAL.stoneLo,PAL.stone,0.4+0.4*rng());col.push(c.r,c.g,c.b);}
+  // rubble / fallen blocks at the base
+  for(let i=0;i<150;i++){const a=rand(0,6.28),rr=rand(11,26),bx=rr*Math.cos(a),bz=rr*Math.sin(a),by=hf(bx,bz,0);for(let j=0;j<5;j++){p.push(bx+rand(-1.3,1.3),by+rand(0,1.6),bz+rand(-1.3,1.3));const c=(rng()<0.3)?new THREE.Color(PAL.green):lerpC(PAL.stoneLo,PAL.stone,0.4+0.4*rng());col.push(c.r,c.g,c.b);}}
+  world.add(rockPoints(p,col,0.75));
+})();
+// climbing tendrils overtaking the relic
+{const p=[],col=[];for(let t2=0;t2<36;t2++){const a0=rand(0,6.28),hmax=rand(8,20),twist=rand(-0.25,0.25);let prev=null;for(let y=0;y<hmax;y+=0.8){const a=a0+y*twist,r=relicR(y)+0.4,x=r*Math.cos(a)+TILT*y,z=r*Math.sin(a);if(prev){p.push(prev[0],prev[1],prev[2],x,y,z);const c=lerpC(PAL.vine,PAL.vineHi,y/hmax);for(let e=0;e<2;e++){col.push(c.r,c.g,c.b);}}prev=[x,y,z];}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));world.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.7})));}
+// broken columns around
+for(let i=0;i<7;i++){const a=i/7*Math.PI*2+rand(-.2,.2),R=rand(24,34),cx=R*Math.cos(a),cz=R*Math.sin(a),ch=rand(4,13),p=[],col=[];
+  for(let h=0;h<ch;h+=0.7){const n=10;for(let k=0;k<n;k++){const aa=k/n*Math.PI*2;p.push(cx+2.2*Math.cos(aa)+rand(-.2,.2)+TILT*h*0.5,hf(cx,cz,0)+h,cz+2.2*Math.sin(aa));const c=(rng()<0.28)?new THREE.Color(PAL.green):lerpC(PAL.stoneLo,PAL.stone,0.4+0.4*rng());col.push(c.r,c.g,c.b);}}
+  world.add(rockPoints(p,col,0.7));}
+
+/* lush jungle canopy trees */
+const leafBase=[],leafPh=[],leafCol=[];
+function tree(x,z){const y0=hf(x,z,0),h=rand(20,34),tp=[],tc=[];
+  for(let s=0;s<30;s++){const f=s/29;tp.push(x+rand(-.6,.6),y0+f*h,z+rand(-.6,.6));const c=lerpC(0x2A241E,0x6A5A48,0.3+0.5*f);tc.push(c.r,c.g,c.b);}
+  world.add(rockPoints(tp,tc,0.7));
+  const cy=y0+h,cn=120+((rng()*80)|0),base=pick(CAN);
+  for(let i=0;i<cn;i++){const a=rand(0,6.28),v=Math.acos(rand(-1,1)),r=rand(5,12);leafBase.push(x+r*Math.sin(v)*Math.cos(a),cy+r*0.7*Math.cos(v)+3,z+r*Math.sin(v)*Math.sin(a));leafPh.push(rand(0,6.28));const c=lerpC(base,pick(CAN),0.4*rng());leafCol.push(c.r,c.g,c.b);}
+}
+for(let i=0;i<20;i++){const a=rand(0,6.28),R=rand(22,80);tree(R*Math.cos(a),R*Math.sin(a));}
+const leafN=leafPh.length,leafPos=new Float32Array(leafBase),leafBaseF=new Float32Array(leafBase);
+const leafGeo=new THREE.BufferGeometry();leafGeo.setAttribute('position',new THREE.BufferAttribute(leafPos,3));leafGeo.setAttribute('color',new THREE.Float32BufferAttribute(leafCol,3));
+const leaves=new THREE.Points(leafGeo,new THREE.PointsMaterial({size:1.8,vertexColors:true,map:GLOW,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));world.add(leaves);
+
+/* watercolor flower-blooms (magenta/gold clusters) */
+{const p=[],col=[];for(let b=0;b<26;b++){const a=rand(0,6.28),R=rand(18,70),cx=R*Math.cos(a),cz=R*Math.sin(a),cy=hf(cx,cz,0)+rand(1,10),hue=pick([PAL.mag,PAL.goldHi,PAL.coral,PAL.teal]);
+  for(let i=0;i<26;i++){const rr=rand(0,3.5),aa=rand(0,6.28),v=rand(-2,2);p.push(cx+rr*Math.cos(aa),cy+v,cz+rr*Math.sin(aa));const c=lerpC(hue,0xFFFFFF,rng()*0.3);col.push(c.r,c.g,c.b);}}
+  world.add(glowPoints(p,col,1.6,0.8));}
+
+/* hanging vines overtaking the relic */
+const vines=[];for(let k=0;k<46;k++){const a=rand(0,6.28),h=rand(4,19),r=relicR(h)+0.5;vines.push({ax:r*Math.cos(a)+TILT*h,ay:h,az:r*Math.sin(a),len:rand(5,15),ph:rand(0,6.28),sway:rand(1,2.6)});}
+let vc=0;for(const v of vines)vc+=8;const vP=new Float32Array(vc*2*3),vCol=new Float32Array(vc*2*3);
+{let i=0;for(const v of vines)for(let s=0;s<8;s++){const c=lerpC(PAL.vine,PAL.vineHi,1-s/7);for(let e=0;e<2;e++){vCol[i*6+e*3]=c.r;vCol[i*6+e*3+1]=c.g;vCol[i*6+e*3+2]=c.b;}i++;}}
+const vGeo=new THREE.BufferGeometry();vGeo.setAttribute('position',new THREE.BufferAttribute(vP,3));vGeo.setAttribute('color',new THREE.BufferAttribute(vCol,3));
+world.add(new THREE.LineSegments(vGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.62})));
+
+/* meandering stream through the topo */
+function spath(s){return {x:-88+s*176,z:34*Math.sin(s*Math.PI*2.1)+12*Math.sin(s*Math.PI*5+1)};}
+function sperp(s){const a=spath(Math.max(0,s-0.004)),b=spath(Math.min(1,s+0.004));let dx=b.x-a.x,dz=b.z-a.z;const l=Math.hypot(dx,dz)||1;return {x:-dz/l,z:dx/l};}
+const ribS=150,ribW=5,rib=[],ribPos=new Float32Array(ribS*ribW*3),ribCol=new Float32Array(ribS*ribW*3);
+for(let i=0;i<ribS;i++){const s=i/(ribS-1),c0=spath(s),pp=sperp(s);for(let w=0;w<ribW;w++){const off=(w/(ribW-1)-0.5)*rand(3.5,5.5),x=c0.x+pp.x*off,z=c0.z+pp.z*off,idx=i*ribW+w;rib.push({x,z,ph:rand(0,6.28)});const c=lerpC(PAL.water,PAL.waterHi,0.15+0.35*rng());ribCol[idx*3]=c.r;ribCol[idx*3+1]=c.g;ribCol[idx*3+2]=c.b;}}
+const ribGeo=new THREE.BufferGeometry();ribGeo.setAttribute('position',new THREE.BufferAttribute(ribPos,3));ribGeo.setAttribute('color',new THREE.BufferAttribute(ribCol,3));
+world.add(new THREE.Points(ribGeo,new THREE.PointsMaterial({size:1.2,vertexColors:true,map:GLOW,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false})));
+const flowN=150,flow=[],flowPos=new Float32Array(flowN*3),flowCol=new Float32Array(flowN*3);
+for(let i=0;i<flowN;i++){flow.push({s:rng(),spd:rand(0.0012,0.0026),off:rand(-2,2)});const c=lerpC(PAL.waterHi,0xFFFFFF,rng()*0.4);flowCol[i*3]=c.r;flowCol[i*3+1]=c.g;flowCol[i*3+2]=c.b;}
+const flowGeo=new THREE.BufferGeometry();flowGeo.setAttribute('position',new THREE.BufferAttribute(flowPos,3));flowGeo.setAttribute('color',new THREE.BufferAttribute(flowCol,3));
+world.add(new THREE.Points(flowGeo,new THREE.PointsMaterial({size:0.9,vertexColors:true,map:GLOW,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* fireflies */
+const fiN=44,fi=[],fiPos=new Float32Array(fiN*3),fiCol=new Float32Array(fiN*3),fireC=new THREE.Color(PAL.fire);
+for(let i=0;i<fiN;i++)fi.push({x:rand(-70,70),z:rand(-70,70),ph:rand(0,6.28),freq:rand(1.5,3),dx:rand(-.05,.05),dz:rand(-.05,.05)});
+const fiGeo=new THREE.BufferGeometry();fiGeo.setAttribute('position',new THREE.BufferAttribute(fiPos,3));fiGeo.setAttribute('color',new THREE.BufferAttribute(fiCol,3));
+world.add(new THREE.Points(fiGeo,new THREE.PointsMaterial({size:1.3,vertexColors:true,map:GLOW,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+/* stars + TWIN SUNS on shared orbital rings */
+let stars,starBase,starPh;
+{const p=[],col=[],ph=[];for(let i=0;i<900;i++){const u=rand(0,6.28),v=Math.acos(rand(-0.1,1)),R=rand(150,260);p.push(R*Math.sin(v)*Math.cos(u),Math.abs(R*Math.cos(v))*0.8+50,R*Math.sin(v)*Math.sin(u));const b=0.4+0.6*rng(),c=lerpC(PAL.pale,0xFFF6E0,rng());col.push(c.r*b,c.g*b,c.b*b);ph.push(rand(0,6.28));}starBase=new Float32Array(col);starPh=ph;stars=glowPoints(p,col,1.0,0.8);world.add(stars);}
+const SC=new THREE.Vector3(0,86,-30),U=new THREE.Vector3(1,0.1,0).normalize(),V=new THREE.Vector3(0,0.8,0.6).normalize();
+for(let ri=0;ri<3;ri++){const RR=26+ri*13,p=[],col=[];for(let k=0;k<180;k++){const a=k/180*Math.PI*2;const v=U.clone().multiplyScalar(RR*Math.cos(a)).add(V.clone().multiplyScalar(RR*Math.sin(a)));p.push(SC.x+v.x,SC.y+v.y,SC.z+v.z);const c=lerpC(PAL.pale,PAL.sun,rng());col.push(c.r,c.g,c.b);}world.add(glowPoints(p,col,0.8,0.34-ri*0.05));}
+function sun(color,R){const p=[],col=[];for(let i=0;i<(R*R*8|0);i++){const u=rand(0,6.28),v=Math.acos(rand(-1,1));p.push(R*Math.sin(v)*Math.cos(u),R*Math.cos(v),R*Math.sin(v)*Math.sin(u));const c=lerpC(color,0xFFFFFF,rng()*0.4);col.push(c.r,c.g,c.b);}const g=new THREE.Group();g.add(glowPoints(p,col,1.4,0.95));g.add(glowPoints([0,0,0],[...new THREE.Color(color).toArray()],R*3,0.3));world.add(g);return g;}
+const suns=[{g:sun(PAL.sun,7),RR:26,a:0.6,spd:0.12},{g:sun(PAL.sun2,5),RR:52,a:3.4,spd:0.08}];
+
+let turntable=true;const ttBtn=document.getElementById('tt');ttBtn.addEventListener('click',()=>{turntable=!turntable;ttBtn.textContent=(turntable?'◉':'○')+' turntable';ttBtn.classList.toggle('off',!turntable);});
+const target=new THREE.Vector3(0,18,0);let camA=Math.PI*0.5,camR=92,camY=24,drag=false,px=0,py=0;
+c.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});addEventListener('pointerup',()=>drag=false);
+addEventListener('pointermove',e=>{if(!drag)return;camA-=(e.clientX-px)*.005;camY=MU.clamp(camY-(e.clientY-py)*.4,8,88);px=e.clientX;py=e.clientY;});
+addEventListener('wheel',e=>{camR=MU.clamp(camR+e.deltaY*.05,44,170);},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('legend').innerHTML=[[PAL.greenHi,'the relic','collapsing into green'],[PAL.vineHi,'vines & tendrils','overtaking the stone'],[PAL.waterHi,'a meandering stream','through the ruins'],[PAL.sun,'twin suns','on the ecliptic']]
+  .map(r=>`<div class="row"><span class="sw" style="background:#${new THREE.Color(r[0]).getHexString()};box-shadow:0 0 10px #${new THREE.Color(r[0]).getHexString()}"></span><span>${r[1]}</span><span class="v">${r[2]}</span></div>`).join('');
+const hint=document.getElementById('hint');hint.style.opacity=1;setTimeout(()=>hint.style.opacity=0,4200);
+
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+  if(turntable&&!drag)camA+=0.0008;camera.position.set(Math.cos(camA)*camR,camY,Math.sin(camA)*camR);camera.lookAt(target);
+  for(let i=0;i<leafN;i++){const ph=leafPh[i];leafPos[i*3]=leafBaseF[i*3]+1.6*Math.sin(t*0.9+ph);leafPos[i*3+1]=leafBaseF[i*3+1]+0.6*Math.sin(t*1.3+ph);leafPos[i*3+2]=leafBaseF[i*3+2]+1.4*Math.cos(t*0.8+ph);}leafGeo.attributes.position.needsUpdate=true;
+  {let i=0;for(const v of vines){let prev=[v.ax,v.ay,v.az];for(let s=1;s<=8;s++){const f=s/8,x=v.ax+v.sway*f*Math.sin(t*0.7+v.ph-f*1.4),y=v.ay-f*v.len,z=v.az+v.sway*0.5*f*Math.cos(t*0.6+v.ph);vP[i*6]=prev[0];vP[i*6+1]=prev[1];vP[i*6+2]=prev[2];vP[i*6+3]=x;vP[i*6+4]=y;vP[i*6+5]=z;prev=[x,y,z];i++;}}vGeo.attributes.position.needsUpdate=true;}
+  for(let i=0;i<ribS*ribW;i++){const r=rib[i];ribPos[i*3]=r.x;ribPos[i*3+1]=hf(r.x,r.z,t)+0.4+0.25*Math.sin(t*2+r.ph);ribPos[i*3+2]=r.z;}ribGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<flowN;i++){const f=flow[i];f.s+=f.spd;if(f.s>1)f.s-=1;const c0=spath(f.s),pp=sperp(f.s),x=c0.x+pp.x*f.off,z=c0.z+pp.z*f.off;flowPos[i*3]=x;flowPos[i*3+1]=hf(x,z,t)+0.6;flowPos[i*3+2]=z;}flowGeo.attributes.position.needsUpdate=true;
+  for(let i=0;i<fiN;i++){const f=fi[i];f.x+=f.dx*Math.sin(t*0.5+f.ph);f.z+=f.dz*Math.cos(t*0.5+f.ph);const y=hf(f.x,f.z,t)+3+3*Math.sin(t*0.5+f.ph);fiPos[i*3]=f.x;fiPos[i*3+1]=y;fiPos[i*3+2]=f.z;const pu=Math.pow(0.5+0.5*Math.sin(t*f.freq+f.ph),3);fiCol[i*3]=fireC.r*pu;fiCol[i*3+1]=fireC.g*pu;fiCol[i*3+2]=fireC.b*pu;}fiGeo.attributes.position.needsUpdate=true;fiGeo.attributes.color.needsUpdate=true;
+  for(const s of suns){s.a+=s.spd*0.01;const v=U.clone().multiplyScalar(s.RR*Math.cos(s.a)).add(V.clone().multiplyScalar(s.RR*Math.sin(s.a)));s.g.position.set(SC.x+v.x,SC.y+v.y,SC.z+v.z);}
+  {const arr=stars.geometry.attributes.color.array;for(let i=0;i<starPh.length;i++){const tw=0.5+0.5*Math.sin(t*1.2+starPh[i]);arr[i*3]=starBase[i*3]*tw;arr[i*3+1]=starBase[i*3+1]*tw;arr[i*3+2]=starBase[i*3+2]*tw;}stars.geometry.attributes.color.needsUpdate=true;}
+  renderer.render(scene,camera);}
+animate();
+</script></body></html>
