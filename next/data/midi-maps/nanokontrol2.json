@@ -1,0 +1,350 @@
+{
+ "name": "nanoKONTROL2 (factory CC mode)",
+ "device": "nanoKONTROL2",
+ "verified": "CC numbers from Korg factory defaults (CC mode, channel 1). Confirm with the MIDI tab monitor on the real unit.",
+ "layout": {
+  "strips": 8,
+  "knob": [
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23
+  ],
+  "fader": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "s": [
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39
+  ],
+  "m": [
+   48,
+   49,
+   50,
+   51,
+   52,
+   53,
+   54,
+   55
+  ],
+  "r": [
+   64,
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71
+  ],
+  "transport": [
+   {
+    "name": "track <",
+    "cc": 58
+   },
+   {
+    "name": "track >",
+    "cc": 59
+   },
+   {
+    "name": "cycle",
+    "cc": 46
+   },
+   {
+    "name": "set",
+    "cc": 60
+   },
+   {
+    "name": "marker <",
+    "cc": 61
+   },
+   {
+    "name": "marker >",
+    "cc": 62
+   },
+   {
+    "name": "<<",
+    "cc": 43
+   },
+   {
+    "name": ">>",
+    "cc": 44
+   },
+   {
+    "name": "stop",
+    "cc": 42
+   },
+   {
+    "name": "play",
+    "cc": 41
+   },
+   {
+    "name": "rec",
+    "cc": 45
+   }
+  ]
+ },
+ "bindings": [
+  {
+   "act": "xfadeTime",
+   "type": "cc",
+   "ch": 1,
+   "num": 16
+  },
+  {
+   "act": "xfadeMix",
+   "type": "cc",
+   "ch": 1,
+   "num": 0
+  },
+  {
+   "act": "blackout",
+   "type": "cc",
+   "ch": 1,
+   "num": 32,
+   "mode": "toggle"
+  },
+  {
+   "act": "cueNext",
+   "type": "cc",
+   "ch": 1,
+   "num": 48,
+   "mode": "toggle"
+  },
+  {
+   "act": "tt",
+   "type": "cc",
+   "ch": 1,
+   "num": 17
+  },
+  {
+   "act": "speed",
+   "type": "cc",
+   "ch": 1,
+   "num": 1
+  },
+  {
+   "act": "resetSpeed",
+   "type": "cc",
+   "ch": 1,
+   "num": 33,
+   "mode": "toggle"
+  },
+  {
+   "act": "contrast",
+   "type": "cc",
+   "ch": 1,
+   "num": 18
+  },
+  {
+   "act": "palInt",
+   "type": "cc",
+   "ch": 1,
+   "num": 2
+  },
+  {
+   "act": "nextPal",
+   "type": "cc",
+   "ch": 1,
+   "num": 34,
+   "mode": "toggle"
+  },
+  {
+   "act": "audioSens",
+   "type": "cc",
+   "ch": 1,
+   "num": 19
+  },
+  {
+   "act": "audioAmt",
+   "type": "cc",
+   "ch": 1,
+   "num": 3
+  },
+  {
+   "act": "audio",
+   "type": "cc",
+   "ch": 1,
+   "num": 35,
+   "mode": "toggle"
+  },
+  {
+   "act": "flashFx",
+   "type": "cc",
+   "ch": 1,
+   "num": 20
+  },
+  {
+   "act": "zoomFx",
+   "type": "cc",
+   "ch": 1,
+   "num": 4
+  },
+  {
+   "act": "hueThr",
+   "type": "cc",
+   "ch": 1,
+   "num": 21
+  },
+  {
+   "act": "dim",
+   "type": "cc",
+   "ch": 1,
+   "num": 5
+  },
+  {
+   "act": "hold",
+   "type": "cc",
+   "ch": 1,
+   "num": 37,
+   "mode": "toggle"
+  },
+  {
+   "act": "orbitA",
+   "type": "cc",
+   "ch": 1,
+   "num": 22
+  },
+  {
+   "act": "orbitH",
+   "type": "cc",
+   "ch": 1,
+   "num": 6
+  },
+  {
+   "act": "resetView",
+   "type": "cc",
+   "ch": 1,
+   "num": 38,
+   "mode": "toggle"
+  },
+  {
+   "act": "pan",
+   "type": "cc",
+   "ch": 1,
+   "num": 23
+  },
+  {
+   "act": "zoom",
+   "type": "cc",
+   "ch": 1,
+   "num": 7
+  },
+  {
+   "act": "star",
+   "type": "cc",
+   "ch": 1,
+   "num": 39,
+   "mode": "toggle"
+  },
+  {
+   "act": "mode",
+   "type": "cc",
+   "ch": 1,
+   "num": 55,
+   "mode": "toggle"
+  },
+  {
+   "act": "panic",
+   "type": "cc",
+   "ch": 1,
+   "num": 71,
+   "mode": "hold",
+   "holdMs": 1000
+  },
+  {
+   "act": "prev",
+   "type": "cc",
+   "ch": 1,
+   "num": 43,
+   "mode": "toggle"
+  },
+  {
+   "act": "next",
+   "type": "cc",
+   "ch": 1,
+   "num": 44,
+   "mode": "toggle"
+  },
+  {
+   "act": "play",
+   "type": "cc",
+   "ch": 1,
+   "num": 41,
+   "mode": "toggle"
+  },
+  {
+   "act": "blackout",
+   "type": "cc",
+   "ch": 1,
+   "num": 42,
+   "mode": "toggle"
+  },
+  {
+   "act": "fire",
+   "type": "cc",
+   "ch": 1,
+   "num": 45,
+   "mode": "toggle"
+  },
+  {
+   "act": "clean",
+   "type": "cc",
+   "ch": 1,
+   "num": 46,
+   "mode": "toggle"
+  },
+  {
+   "act": "menu",
+   "type": "cc",
+   "ch": 1,
+   "num": 60,
+   "mode": "toggle"
+  },
+  {
+   "act": "prevPal",
+   "type": "cc",
+   "ch": 1,
+   "num": 61,
+   "mode": "toggle"
+  },
+  {
+   "act": "nextPal",
+   "type": "cc",
+   "ch": 1,
+   "num": 62,
+   "mode": "toggle"
+  },
+  {
+   "act": "cueUp",
+   "type": "cc",
+   "ch": 1,
+   "num": 58,
+   "mode": "toggle"
+  },
+  {
+   "act": "cueDown",
+   "type": "cc",
+   "ch": 1,
+   "num": 59,
+   "mode": "toggle"
+  }
+ ]
+}

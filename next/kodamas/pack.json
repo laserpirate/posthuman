@@ -1,0 +1,9 @@
+{
+ "format": "posthuman-kodama-enc",
+ "version": 1,
+ "kdf": "PBKDF2-SHA256",
+ "iter": 250000,
+ "salt": "bGH+dFrG4yHDsS3c1GT2nQ==",
+ "cipher": "AES-256-GCM",
+ "index": "087.bin"
+}

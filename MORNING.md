@@ -1,5 +1,16 @@
 # MORNING
 
+## MIDI preview (handoff-10, 24 Oct): read this first
+
+- **Preview:** https://laserpirate.github.io/posthuman/next/?i=<name> (tag `posthuman-v0.5.0-next`). **The root `/` is unchanged** (byte-identical to `posthuman-v0.4.2`; checked by `node tools/root-hash.mjs` before the push).
+- **Enable:** plug the nanoKONTROL in before Chrome, MIDI tab, **Enable MIDI** (Chrome only). Map **Auto** = original nanoKONTROL (scene 1, your map) or nanoKONTROL2 by port name. Keep SCENE on 1.
+- **Map:** strips 1-8 as the handoff-10 table (upper = S, lower = M, lower 8 = mode); strip 9 knob palette pick, upper fire cue, lower menu, fader free; REW/FF prev/next, PLAY play, STOP blackout, LOOP Clean full-window, **REC panic (hold 1 s)**. Full table in SHOWNIGHT.md.
+- **Promote** `/next/` to `/` (only when you say so, after trying your controller): `bash tools/promote-next.sh promote` in the main checkout (tags `posthuman-v0.5.0`).
+- **Rollback:** `bash tools/promote-next.sh rollback` (reverts the promote merge, tags `posthuman-v0.5.0-rollback`).
+- **Not verified with real hardware:** no nanoKONTROL here. Tested with a fake Web MIDI in Chrome (tools/e2e-midi.mjs). The nanoKONTROL CCs of sliders 6-9, buttons and transport are factory defaults from memory: check them in the MIDI tab monitor at soundcheck; MIDI Learn fixes any that differ.
+- **Full screen** can't come from MIDI (browsers need a click or key): LOOP toggles Clean full-window; F / double-click / `--kiosk` for true full screen.
+- **Tests:** see "v0.5.0-next" in DECISIONS.md for the gate numbers.
+
 ## Show day 24 Oct (handoff-8 + handoff-9, addendum 9a): read this first
 
 - **Live tag: `posthuman-v0.4.2`** (pk36 and the Gund fix landed together, one tag). The freezes are lifted per addendum 9a.

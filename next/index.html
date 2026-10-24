@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai">
+<title>POST/HUMAN · VJ</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <header id="bar">
+    <div class="grp brand"><b>POST/HUMAN · VJ</b><span id="inst" class="tag" title="Instance name (?i=)"></span>
+      <span class="seg" role="group" aria-label="Mode"><button id="b-mh" title="Hydra sketches">Hydras</button><button id="b-mk" title="Kodama scenes">Kodamas</button></span></div>
+    <div class="grp transport">
+      <button id="b-prev" title="Previous (Left)">Prev</button>
+      <button id="b-play" class="wide" title="Play / pause (Space)">Play</button>
+      <button id="b-next" title="Next (Right)">Next</button>
+      <span id="count" class="readout" title="Time to next switch">0:00</span>
+      <button id="b-star" class="star" title="Star the current sketch (S)">☆</button>
+      <span id="now" class="now"></span>
+    </div>
+    <div class="grp tools">
+      <button id="b-rand" title="Random mode (R)">Random</button>
+      <select id="s-scope" title="Random picks from">
+        <option value="playlist">from playlist</option>
+        <option value="pool">from pool</option>
+      </select>
+      <select id="s-trans" title="Transition">
+        <option value="xfade">Crossfade</option>
+        <option value="cut">Cut</option>
+      </select>
+      <label class="num" title="Crossfade seconds"><input id="n-xfade" type="number" min="0.2" max="10" step="0.1"><span>s</span></label>
+      <select id="s-q" title="Quality">
+        <option value="low">Low 960×540</option>
+        <option value="med">Med 1280×720</option>
+        <option value="high">High 1920×1080</option>
+      </select>
+      <select id="b-pal" title="Palette (P cycles)" hidden>
+        <option value="original">Original</option>
+        <option value="grayscale">Grayscale</option>
+        <option value="bw">Black / white</option>
+        <option value="mono">Mono</option>
+        <option value="duotone">Duotone</option>
+        <option value="rg">Red/green gradient map</option>
+      </select>
+      <span id="fps" class="readout" title="Frames per second">-- fps</span>
+      <button id="b-code" title="Code overlay (C)">Code</button>
+      <button id="b-cred" title="Credits line">Credits</button>
+      <button id="b-clean" title="Clean output: hide all UI (H or Esc to leave)">Clean</button>
+      <button id="b-black" class="warn" title="Blackout (B)">Blackout</button>
+      <button id="b-full" title="Full screen (F)">Full screen</button>
+      <button id="b-hide" title="Hide menu (H)">Hide</button>
+      <button id="b-help" title="Keys (?)">?</button>
+    </div>
+  </header>
+  <button id="peek" title="Show menu (H)" hidden>Menu</button>
+
+  <main id="main">
+    <section id="stage" aria-label="Output">
+      <div id="pal">
+        <div id="decks">
+          <canvas id="deck-a"></canvas>
+          <canvas id="deck-b"></canvas>
+          <div id="kdecks"><div class="kd"></div><div class="kd"></div></div>
+        </div>
+      </div>
+      <pre id="code-ov" hidden></pre>
+      <div id="credit"></div>
+      <div id="stage-msg" hidden></div>
+      <div id="mfade"></div>
+      <div id="dim"></div>
+        <div id="black" hidden></div>
+      <svg id="pal-svg" width="0" height="0" aria-hidden="true"><filter id="phpal" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"></filter></svg>
+    </section>
+
+    <aside id="panel">
+      <nav id="tabs" role="tablist">
+        <button data-tab="playlist" role="tab">Playlist</button>
+        <button data-tab="gallery" role="tab" id="tab-gal">Gallery</button>
+        <button data-tab="live" role="tab">Live</button>
+        <button data-tab="scene" role="tab">Scene</button>
+        <button data-tab="code" role="tab">Code</button>
+        <button data-tab="credits" role="tab">Credits</button>
+        <button data-tab="midi" role="tab">MIDI</button>
+        <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
+      </nav>
+
+      <div id="v-playlist" class="view">
+        <div class="row">
+          <select id="pl-sel" title="Playlists"></select>
+          <button id="pl-new">New</button>
+          <button id="pl-ren">Rename</button>
+          <button id="pl-del">Delete</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Pull</span>
+          <input id="pull-n" type="number" min="1" max="58" value="5" title="How many">
+          <select id="pull-from" title="Pull from">
+            <option value="pool">from pool</option>
+            <option value="starred">from starred</option>
+          </select>
+          <button id="pull">Pull random</button>
+          <button id="pl-shuf">Shuffle</button>
+          <button id="pl-clear">Clear</button>
+          <button id="pl-fromstar" title="Make a playlist named Starred from every starred sketch">Playlist from starred</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Default</span>
+          <label class="num"><input id="def-dur" type="number" min="1" max="3600" step="1"><span>s</span></label>
+          <button id="pl-apply">Apply to all</button>
+          <button id="pl-exp">Export</button>
+          <button id="pl-imp">Import</button>
+          <input id="pl-file" type="file" accept="application/json,.json" hidden>
+          <button id="pl-share">Share link</button>
+        </div>
+        <input id="share-out" class="share" readonly hidden>
+        <ol id="pl-list"></ol>
+        <p id="pl-empty" class="dim" hidden>Empty. Add sketches from the Gallery or pull random ones.</p>
+      </div>
+
+      <div id="v-gallery" class="view" hidden>
+        <div id="k-pack" hidden>
+          <p id="k-pack-st" class="dim"></p>
+          <form id="k-unlock" class="row" hidden>
+            <input id="k-pass" type="password" autocomplete="current-password" placeholder="Kodama pack password" aria-label="Kodama pack password">
+            <label class="chk"><input id="k-remember" type="checkbox" checked> Remember on this laptop</label>
+            <button id="k-go" type="submit">Unlock</button>
+          </form>
+          <div class="row"><button id="k-forget" hidden>Forget the saved key</button></div>
+        </div>
+        <div class="row">
+          <input id="g-q" type="search" placeholder="Search title or author">
+          <label class="chk"><input id="g-star" type="checkbox"> Starred</label>
+          <span id="g-n" class="dim"></span>
+        </div>
+        <div id="g-grid"></div>
+      </div>
+
+      <div id="v-live" class="view" hidden>
+        <h3>Output window</h3>
+        <div class="row"><button id="out-open">Open output window</button><span id="out-st" class="dim">Not open</span></div>
+        <div class="row"><label class="chk"><input id="out-prev" type="checkbox"> Keep this preview running while the output window is open</label></div>
+        <p class="dim">Move the output window to the projector and press F there (or double-click it). This window stays the controller.</p>
+
+        <h3>Hold, cue, ban</h3>
+        <div class="row">
+          <button id="b-hold" title="Hold the current sketch (G)">Hold</button>
+          <button id="b-ban" class="warn" title="Ban the current sketch and skip it (X)">Ban current</button>
+          <button id="b-unban">Unban all</button>
+          <span id="cue-st" class="dim"></span>
+        </div>
+        <p class="dim">Cue and Ban are also on each playlist row. Banned sketches are never autoplayed on this instance.</p>
+
+        <h3>Tempo</h3>
+        <div class="row">
+          <button id="b-tap" class="wide" title="Tap tempo (T)">Tap</button>
+          <label class="num"><input id="n-bpm" type="number" min="40" max="240" step="0.1"><span>BPM</span></label>
+          <select id="s-bars" title="Switch sketches on the beat">
+            <option value="0">Use item durations</option>
+            <option value="4">Every 4 bars</option>
+            <option value="8">Every 8 bars</option>
+            <option value="16">Every 16 bars</option>
+            <option value="32">Every 32 bars</option>
+          </select>
+        </div>
+
+        <h3>Audio</h3>
+        <div class="row"><label class="chk"><input id="au-on" type="checkbox"> Audio reactive</label><select id="au-dev" title="Input device"><option value="">Default input</option></select></div>
+        <div class="row"><span id="au-status">Input: off</span></div>
+        <div id="au-bands"></div>
+        <div class="row"><span class="lbl">Custom</span>
+          <label class="num"><input id="au-lo" type="number" min="20" max="18000" step="1"><span>to</span></label>
+          <label class="num"><input id="au-hi" type="number" min="30" max="20000" step="1"><span>Hz</span></label>
+          <button data-hz="40-120">Kick 40-120</button><button data-hz="60-250">Bass 60-250</button>
+        </div>
+        <div class="row sl"><span class="lbl">Zoom</span><select id="au-zsrc" title="Band driving the zoom pump"></select><input id="au-zoom" type="range" min="0" max="0.3" step="0.01" title="Zoom amount"></div>
+        <div class="row sl"><span class="lbl">Flash</span><select id="au-fsrc" title="Band driving the flash"></select><input id="au-flash" type="range" min="0" max="1.5" step="0.05" title="Flash amount"></div>
+        <p class="dim">Zoom and flash sit on top of the sketch; sketch code is untouched. Browser voice processing is off. In edited code, A.full, A.low, A.mid, A.high and A.custom give the levels (0 to 1).</p>
+      </div>
+
+      <div id="v-scene" class="view" hidden>
+        <h3>Palette</h3>
+        <p id="p-for" class="dim"></p>
+        <div class="row" id="p-item" hidden><span id="p-item-t"></span><button id="p-item-x" title="Remove this item's own palette">Use the mode palette</button></div>
+        <div class="row">
+          <select id="p-style" title="Palette">
+            <option value="original">Original</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="bw">Black / white</option>
+            <option value="mono">Mono</option>
+            <option value="duotone">Duotone</option>
+            <option value="rg">Red/green gradient map</option>
+          </select>
+          <span id="p-extra"></span>
+        </div>
+        <div class="row" id="p-bw"><span class="lbl">Threshold</span><input id="p-thr" type="range" min="0.05" max="0.95" step="0.01"></div>
+        <div class="row" id="p-mono"><span class="lbl">Hue</span><input id="p-mono-c" type="color" title="Mono color"></div>
+        <div class="row" id="p-duo"><span class="lbl">Duotone</span>
+          <select id="p-duo-pre" title="Duotone preset">
+            <option value="rg">Red / green</option>
+            <option value="cm">Cyan / magenta</option>
+            <option value="ai">Amber / indigo</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input id="p-duo-a" type="color" title="Shadows"><input id="p-duo-b" type="color" title="Highlights">
+        </div>
+        <div class="row sl"><span class="lbl">Intensity</span><input id="p-int" type="range" min="0" max="1" step="0.01" title="Mix with the original"></div>
+        <div class="row sl"><span class="lbl">Contrast</span><input id="p-con" type="range" min="0.5" max="2" step="0.01" title="Contrast"></div>
+        <p class="dim">Applied on the output after the scene or sketch, on the controller and in the output window. Hydras and Kodamas each keep their own. P cycles styles. A playlist row's Pal button gives that item its own palette; while it is on screen, these controls edit it.</p>
+
+        <div class="row" id="p-kdef-row"><span class="lbl">On start</span>
+          <select id="p-kdef" title="Kodama palette when the app opens">
+            <option value="original">Original</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="duotone">Duotone</option>
+            <option value="bw">Black / white</option>
+            <option value="mono">Mono</option>
+            <option value="rg">Red/green gradient map</option>
+          </select>
+          <span class="dim">Kodama palette when the app opens (changing it applies it now)</span>
+        </div>
+
+        <div id="k-scene">
+          <h3>Scene controls</h3>
+          <p id="k-cur" class="dim"></p>
+          <div id="k-ctrls"></div>
+          <div class="row sl"><span class="lbl">Speed</span><input id="k-speed" type="range" min="0.1" max="3" step="0.05" title="Playback speed"><span id="k-speed-v" class="readout"></span><button id="k-speed-1" title="Back to 1x">1×</button></div>
+          <div class="row sl"><span class="lbl">Turntable</span><input id="k-tt" type="range" min="0" max="3" step="0.05" title="Turntable speed"><span id="k-tt-v" class="readout"></span><label class="chk"><input id="k-rev" type="checkbox"> Reverse</label></div>
+          <h3>View</h3>
+          <div class="row"><div id="k-pad" title="Drag: orbit. Shift-drag or right-drag: pan. Wheel: zoom."><span id="k-pad-dot"></span></div>
+            <div class="col"><button id="k-view-reset" title="The scene's own starting view">Reset view</button><span id="k-view-v" class="readout"></span></div></div>
+          <p class="dim">Speed scales the whole scene clock (0.1× to 3×). Turntable 0 stops the orbit. Orbit, pan and zoom: drag on the stage or on the pad (shift-drag or right-drag pans, wheel zooms), here or in the output window; the turntable rests while you steer and resumes 2 s later. A playlist row's View button saves the current view for that item.</p>
+        </div>
+      </div>
+
+      <div id="v-code" class="view" hidden>
+        <div class="row"><b id="ed-title"></b></div>
+        <div class="ed"><pre id="ed-gutter" aria-hidden="true"></pre><textarea id="ed-text" spellcheck="false" autocomplete="off" wrap="off" aria-label="Sketch code"></textarea></div>
+        <div class="row">
+          <button id="ed-run" title="Run on the live deck, no crossfade, no time reset (Ctrl+Enter)">Run</button>
+          <button id="ed-revert" title="Back to the gallery code">Revert</button>
+          <button id="ed-bake" title="Write the knob values into the code">Bake</button>
+          <button id="ed-save" title="Keep this edit in this instance as a new sketch">Save as variant</button>
+          <button id="ed-hydra" title="Open this code in the Hydra editor">Copy to Hydra</button>
+        </div>
+        <pre id="ed-err" hidden></pre>
+        <h3>Knobs</h3>
+        <div id="knobs"></div>
+      </div>
+
+      <div id="v-credits" class="view" hidden>
+        <p class="dim">Sketches from the Hydra gallery, each by the artist named, licensed CC BY-NC-SA 4.0. Code runs unmodified.
+          Engine: hydra-synth by Olivia Jack and contributors, AGPL-3.0. Fonts: Chakra Petch and Martian Mono, SIL OFL 1.1.
+          App code © 2026 Marko Manriquez, all rights reserved.</p>
+        <p class="dim">Kodama scenes © Marko Manriquez, all rights reserved; not part of the public site (local pack or password). three.js r128, MIT.</p>
+        <table id="cr-table"><thead><tr><th>Title</th><th>Author</th><th>License</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="v-midi" class="view" hidden></div>
+
+      <div id="v-log" class="view" hidden>
+        <div class="row"><span id="gpu" class="dim"></span><button id="log-clear">Clear</button></div>
+        <ol id="log"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <div id="help" class="card" hidden>
+    <h2>Keys</h2>
+    <dl>
+      <dt>Space</dt><dd>Play / pause</dd>
+      <dt>→ / ←</dt><dd>Next / previous</dd>
+      <dt>F</dt><dd>Full screen</dd>
+      <dt>H</dt><dd>Hide / show menu</dd>
+      <dt>C</dt><dd>Code overlay</dd>
+      <dt>B</dt><dd>Blackout</dd>
+      <dt>R</dt><dd>Random mode</dd>
+      <dt>S</dt><dd>Star current sketch</dd>
+      <dt>Ctrl+Enter</dt><dd>Run edited code (Code tab)</dd>
+      <dt>T</dt><dd>Tap tempo</dd>
+      <dt>G</dt><dd>Hold current sketch</dd>
+      <dt>X</dt><dd>Ban current sketch</dd>
+      <dt>P</dt><dd>Next palette</dd>
+      <dt>Drag</dt><dd>Orbit a kodama (shift or right-drag pans, wheel zooms)</dd>
+      <dt>Esc</dt><dd>Leave full screen</dd>
+      <dt>?</dt><dd>This card</dd>
+    </dl>
+    <button id="help-x">Close</button>
+  </div>
+</div>
+<script src="vendor/hydra-synth/hydra-synth.js"></script>
+<script src="data/sketches.js"></script>
+<script src="kodama.js"></script>
+<script src="app.js"></script>
+<script src="midi.js"></script>
+</body>
+</html>
