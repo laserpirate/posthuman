@@ -1736,5 +1736,112 @@
    ],
    "pan": 12
   }
+ },
+ "pk37": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0001
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "astral",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "deep",
+      "sel": "[data-t=\"1\"]"
+     },
+     {
+      "label": "ember",
+      "sel": "[data-t=\"2\"]"
+     },
+     {
+      "label": "void",
+      "sel": "[data-t=\"3\"]"
+     }
+    ]
+   },
+   {
+    "name": "pulse",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-p=\"auto\"]"
+     },
+     {
+      "label": "slow",
+      "sel": "[data-p=\"6\"]"
+     },
+     {
+      "label": "calm",
+      "sel": "[data-p=\"4\"]"
+     },
+     {
+      "label": "fast",
+      "sel": "[data-p=\"2.2\"]"
+     }
+    ]
+   },
+   {
+    "name": "aura",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-a=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-a=\"0.6\"]"
+     },
+     {
+      "label": "mid",
+      "sel": "[data-a=\"1\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-a=\"1.45\"]"
+     }
+    ]
+   },
+   {
+    "name": "glow",
+    "items": [
+     {
+      "label": "low",
+      "sel": "[data-g=\"0.5\"]"
+     },
+     {
+      "label": "mid",
+      "sel": "[data-g=\"1\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-g=\"1.6\"]"
+     }
+    ]
+   }
+  ],
+  "cam": {
+   "ka": 0.005,
+   "ky": 0.4,
+   "y": [
+    4,
+    40
+   ],
+   "kr": 0.05,
+   "r": [
+    24,
+    95
+   ],
+   "pan": 12
+  }
  }
 }

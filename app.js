@@ -1546,7 +1546,7 @@
     kind: 'k', canvas: el, frame: null, id: null, badSince: 0, tickErr: '', ready: false, rendered: false, t0: 0,
   }));
   const CTX = { hydra: null, kodama: null };
-  const APPROVED = ['pk26', 'pk27', 'pk28', 'pk29']; // handoff-6: out of draft, into the default playlist
+  const APPROVED = ['pk26', 'pk27', 'pk28', 'pk29', 'pk37']; // handoff-6, handoff-11: out of draft, into the default playlist
 
   // each iframe covers the letterboxed stage; inside it the scene draws at the quality level's size
   // and its canvas is stretched to fit (kodama-rig.js)

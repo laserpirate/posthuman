@@ -14,7 +14,7 @@ const OUT = path.join(ROOT, 'local', 'kodamas');
 const WANT = [
   ...['17', '18', '19', '20', '21', '22', '23', '24'].map(n => 'pk' + n),
   ...Array.from({ length: 25 }, (_, i) => 'kv' + String(i + 1).padStart(2, '0')).filter(k => k !== 'kv22'),
-  'pk26', 'pk27', 'pk28', 'pk29', 'pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35', 'pk36',
+  'pk26', 'pk27', 'pk28', 'pk29', 'pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35', 'pk36', 'pk37',
 ];
 // new scenes, plain working titles (Marko names them later). pk26-pk29 approved by Marko
 // (handoff-6); pk30-pk36 are drafts pending his approval, out of the default playlist.
@@ -32,6 +32,8 @@ const NEW = {
   pk35: { file: 'phylla-kodama-topo-35-gund-ruin.html', title: 'gund ruin', series: 'phylla-kodama-topo', draft: true },
   // handoff-8: paper airplanes on strings swaying like kelp, draft
   pk36: { file: 'phylla-kodama-topo-36-paper-forest.html', title: 'paper forest', series: 'phylla-kodama-topo', draft: true },
+  // handoff-11: Remy as an astral being; straight into the default Kodamas playlist (not a draft)
+  pk37: { file: 'phylla-kodama-topo-37-remy-astral.html', title: 'remy astral', series: 'phylla-kodama-topo' },
 };
 
 function csv(text) {
