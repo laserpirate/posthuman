@@ -10,6 +10,8 @@ const args = process.argv.slice(2);
 const MIN = Number(args.find(a => /^\d+(\.\d+)?$/.test(a)) || 32);
 const BASE = args.find(a => a.startsWith('http')) || 'http://localhost:8091/';
 const headless = args.includes('--headless');
+const KODAMA = args.includes('--kodama'); // Kodama mode: the kodama pool at 20 s per scene
+const PER = KODAMA ? 20 : 10;
 
 const browser = await chromium.launch({
   headless,
@@ -22,22 +24,26 @@ let navigations = 0;
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') problems.push({ t: Date.now(), type: m.type(), text: m.text().slice(0, 300) }); });
 page.on('pageerror', e => problems.push({ t: Date.now(), type: 'pageerror', text: e.message }));
 page.on('framenavigated', f => { if (f === page.mainFrame()) navigations++; });
-await page.goto(BASE + '?i=soak');
+await page.goto(BASE + (KODAMA ? '?i=ksoak' : '?i=soak'));
 await page.waitForFunction(() => window.PHVJ);
+if (KODAMA) {
+  await page.waitForFunction(() => PHVJ.state.kscenes > 0, null, { timeout: 15000 });
+  await page.evaluate(() => PHVJ.setMode('kodama', { instant: true }));
+}
 const cdp = await ctx.newCDPSession(page);
 
-// the full pool (minus quarantine), 10 s each, crossfade 2 s, playing
-await page.evaluate(() => {
+// the full pool (minus quarantine), 10 s each (kodamas 20 s), crossfade 2 s, playing
+await page.evaluate(per => {
   const L = PHVJ.state.list.map(i => i.id);
-  document.querySelector('#def-dur').value = '10';
+  document.querySelector('#def-dur').value = String(per);
   document.querySelector('#def-dur').dispatchEvent(new Event('change'));
   for (const id of L) document.querySelector(`#pl-list li[data-id="${id}"] [data-act=rm]`).click();
-  for (const s of PH_DATA.sketches) if (!s.quarantine) PHVJ.addToList(s.id);
+  for (const id of PHVJ.poolIds()) PHVJ.addToList(id);
   PHVJ.show(PHVJ.state.list[0].id, { cut: true });
   PHVJ.setPlaying(true);
-});
+}, PER);
 const poolSize = await page.evaluate(() => PHVJ.state.list.length);
-console.log(`soak: ${poolSize} sketches, 10 s each, ${MIN} min, ${headless ? 'headless' : 'headed'}, GPU ${await page.textContent('#gpu')}`);
+console.log(`soak: ${poolSize} ${KODAMA ? 'kodamas' : 'sketches'}, ${PER} s each, ${MIN} min, ${headless ? 'headless' : 'headed'}, GPU ${await page.textContent('#gpu')}`);
 
 async function heap() {
   await cdp.send('HeapProfiler.collectGarbage');
@@ -47,15 +53,16 @@ async function heap() {
 const samples = [];
 const seen = new Set();
 const t0 = Date.now();
-let lastCur = null, switches = 0;
+let lastCur = null, switches = 0, kframesMax = 0;
 while (Date.now() - t0 < MIN * 60000) {
   for (let k = 0; k < 30; k++) {
     await page.waitForTimeout(1000);
     const s = await page.evaluate(() => PHVJ.state);
     if (s.cur !== lastCur) { switches++; lastCur = s.cur; seen.add(s.cur); }
+    kframesMax = Math.max(kframesMax, s.kframes);
   }
   const s = await page.evaluate(() => ({ ...PHVJ.state, dom: document.getElementsByTagName('*').length }));
-  const row = { min: +((Date.now() - t0) / 60000).toFixed(2), fps: +s.fps.toFixed(1), heapMB: +(await heap()).toFixed(2), level: s.level, hydras: s.hydras, ctxLost: s.ctxLost, skips: s.skips, errors: s.errors, dom: s.dom, cur: s.cur };
+  const row = { min: +((Date.now() - t0) / 60000).toFixed(2), fps: +s.fps.toFixed(1), heapMB: +(await heap()).toFixed(2), level: s.level, hydras: s.hydras, ctxLost: s.ctxLost, skips: s.skips, errors: s.errors, dom: s.dom, iframes: s.kframes, mode: s.mode, cur: s.cur };
   samples.push(row);
   console.log(JSON.stringify(row));
 }
@@ -72,12 +79,12 @@ const summary = {
   fpsMin: Math.min(...fps), fpsMax: Math.max(...fps), fpsAvg: +avg(fps).toFixed(2),
   heapStartMB: heaps[0], heapEndMB: heaps[heaps.length - 1], heapFirstThirdMB: +heapFirst.toFixed(2), heapLastThirdMB: +heapLast.toFixed(2),
   hydras: last.hydras, ctxLost: last.ctxLost, reloads: navigations - 1, skips: last.skips, consoleProblems: problems.length,
-  quality: last.level,
+  quality: last.level, mode: last.mode, iframesMax: kframesMax,
 };
 summary.pass = summary.ctxLost === 0 && summary.reloads === 0 && summary.consoleProblems === 0 && summary.hydras === 2 &&
-  summary.fpsMin >= 24 && heapLast - heapFirst < 2;
+  summary.fpsMin >= 24 && heapLast - heapFirst < 2 && kframesMax <= 2 && (!KODAMA || last.mode === 'kodama');
 fs.mkdirSync('test-results', { recursive: true });
-fs.writeFileSync(path.join('test-results', 'soak.json'), JSON.stringify({ summary, samples, problems, log }, null, 1));
+fs.writeFileSync(path.join('test-results', KODAMA ? 'soak-kodama.json' : 'soak.json'), JSON.stringify({ summary, samples, problems, log }, null, 1));
 console.log('\nSUMMARY', JSON.stringify(summary, null, 1));
 if (problems.length) console.log('problems:', problems.slice(0, 10));
 process.exit(summary.pass ? 0 : 1);
