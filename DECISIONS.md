@@ -167,3 +167,4 @@ One line per judgment call. Newest at the bottom.
 - Audio bands: the kodama rig does not expose any, so the low band to aura mapping was skipped.
 - Perf: the build takes about 0.2 s on the main thread (typed arrays, one pass). In the app, 60 fps at High on the RTX 3080 and 29.9 fps (min 29.5) at Low on SwiftShader. A software renderer gets fewer stars, ring and tunnel particles and a smaller nebula texture; Remy is never thinned.
 - e2e-kodama: KSCENES 44; pk37 is in the visuals-only check and must be last in the default playlist. The local encrypted-pack check expects 44 scenes too, so it passes only once Phase B re-encrypts the pack with pk37.
+- Root baseline moved to `posthuman-v0.4.3` (pk37: app.js APPROVED list, registry, encrypted pack) with `node tools/root-hash.mjs --set posthuman-v0.4.3`; `/next/` rebuilt from feat/midi with pk37 and the same pack.
