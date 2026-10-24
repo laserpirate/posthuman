@@ -83,16 +83,16 @@ const noLock = async p => {
   assert(!/locked|password/i.test(await p.textContent('#k-pack-st')), 'no locked message');
 };
 if (LOCAL) {
-  await test('pack: local folder opens; the public copy (kodamas/) opens with no password and plays', async () => {
+  await test('pack: local folder opens; the public copy (kodamas/) opens with no password and plays, even when Kodamas is clicked before it opens', async () => {
     const c = await ctx(); const p = await open(c, '?i=kp');
     await p.waitForFunction(() => PHVJ.state.kpack !== 'none' && PHVJ.state.kscenes > 0, null, { timeout: 15000 });
     const s = await st(p);
     assert(s.kpack === 'local' && s.kscenes === KSCENES, 'local pack ' + s.kpack + ' ' + s.kscenes);
     const p2 = await open(c, '?i=kpub&kpack=pub');
+    await p2.click('#b-mk'); // straight away, as a person would, before the pack has opened
     await p2.waitForFunction(n => PHVJ.state.kpack === 'public' && PHVJ.state.kscenes === n, KSCENES, { timeout: 20000 });
+    await p2.waitForFunction(() => PHVJ.state.mode === 'kodama' && PHVJ.state.kready, null, { timeout: 20000 });
     await noLock(p2);
-    await kodama(p2);
-    assert((await st(p2)).kready, 'public scene plays');
     await c.close();
   });
 } else {

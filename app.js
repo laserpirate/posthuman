@@ -1734,7 +1734,8 @@
     $('#g-q').placeholder = MODE === 'kodama' ? 'Search title' : 'Search title or author';
   }
   btn('mh').addEventListener('click', () => setMode('hydra'));
-  btn('mk').addEventListener('click', () => setMode('kodama'));
+  // a click in the first second, while the pack is still opening, switches once it is in
+  btn('mk').addEventListener('click', () => (CTX.kodama || !kOpening ? setMode('kodama') : kOpening.then(() => setMode('kodama'))));
 
   // the scene's own controls, mirrored from data/kodama-controls.json; clicks go to the scene's buttons
   function kRenderScene() {
