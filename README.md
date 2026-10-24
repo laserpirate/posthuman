@@ -56,6 +56,7 @@ node tools/kodama-registry.mjs      # -> data/kodama-controls.json
 node tools/kodama-preflight.mjs     # GPU preflight, quarantine, thumbnails (--swiftshader for the floor)
 node tools/kodama-pack.mjs          # -> kodamas/ encrypted with the password in local/kodama-pass.txt
 node tools/e2e-kodama.mjs           # Kodama e2e; node tools/soak.mjs 15 --kodama for the soak
+                                    # (--ids pk34,pk35,pk36 loops just those, drafts included; --headless)
 ```
 
 ## License

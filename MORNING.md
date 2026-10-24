@@ -1,5 +1,16 @@
 # MORNING
 
+## Show day 24 Oct (handoff-8 + handoff-9, addendum 9a): read this first
+
+- **Live tag: `posthuman-v0.4.2`** (pk36 and the Gund fix landed together, one tag). The freezes are lifted per addendum 9a.
+- **pk36 paper forest (draft):** paper airplanes on threads swaying like kelp, spirit lights, light shafts, a plane comes loose and glides down every few seconds. FLOOD = current strength. Out of the default playlist until you approve it.
+- **Gund, 8 bays, 4 trays (drafts):** pk35 gund ruin with 9 fins, 8 roof units, the trays stepping west over the flooded street, caved bays 2, 5 and 7; pk34 gund trays with the column rhythm and 8 roof units overhead. Wider framing (pk35 zoom 110 to 250).
+- **fps:** 3080 at High 57 to 60; SwiftShader at Low pk34 25.7 (min 23.2), pk35 30, pk36 30.
+- **Fixed before pushing:** pk36 first took 3.5 s to build, enough to stall a crossfade. It now takes 0.5 s (heap 93 MB down to 4 MB).
+- **Tests:** Hydra e2e 27/27, kodama e2e 14/14 local. Soaks 5 min: Hydra pass (29.7 fps), kodamas pk33 to pk36 looped pass (29.2 fps, 0 errors), full pool pass (29.8 fps). Leak check 0.
+- **Contact sheet:** `local\kodamas\contact-sheet.jpg` (11-up, pk26 to pk36).
+- **Recopy `local\kodamas\` to the show laptops** (or use the live site with the password).
+
 ## Overnight 24 Oct (handoff-6 + handoff-7): read this first
 
 - **Live tag: `posthuman-v0.4.1`** at https://laserpirate.github.io/posthuman/ (v0.4.0 = handoff-6). Nothing skipped.
@@ -17,7 +28,7 @@
 
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`, `posthuman-v0.4.0`, `posthuman-v0.4.1`; safety tag `posthuman-v0.2.2-pre-kodama`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`, `posthuman-v0.4.0`, `posthuman-v0.4.1`, `posthuman-v0.4.2`; safety tag `posthuman-v0.2.2-pre-kodama`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 

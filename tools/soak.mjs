@@ -1,5 +1,5 @@
 // Soak test: autoplay through the full pool at 10 s per sketch, on the real GPU, for N minutes.
-//   node serve.mjs --port 8091 &   then   node tools/soak.mjs [minutes=32] [base url] [--headless]
+//   node serve.mjs --port 8091 &   then   node tools/soak.mjs [minutes=32] [base url] [--headless] [--kodama] [--ids a,b]
 // Pass criteria: no WebGL context lost, no console errors, stable fps, JS heap does not climb.
 // Writes test-results/soak.json and prints a summary.
 import fs from 'node:fs';
@@ -12,6 +12,8 @@ const BASE = args.find(a => a.startsWith('http')) || 'http://localhost:8091/';
 const headless = args.includes('--headless');
 const KODAMA = args.includes('--kodama'); // Kodama mode: the kodama pool at 20 s per scene, steered, palettes cycling
 const PER = KODAMA ? 20 : 10;
+// --ids pk34,pk35,pk36 soaks only those (drafts included), looping
+const IDS = args.includes('--ids') ? args[args.indexOf('--ids') + 1].split(',') : null;
 
 const browser = await chromium.launch({
   headless,
@@ -33,15 +35,15 @@ if (KODAMA) {
 const cdp = await ctx.newCDPSession(page);
 
 // the full pool (minus quarantine), 10 s each (kodamas 20 s), crossfade 2 s, playing
-await page.evaluate(per => {
+await page.evaluate(([per, ids]) => {
   const L = PHVJ.state.list.map(i => i.id);
   document.querySelector('#def-dur').value = String(per);
   document.querySelector('#def-dur').dispatchEvent(new Event('change'));
   for (const id of L) document.querySelector(`#pl-list li[data-id="${id}"] [data-act=rm]`).click();
-  for (const id of PHVJ.poolIds()) PHVJ.addToList(id);
+  for (const id of ids || PHVJ.poolIds()) PHVJ.addToList(id);
   PHVJ.show(PHVJ.state.list[0].id, { cut: true });
   PHVJ.setPlaying(true);
-}, PER);
+}, [PER, IDS]);
 const poolSize = await page.evaluate(() => PHVJ.state.list.length);
 console.log(`soak: ${poolSize} ${KODAMA ? 'kodamas' : 'sketches'}, ${PER} s each, ${MIN} min, ${headless ? 'headless' : 'headed'}, GPU ${await page.textContent('#gpu')}`);
 

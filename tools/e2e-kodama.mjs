@@ -16,7 +16,7 @@ const PASSFILE = path.join('local', 'kodama-pass.txt');
 const PASS = process.env.KODAMA_PASS === 'none' ? '' : process.env.KODAMA_PASS || (fs.existsSync(PASSFILE) ? fs.readFileSync(PASSFILE, 'utf8').trim() : '');
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const offsite = [], consoleProblems = [], results = [];
-const KSCENES = 42; // pk17-pk24, kv01-kv25 (no kv22), pk26-pk35
+const KSCENES = 43; // pk17-pk24, kv01-kv25 (no kv22), pk26-pk36
 
 async function ctx(opts = {}) {
   const c = await browser.newContext({ viewport: { width: 1366, height: 768 }, ...opts });
@@ -274,7 +274,7 @@ if (PLAYABLE) {
     let s = await st(p);
     assert(s.dur === 90 || s.list.find(i => i.id === s.cur).dur === 90, 'kodama default duration 90 s');
     assert(['pk26', 'pk27', 'pk28', 'pk29'].every(id => s.list.some(i => i.id === id)), 'approved pk26 to pk29 in the default playlist');
-    assert(!s.list.some(i => ['pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35'].includes(i.id)), 'drafts pk30 to pk35 not in the default playlist');
+    assert(!s.list.some(i => ['pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35', 'pk36'].includes(i.id)), 'drafts pk30 to pk36 not in the default playlist');
     // short durations, crossfade 1 s, play
     await p.evaluate(() => {
       for (const li of document.querySelectorAll('#pl-list li input[data-act=dur]')) { li.value = '3'; li.dispatchEvent(new Event('change', { bubbles: true })); }

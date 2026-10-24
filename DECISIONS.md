@@ -118,3 +118,17 @@ One line per judgment call. Newest at the bottom.
 - pk35 gund ruin (exterior): the long side elevation by default, so the stepped roof reads. camY 10 to 80, camR 120 to 230, pan 60. Rain follows TIME. The ruin damage (caved bays, dangling trusses, trees through the holes) is invented.
 - No Harvard shield, wordmark, signage or text in either canvas. No people or creatures; pk35 has small abstract kodama motes around the trees.
 - Both are drafts pending approval, out of the default playlist. Contact sheet now 10-up (pk26 to pk35).
+
+## v0.4.2 · pk36 paper forest and the Gund 8-bay fix (handoff-8, handoff-9, addendum 9a)
+
+- Addendum 9a (24 Oct 12:46) voids the noon freeze and the local-only rules of handoff-8 and -9: both went through the normal flow (local pack, encrypted pack, push to `main`). They landed together, so one tag, `posthuman-v0.4.2`, not v0.4.2 plus v0.4.3.
+- Gates for show-day iterations: Hydra e2e, kodama e2e, a 5 min soak per mode, leak check 0 (9a says 5 min is enough).
+- Three scenes built by parallel agents from separate briefs (pk36 new, pk34 and pk35 rebuilt); final fps re-measured in the app alone, so the agents' shared GPU did not skew it.
+- pk36 paper forest: draft, out of the default playlist. Six draw calls; all sway, flutter and drift in vertex shaders. FLOOD is the current: sway amount, speed and a downstream lean. Threads fade out well below their tops, so the tops never show. The scene builds a thinner forest when it detects a software renderer (SwiftShader, llvmpipe).
+- Gund: 4 trays, not 5 as handoff-7 asked. Drawing A-53 labels levels one to four, which matches the GSD's own description (handoff-9 asks for this change).
+- pk35 gund ruin: 8 bays between 9 full-height fins, 8 raised roof units, 4 tray bands stepping down to the west over the flooded street, 8 tall glazed bays on the east, the stepped service block past line E. Caved bays 2, 5 and 7 counted from N (non-adjacent). About 3.7:1 length to height. Clamps camY 8 to 85, camR 110 to 250 (pan 55 from the registry).
+- pk34 gund trays: 8 bays of 13 m, a truss and columns on each of the 9 lines, 8 roof units over the top tray, 4 trays. The view tilts up (target y 13.6) so the roof units show from inside. Full-height columns only on the tray-1 and tray-3 edges (short piers on tray 2), to keep pan 3 clear. camR 6 to 8.2 (was 10.5); clearance swept over the full orbit and pan.
+- Both Gund scenes thinned detail (desks, stipple, tube segments, shards), never bays, to pay for the extra length.
+- pk36 as first built took 3.5 s on the main thread at load (one point cloud per plane, plain JS arrays, about 93 MB heap). Same-origin scene iframes share the app's main thread, so a crossfade into it stalled the outgoing scene (19 fps in the soak). It now reuses 72 folded templates (40 at Low) with a scale, tint and rotation per plane and fills preallocated typed arrays: 0.5 s, about 4 MB. Gliders copy their points from the plane geometry.
+- `tools/soak.mjs --ids a,b` loops only the named scenes (drafts included), so a draft can be soaked before approval. The 5 min kodama gate ran both the full default pool and pk33 to pk36 looped.
+- A headed kodama soak dropped to exactly 1 fps at 2.5 min on pk23 (unchanged scene): Chrome throttling the window once it was covered. The gate soaks ran headless on the same GPU (d3d11, RTX 3080).
