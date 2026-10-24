@@ -62,6 +62,7 @@
 - **New kodamas (drafts, pending your approval, not in the default playlist):** pk26 airfield, pk27 under-city, pk28 drowned towers, pk29 cloud city. Contact sheet: `local\kodamas\contact-sheet.jpg` (4-up). Copies also in `..\All_Kodamas\phylla-kodama-topo-26..29-*.html`. GPU 45 to 60 fps; SwiftShader at Low 22 to 30 fps.
 - **Quarantine (kodamas):** none. All 36 passed preflight on the RTX 3080 (p95 frame cost at most 9.3 ms, no visible text).
 - **Tests:** `tools/e2e-kodama.mjs` 9/9 (pack local and encrypted, wrong password, remembered key; visuals only; mirrored controls; speed and turntable; palettes; autoplay, crossfade, cut, mode switch, teardown, bad scene skipped; output window; offline; zero console errors). Hydra `tools/e2e.mjs` 27/27. Soaks (headless, RTX 3080, Med), both pass: Hydra 10 min, 61 switches, all 57 played, 30 fps, heap 3.6 to 3.9 MB; Kodama 15 min, 46 switches, all 36 played, fps min 29.5 avg 30, heap 6.7 to 7.1 MB, at most 2 iframes; both 0 context lost, 0 skips, 0 console errors.
+- **Live (Pages, v0.3.1):** Hydra e2e 26/26; kodama e2e 8/8 locked and 8/8 unlocked with the password (offline check is local only).
 - **Not built:** a camera height/zoom slider (scenes don't share one camera model).
 - **Not verified:** Luna, the M4, Stardust, an Intel iGPU, any projector. Kodama mode ran only on Polaris (RTX 3080) and SwiftShader.
 
