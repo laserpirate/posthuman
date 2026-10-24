@@ -28,7 +28,7 @@ One page for running POST/HUMAN · VJ at the show. URL: https://laserpirate.gith
 Getting the kodama pack onto a laptop (pick one):
 
 1. **Local folder (best for the show, works offline):** copy `posthuman-vj\local\kodamas\` from Polaris by USB into the same place in that laptop's `posthuman-vj` folder. Run `node serve.mjs`, open http://localhost:8080/?i=<name>. The Kodamas tab says "from the local folder".
-2. **Encrypted pack on the live site:** open https://laserpirate.github.io/posthuman/?i=<name>, Gallery tab, enter the kodama password (it is in `local\kodama-pass.txt` on Polaris; not in the repo), keep "Remember on this laptop" ticked. Every `?i=` name and the output window on that browser then open it by themselves.
+2. **Live site (v0.4.5, no password):** open https://laserpirate.github.io/posthuman/?i=<name> and click Kodamas: the pack is public and plays at once, like localhost.
 
 Without either, the Kodamas button says "Kodama pack not loaded" and the Hydras keep playing.
 

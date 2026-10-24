@@ -178,3 +178,14 @@ One line per judgment call. Newest at the bottom.
 - e2e-kodama: the "drafts not in the default playlist" assertion is now "the last eight are pk30 to pk37 in order" plus "no scene in the default playlist is a draft" (checked against the pack's scene list). The append path for existing instances was checked in node, not in the browser.
 - Root baseline moved to `posthuman-v0.4.4` (172 files).
 - Gates (16:33 to 16:40, RTX 3080, headless): kodama e2e 14/14 on `/` and `/next/`, Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, kodama soak 2 min pass (44 scenes, 29.5 to 30 fps, 0 errors, 0 context lost), leak check 0, root byte-identical to `posthuman-v0.4.4`.
+
+## v0.4.5 · kodama pack public, no password (handoff-13)
+
+- Marko's call, final (24 Oct, 16:44): no password and no password prompt for kodamas on the live sites. The pack ships unencrypted on `/` and `/next/`, so Kodamas load and play at once, like localhost. The scenes stay © Marko Manriquez, all rights reserved (credits line kept; "not part of the public site" removed since it no longer holds).
+- `kodamas/` is now a plain copy of `local/kodamas/` (index.json, the 44 scene files, the manifest, thumbs/), built by `tools/kodama-pack.mjs`. The `.bin` files and `pack.json` are gone from the tree (still in git history up to v0.4.4).
+- kodama.js opens `local/kodamas/` first (not probed on github.io), then `kodamas/` (mode `public`). All the AES/PBKDF2 code, `unlock`, `forget` and the `kkey` message to the output window are removed. A key an old browser saved (`phvj:kodama-key`) is deleted on open.
+- Gallery tab: the unlock form, password field, Remember box and Forget button are removed from index.html and app.js. Same change on `feat/midi` (6dc9c7f); `/next/` rebuilt from it. `build-next` now copies `kodamas/` recursively (thumbs/).
+- The password was never committed. `local/kodama-pass.txt` stays on Polaris, unused. The leak check now scans tracked files for that password and for any tracked `local/` or pass file; scene code in `kodamas/` is expected and no longer a leak.
+- e2e-kodama: the encrypted-pack tests became "the public copy opens with no password and plays" (`?kpack=pub` locally; on Pages by default), with no unlock box, password field or locked message; the password steps before each test are gone.
+- Root baseline moved to `posthuman-v0.4.5` (171 files).
+- Gates (16:48 to 16:53, RTX 3080, headless, no password anywhere): kodama e2e 14/14 on `/` and `/next/` (local folder and the public copy), Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, leak check 0, root byte-identical to `posthuman-v0.4.5`.
