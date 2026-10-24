@@ -7,7 +7,7 @@
 - **Gund, 8 bays, 4 trays (drafts):** pk35 gund ruin with 9 fins, 8 roof units, the trays stepping west over the flooded street, caved bays 2, 5 and 7; pk34 gund trays with the column rhythm and 8 roof units overhead. Wider framing (pk35 zoom 110 to 250).
 - **fps:** 3080 at High 57 to 60; SwiftShader at Low pk34 25.7 (min 23.2), pk35 30, pk36 30.
 - **Fixed before pushing:** pk36 first took 3.5 s to build, enough to stall a crossfade. It now takes 0.5 s (heap 93 MB down to 4 MB).
-- **Tests:** Hydra e2e 27/27, kodama e2e 14/14 local. Soaks 5 min: Hydra pass (29.7 fps), kodamas pk33 to pk36 looped pass (29.2 fps, 0 errors), full pool pass (29.8 fps). Leak check 0.
+- **Tests:** Hydra e2e 27/27, kodama e2e 14/14 local. Soaks 5 min: Hydra pass (29.7 fps), kodamas pk33 to pk36 looped pass (29.2 fps, 0 errors), full pool pass (29.8 fps). Leak check 0. Live after the push: Hydra 26/26, kodama locked 2/2, unlocked 13/13 (43 scenes).
 - **Contact sheet:** `local\kodamas\contact-sheet.jpg` (11-up, pk26 to pk36).
 - **Recopy `local\kodamas\` to the show laptops** (or use the live site with the password).
 
