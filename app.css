@@ -170,14 +170,14 @@ body.fs.idle #bar { opacity: 0; pointer-events: none; }
 body.fs.idle, body.clean { cursor: none; }
 body.clean #bar, body.clean #peek, body.fs #peek { display: none; }
 body.fs #credit, body.clean #credit, body.fs #stage-msg, body.clean #stage-msg { display: none; }
-body.fs #black, body.clean #black, body.fs #mfade, body.clean #mfade { position: fixed; }
+body.fs #black, body.clean #black, body.fs #mfade, body.clean #mfade, body.fs #dim, body.clean #dim { position: fixed; }
 
 /* output window (?out=1): the stage only */
 body.out #app { grid-template-rows: 0 minmax(0, 1fr); }
 body.out #main { grid-template-columns: 1fr; }
 body.out #bar, body.out #peek, body.out #panel, body.out #credit, body.out #stage-msg, body.out #help { display: none !important; }
 body.out { cursor: none; }
-body.out #black, body.out #mfade { position: fixed; }
+body.out #black, body.out #mfade, body.out #dim { position: fixed; }
 
 /* small screens */
 @media (max-width: 900px) {
@@ -213,3 +213,15 @@ body.kmode #stage.steer { cursor: grabbing; }
 #k-pad-dot { position: absolute; width: 7px; height: 7px; margin: -3px 0 0 -3px; background: var(--on); left: 50%; top: 50%; z-index: 1; }
 .col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 #p-item { color: var(--on); }
+
+/* MIDI: master dim, the MIDI tab, learn mode */
+#dim { position: absolute; inset: 0; background: #000; z-index: 44; opacity: 0; pointer-events: none; }
+#v-midi .mon { font: 11px/1.45 var(--mono, monospace); max-height: 9.5em; overflow: auto; background: var(--bg2); border: 1px solid var(--line); padding: 4px 6px; margin: 0; list-style: none; }
+#v-midi .pick { color: var(--on); min-height: 1.4em; }
+#v-midi table { width: 100%; border-collapse: collapse; font-size: 11px; }
+#v-midi td { padding: 2px 4px; border-bottom: 1px solid var(--line); }
+#v-midi td button { padding: 1px 6px; }
+#v-midi svg { width: 100%; height: auto; display: block; background: var(--bg2); border: 1px solid var(--line); }
+#v-midi svg text { font: 7.5px sans-serif; fill: currentColor; }
+body.midi-learn [data-midi] { outline: 2px dashed var(--on); outline-offset: 1px; cursor: crosshair; }
+body.midi-learn [data-midi].learn-on { outline-style: solid; }

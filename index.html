@@ -70,7 +70,8 @@
       <div id="credit"></div>
       <div id="stage-msg" hidden></div>
       <div id="mfade"></div>
-      <div id="black" hidden></div>
+      <div id="dim"></div>
+        <div id="black" hidden></div>
       <svg id="pal-svg" width="0" height="0" aria-hidden="true"><filter id="phpal" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"></filter></svg>
     </section>
 
@@ -82,6 +83,7 @@
         <button data-tab="scene" role="tab">Scene</button>
         <button data-tab="code" role="tab">Code</button>
         <button data-tab="credits" role="tab">Credits</button>
+        <button data-tab="midi" role="tab">MIDI</button>
         <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
       </nav>
 
@@ -256,6 +258,8 @@
         <table id="cr-table"><thead><tr><th>Title</th><th>Author</th><th>License</th></tr></thead><tbody></tbody></table>
       </div>
 
+      <div id="v-midi" class="view" hidden></div>
+
       <div id="v-log" class="view" hidden>
         <div class="row"><span id="gpu" class="dim"></span><button id="log-clear">Clear</button></div>
         <ol id="log"></ol>
@@ -290,5 +294,6 @@
 <script src="data/sketches.js"></script>
 <script src="kodama.js"></script>
 <script src="app.js"></script>
+<script src="midi.js"></script>
 </body>
 </html>

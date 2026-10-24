@@ -381,7 +381,7 @@
     RT.cur = id; RT.elapsed = opts.elapsed || 0;
     if (PLAY.cue === id) PLAY.cue = null;
     const old = RT.live >= 0 ? RT.decks[RT.live] : null;
-    const cut = !!(opts.cut || S.transition === 'cut' || !old);
+    const cut = !!(opts.cut || (S.transition === 'cut' && !opts.manual) || !old);
     post({ t: 'show', id, cut, xfadeSec: S.xfadeSec, mode: MODE });
     d.canvas.style.zIndex = '2';
     if (old) old.canvas.style.zIndex = '1';
@@ -392,7 +392,7 @@
       RT.live = idle;
     } else {
       d.canvas.style.opacity = '0';
-      RT.fade = { from: RT.live, to: idle, t0: performance.now(), ms: cut ? 1 : S.xfadeSec * 1000 };
+      RT.fade = { from: RT.live, to: idle, t0: performance.now(), ms: cut ? 1 : S.xfadeSec * 1000, manual: !!opts.manual && !cut, k: 0 };
     }
     const idx = list().findIndex(it => it.id === id);
     if (idx >= 0) PLAY.pos = idx;
@@ -515,10 +515,15 @@
     const f = RT.fade;
     if (f) {
       const to = RT.decks[f.to];
-      if (to.kind === 'k' && !to.ready) f.t0 = now; // the fade starts with the scene's first frame
-      const k = (now - f.t0) / f.ms;
-      if (k >= 1) finishFade();
-      else RT.decks[f.to].canvas.style.opacity = k.toFixed(3);
+      if (f.manual) { // MIDI fader: the mix follows the fader, not the clock
+        if (f.k >= 0.995) finishFade();
+        else to.canvas.style.opacity = f.k.toFixed(3);
+      } else {
+        if (to.kind === 'k' && !to.ready) f.t0 = now; // the fade starts with the scene's first frame
+        const k = (now - f.t0) / f.ms;
+        if (k >= 1) finishFade();
+        else RT.decks[f.to].canvas.style.opacity = k.toFixed(3);
+      }
     }
     // with an output window open, this preview can rest (the output checks its own frames)
     const rest = previewResting();
@@ -592,6 +597,7 @@
     body.classList.toggle('menu-off', S.menuHidden && !S.clean);
     $('#peek').hidden = !(S.menuHidden && !S.clean && !RT.fs);
     $('#black').hidden = !S.black;
+    $('#dim').style.opacity = String(RT.dim || 0);
     $('#code-ov').hidden = !RT.code;
     $('#credit').hidden = !S.credits;
     // live tab
@@ -669,7 +675,7 @@
   function setTab(t) {
     S.tab = t; saveSettings();
     for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
-    for (const v of ['playlist', 'gallery', 'live', 'scene', 'code', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
+    for (const v of ['playlist', 'gallery', 'live', 'scene', 'code', 'credits', 'midi', 'log']) $('#v-' + v).hidden = v !== t;
     if (t === 'log') { unseen = 0; logN.hidden = true; }
     if (t === 'gallery' && !$('#g-grid').children.length) renderGallery();
   }
@@ -980,7 +986,7 @@
 
   const chan = 'BroadcastChannel' in window ? new BroadcastChannel('phvj:' + INST) : null;
   function post(m) { if (chan && !OUT) try { chan.postMessage(m); } catch (e) { /* closed */ } }
-  function postState() { post({ t: 'state', black: S.black, code: RT.code, level: RT.level }); }
+  function postState() { post({ t: 'state', black: S.black, code: RT.code, level: RT.level, dim: RT.dim || 0 }); }
   const outLive = () => !OUT && performance.now() - RT.outSeen < 3000;
   const previewResting = () => outLive() && !S.outPreview;
   let pendingMsg = null, outFadeT = 0; // output window: a show that waits for the kodama pack to open
@@ -1009,11 +1015,13 @@
         }
       }
       if (m.t === 'state' || m.t === 'sync') {
-        S.black = !!m.black; RT.code = !!m.code;
+        S.black = !!m.black; RT.code = !!m.code; RT.dim = clamp(m.dim, 0, 1, 0);
         if (LEVEL[m.level] && m.level !== RT.level) { RT.level = m.level; applyQuality(); }
         renderBar();
       }
       if (m.t === 'fx') applyFx(m.A, m.fx || S.au);
+      if (m.t === 'clean') { S.clean = !!m.on; renderBar(); } // MIDI clean full-window (not saved here)
+      if (m.t === 'mix' && RT.fade) { RT.fade.manual = true; RT.fade.k = clamp(m.v, 0, 1, 0); }
       if (m.t === 'knobs' && m.slot) PHK[m.slot] = m.vals;
       if (m.t === 'run' && MODE === 'hydra' && m.id === RT.cur && typeof m.code === 'string') {
         if (m.slot) PHK[m.slot] = m.vals;
@@ -1029,7 +1037,7 @@
         log('Output window connected');
         if (PHKODA.P.raw) post({ t: 'kkey', key: PHKODA.P.raw });
         post({ t: 'kset', k: S.k });
-        post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level, mode: MODE });
+        post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level, mode: MODE, dim: RT.dim || 0 });
         post({ t: 'pal', pal: effPal() });
         { const r = MODE === 'kodama' ? kCurRig() : null, v = r && r.view ? r.view() : null; if (v) post({ t: 'view', id: RT.cur, v }); }
         if (ED.liveCode) post({ t: 'run', id: RT.cur, code: ED.liveCode, slot: ED.active ? ED.slot : 0, vals: PHK[ED.slot] });
@@ -1112,7 +1120,7 @@
   function applyFx(levels, fx = S.au) {
     for (const b of BANDS) A[b] = clamp(levels && levels[b], 0, 1, 0);
     const z = fx.zoomSrc === 'off' ? 0 : A[fx.zoomSrc] || 0, f = fx.flashSrc === 'off' ? 0 : A[fx.flashSrc] || 0;
-    const zoom = clamp(fx.zoom, 0, 0.3, 0), flash = clamp(fx.flash, 0, 1.5, 0);
+    const amt = clamp(fx.amt, 0, 2, 1), zoom = clamp(fx.zoom, 0, 0.3, 0) * amt, flash = clamp(fx.flash, 0, 1.5, 0) * amt;
     RT.fx = Math.max(z, f);
     decksEl.style.transform = z * zoom > 0.0005 ? 'scale(' + (1 + z * zoom).toFixed(4) + ')' : '';
     decksEl.style.filter = f * flash > 0.001 ? 'brightness(' + (1 + f * flash).toFixed(3) + ')' : '';
@@ -1162,7 +1170,7 @@
     if (show) return show.deviceId;
     return devs.some(d => d.deviceId === S.au.dev) ? S.au.dev : '';
   }
-  const fxSettings = () => ({ zoomSrc: S.au.zoomSrc, zoom: S.au.zoom, flashSrc: S.au.flashSrc, flash: S.au.flash });
+  const fxSettings = () => ({ zoomSrc: S.au.zoomSrc, zoom: S.au.zoom, flashSrc: S.au.flashSrc, flash: S.au.flash, amt: clamp(S.au.amt, 0, 2, 1) });
   function audioStop() {
     if (AU.stream) for (const t of AU.stream.getTracks()) { t.onended = null; t.stop(); }
     if (AU.ctx) AU.ctx.close().catch(() => {});
@@ -1240,7 +1248,7 @@
       x.an.getFloatTimeDomainData(AU.buf);
       let sum = 0;
       for (let i = 0; i < AU.buf.length; i++) sum += AU.buf[i] * AU.buf[i];
-      const raw = Math.min(1, Math.sqrt(sum / AU.buf.length) * p.sens);
+      const raw = Math.min(1, Math.sqrt(sum / AU.buf.length) * p.sens * clamp(S.au.gain, 0, 4, 1));
       const gated = raw <= p.thr ? 0 : (raw - p.thr) / (1 - p.thr);
       x.v = Math.max(gated, x.v * p.smooth);
       lv[b] = x.v;
@@ -2106,6 +2114,156 @@
     else { log('Kodama pack not available; starting in Hydras', true); S.mode = 'hydra'; saveSettings(); stageMsg(''); startMode(); renderBar(); }
   });
 
+  // ---- MIDI actions (midi.js drives these; the controller window only) ------------------------------
+  // Knobs and faders: set(x) with x in 0..1, and get() the current value in 0..1 for soft takeover
+  // (null: no pickup). Buttons: fire(). An action that does not apply returns a short note instead.
+
+  RT.dim = 0;
+  let midiSaveT = 0;
+  const saveSoon = () => { clearTimeout(midiSaveT); midiSaveT = setTimeout(saveSettings, 400); };
+  const kOnly = () => (MODE === 'kodama' ? '' : 'Kodamas only');
+  const hueOf = hex => {
+    const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+    if (!d) return 0;
+    const hh = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return hh / 6;
+  };
+  const hueHex = x => {
+    const f = n => { const k = (n + x * 12) % 12; return Math.round(255 * (0.55 - 0.4 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return '#' + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join('');
+  };
+  function setDim(x) { RT.dim = clamp(x, 0, 1, 0); renderBar(); postState(); }
+  // the manual crossfade: the first move up starts a fade to the cued (or next) item and holds autoplay
+  let mixHold = false;
+  function mixTo(x) {
+    x = clamp(x, 0, 1, 0);
+    if (!RT.fade || !RT.fade.manual) {
+      if (x < 0.02 || !RT.cur) return '';
+      finishFade();
+      const id = pickNext(1, RT.cur);
+      if (!id || !show(id, { manual: true })) return 'nothing to crossfade to';
+      if (!PLAY.hold) { setHold(true); mixHold = true; }
+      if (!RT.fade) return ''; // no deck to fade from: it was a cut
+    }
+    RT.fade.k = x;
+    post({ t: 'mix', v: x });
+    return '';
+  }
+  function midiResume() { if (mixHold) { mixHold = false; setHold(false); } }
+  function fireCue() {
+    if (RT.fade && RT.fade.manual) { RT.fade.k = 1; post({ t: 'mix', v: 1 }); }
+    else advance(1);
+    midiResume();
+  }
+  function cueMove(dir, fromCur) {
+    const L = list();
+    if (!L.length) return;
+    let i = !fromCur && PLAY.cue ? L.findIndex(it => it.id === PLAY.cue) : L.findIndex(it => it.id === RT.cur);
+    if (i < 0) i = PLAY.pos;
+    for (let j = 1; j <= L.length; j++) {
+      const k = (((i + dir * j) % L.length) + L.length) % L.length;
+      if (playable(L[k].id) && L[k].id !== RT.cur) { setCue(L[k].id); return; }
+    }
+  }
+  function camVal(fn) {
+    if (MODE !== 'kodama') return null;
+    const r = kCurRig(), v = r && r.view ? r.view() : null;
+    return v && r.view0 ? fn(v, camCfg(RT.cur), r.view0) : null;
+  }
+  function camSet(fn) {
+    if (MODE !== 'kodama') return 'Kodamas only';
+    const r = kCurRig(), v = r && r.view ? r.view() : null;
+    if (!v || !r.view0) return 'no scene view yet';
+    const note = fn(v, camCfg(RT.cur), r.view0);
+    if (note) return note;
+    setViewNow(v, true);
+    return '';
+  }
+  const TAU = Math.PI * 2;
+  function panic() {
+    setBlack(true);
+    setDim(0);
+    S.au.zoom = 0; S.au.flash = 0; S.au.amt = 1;
+    if (S.au.on) { const c = $('#au-on'); c.checked = false; c.dispatchEvent(new Event('change')); }
+    applyFx({}); post({ t: 'fx', A: {}, fx: fxSettings() });
+    setPal({ style: 'original', con: 1, int: 1 });
+    S.k.speed = 1; S.k.tt = 1; kSet();
+    if (MODE === 'kodama') resetView();
+    if (RT.fade && RT.fade.manual) { RT.fade.k = 1; post({ t: 'mix', v: 1 }); }
+    mixHold = false; setHold(false);
+    saveSettings(); renderBar();
+    log('PANIC (MIDI): blackout on, FX 0, palette Original, speed and turntable 1x, view reset, audio off, hold off', true);
+  }
+  const MIDI_ACTS = {
+    xfadeTime: { label: 'Crossfade time', get: () => (S.xfadeSec - 0.2) / 9.8, set: x => { S.xfadeSec = Math.round((0.2 + x * 9.8) * 10) / 10; saveSoon(); renderBar(); } },
+    xfadeMix: { label: 'Manual crossfade A/B', get: () => (RT.fade && RT.fade.manual ? RT.fade.k : 0), set: mixTo },
+    tt: { label: 'Turntable speed', get: () => (MODE === 'kodama' ? S.k.tt / 3 : null), set: x => kOnly() || (S.k.tt = Math.round(x * 300) / 100, kSet(), saveSoon(), '') },
+    speed: { label: 'Playback speed', get: () => (MODE === 'kodama' ? (S.k.speed - 0.1) / 2.9 : null), set: x => kOnly() || (S.k.speed = Math.round((0.1 + x * 2.9) * 100) / 100, kSet(), saveSoon(), '') },
+    contrast: { label: 'Contrast', get: () => (effPal().con - 0.5) / 1.5, set: x => { setPal({ con: 0.5 + x * 1.5 }); saveSoon(); } },
+    palInt: { label: 'Palette intensity', get: () => effPal().int, set: x => { setPal({ int: x }); saveSoon(); } },
+    audioSens: { label: 'Audio sensitivity', get: () => clamp(S.au.gain, 0, 4, 1) / 4, set: x => { S.au.gain = x * 4; saveSoon(); } },
+    audioAmt: { label: 'Audio react amount', get: () => clamp(S.au.amt, 0, 2, 1) / 2, set: x => { S.au.amt = x * 2; saveSoon(); } },
+    flashFx: { label: 'Flash FX amount', get: () => S.au.flash / 1.5, set: x => { S.au.flash = Math.round(x * 150) / 100; saveSoon(); renderBar(); } },
+    zoomFx: { label: 'Zoom FX amount', get: () => S.au.zoom / 0.3, set: x => { S.au.zoom = Math.round(x * 30) / 100; saveSoon(); renderBar(); } },
+    hueThr: {
+      label: 'Palette hue / B-W threshold',
+      get: () => { const p = effPal(); return p.style === 'bw' ? (p.thr - 0.05) / 0.9 : p.style === 'mono' ? hueOf(p.mono) : null; },
+      set: x => {
+        const p = effPal();
+        if (p.style === 'bw') setPal({ thr: 0.05 + x * 0.9 });
+        else if (p.style === 'mono') setPal({ mono: hueHex(Math.min(x, 0.999)) });
+        else return 'palette ' + p.style + ' has no hue or threshold';
+        saveSoon(); return '';
+      },
+    },
+    dim: { label: 'Master dim', get: () => 1 - RT.dim, set: x => setDim(1 - x) },
+    orbitA: {
+      label: 'Orbit angle',
+      get: () => camVal((v, c, v0) => (((v.a - v0.a) / TAU + 0.5) % 1 + 1) % 1),
+      set: x => camSet((v, c, v0) => { v.a = v0.a + (x - 0.5) * TAU; }),
+    },
+    orbitH: {
+      label: 'Orbit height',
+      get: () => camVal((v, c) => (c.y ? (v.y - c.y[0]) / (c.y[1] - c.y[0] || 1) : null)),
+      set: x => camSet((v, c) => { if (!c.y) return 'this scene has no orbit height'; v.y = c.y[0] + x * (c.y[1] - c.y[0]); }),
+    },
+    pan: {
+      label: 'Pan',
+      get: () => camVal((v, c) => (c.pan ? clamp((-v.px * Math.sin(v.a) + v.pz * Math.cos(v.a)) / (2 * c.pan) + 0.5, 0, 1, 0.5) : null)),
+      set: x => camSet((v, c) => {
+        if (!c.pan) return 'this scene has no pan';
+        const sv = (x - 0.5) * 2 * c.pan;
+        v.px = -sv * Math.sin(v.a); v.pz = sv * Math.cos(v.a);
+      }),
+    },
+    zoom: {
+      label: 'Zoom',
+      get: () => camVal((v, c) => (c.r ? (c.r[1] - v.r) / (c.r[1] - c.r[0] || 1) : null)),
+      set: x => camSet((v, c) => { if (!c.r) return 'this scene has no zoom'; v.r = c.r[1] - x * (c.r[1] - c.r[0]); }),
+    },
+    // buttons
+    blackout: { label: 'Blackout', fire: () => setBlack(!S.black), on: () => S.black },
+    cueNext: { label: 'Cue next', fire: () => cueMove(1, true) },
+    cueUp: { label: 'Cue up the playlist', fire: () => cueMove(-1) },
+    cueDown: { label: 'Cue down the playlist', fire: () => cueMove(1) },
+    fire: { label: 'Fire the cue', fire: fireCue },
+    resetSpeed: { label: 'Reset speed + turntable', fire: () => kOnly() || (S.k.speed = 1, S.k.tt = 1, kSet(), saveSoon(), '') },
+    nextPal: { label: 'Next palette', fire: cyclePal },
+    prevPal: { label: 'Previous palette', fire: () => { const i = PAL_STYLES.indexOf(effPal().style); setPal({ style: PAL_STYLES[(i + PAL_STYLES.length - 1) % PAL_STYLES.length] }); saveSettings(); } },
+    audio: { label: 'Audio on/off', fire: () => { const c = $('#au-on'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }, on: () => !!S.au.on },
+    hold: { label: 'Hold', fire: () => { mixHold = false; setHold(!PLAY.hold); }, on: () => PLAY.hold },
+    resetView: { label: 'Reset view', fire: () => kOnly() || (resetView(), '') },
+    star: { label: 'Star current', fire: () => { if (RT.cur) toggleStar(RT.cur); } },
+    mode: { label: 'Mode Hydras/Kodamas', fire: () => $(MODE === 'kodama' ? '#b-mh' : '#b-mk').click() },
+    panic: { label: 'PANIC', fire: panic },
+    prev: { label: 'Previous', fire: () => { prev(); midiResume(); } },
+    next: { label: 'Next', fire: () => { next(); midiResume(); } },
+    play: { label: 'Play/pause', fire: () => setPlaying(!PLAY.playing), on: () => PLAY.playing },
+    clean: { label: 'Clean full-window', fire: () => { setClean(!S.clean); post({ t: 'clean', on: S.clean }); }, on: () => S.clean },
+    menu: { label: 'Hide/show menu', fire: () => { if (S.clean) { setClean(false); post({ t: 'clean', on: false }); setMenuHidden(false); } else setMenuHidden(!S.menuHidden); } },
+  };
+
   // test and debug handle
   window.PHVJ = {
     get state() {
@@ -2143,6 +2301,7 @@
       SK.set(id, { id, title: scene.title, author: 'test', code: '', thumb: '', quarantine: '', kodama: true, scene });
     },
     kRig: () => { const d = curDeck(); return d && d.kind === 'k' ? kRig(d) : null; },
+    midi: { acts: MIDI_ACTS, mode: () => MODE, log, inst: INST, out: OUT, setTab },
     testEndInput: () => { if (AU.stream) AU.stream.getAudioTracks()[0].dispatchEvent(new Event('ended')); },
   };
 })();

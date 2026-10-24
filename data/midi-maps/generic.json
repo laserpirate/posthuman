@@ -1,0 +1,16 @@
+{
+ "name": "Generic",
+ "device": "",
+ "verified": "No device assumed: bind with MIDI Learn. Panic on CC 127 (hold 1 s) as a safe default.",
+ "layout": null,
+ "bindings": [
+  {
+   "act": "panic",
+   "type": "cc",
+   "ch": 0,
+   "num": 127,
+   "mode": "hold",
+   "holdMs": 1000
+  }
+ ]
+}
