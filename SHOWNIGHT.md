@@ -21,6 +21,24 @@ One page for running POST/HUMAN · VJ at the show. URL: https://laserpirate.gith
 - Plug it back in. The app reconnects by itself within a few seconds; nothing to click.
 - If it doesn't, untick and tick Audio reactive, or pick the device in the list.
 
+## Kodama mode (Marko's kodama scenes)
+
+**Hydras | Kodamas** in the menu bar switches what plays; it fades through black. Each mode keeps its own playlists, stars, bans and position.
+
+Getting the kodama pack onto a laptop (pick one):
+
+1. **Local folder (best for the show, works offline):** copy `posthuman-vj\local\kodamas\` from Polaris by USB into the same place in that laptop's `posthuman-vj` folder. Run `node serve.mjs`, open http://localhost:8080/?i=<name>. The Kodamas tab says "from the local folder".
+2. **Encrypted pack on the live site:** open https://laserpirate.github.io/posthuman/?i=<name>, Gallery tab, enter the kodama password (it is in `local\kodama-pass.txt` on Polaris; not in the repo), keep "Remember on this laptop" ticked. Every `?i=` name and the output window on that browser then open it by themselves.
+
+Without either, the Kodamas button says "Kodama pack not loaded" and the Hydras keep playing.
+
+Scene tab (Kodama mode):
+
+- **The scene's own buttons**, mirrored: TIME (dawn/day/dusk/night/cycle), FLOOD (low/high/cycle), CLIMATE/RIVER/LIGHT cycles, as each scene has them. The scene's text and buttons never show on the output.
+- **Speed** 0.1× to 3× (1× button resets). **Turntable** 0 to 3×, plus Reverse; 0 stops the orbit.
+- **Palette** (both modes, each its own): Original, Grayscale, Black/white (threshold), Mono (hue), Duotone (presets red/green, cyan/magenta, amber/indigo, or two colors), Red/green gradient map; Intensity and Contrast. A playlist row's **Pal** button saves the current palette for that item. "Kodama start" picks the palette used on entering Kodama mode.
+- Default kodama duration is 90 s. The new drafts (airfield, under-city, drowned towers, cloud city) are marked Draft and are not in the default Kodamas playlist.
+
 ## Keys
 
 Space play/pause · → ← next/previous · F full screen · B blackout · H menu · C code overlay · R random · S star · T tap tempo · G hold · X ban · Ctrl+Enter run edited code · ? keys card.
@@ -28,4 +46,5 @@ Space play/pause · → ← next/previous · F full screen · B blackout · H me
 ## Not verified
 
 - Tested only with Chromium's fake microphone, plus a renamed fake device standing in for the Scarlett. Not yet tested with a real Scarlett, a real mixer, Luna, the M4, Stardust or a projector.
+- Kodama mode tested on Polaris (RTX 3080) and on SwiftShader only; not yet on Luna, the M4 or Stardust.
 - Check the real Scarlett's device name in the Live tab picker at soundcheck.
