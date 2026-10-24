@@ -477,7 +477,7 @@ await test('instances ?i=a and ?i=b are separate; share link opens the same play
   const link = await pa.evaluate(() => PHVJ.shareLink());
   const c2 = await ctx(); const pc = await c2.newPage();
   pc.on('pageerror', e => consoleProblems.push('pageerror: ' + e.message));
-  await pc.goto(link.replace(/^https?:\/\/[^/]+\/(posthuman\/)?/, BASE));
+  await pc.goto(link.replace(/^https?:\/\/[^/]+\/(posthuman\/)?(next\/)?/, BASE));
   await pc.waitForFunction(() => window.PHVJ);
   const sc = await st(pc);
   assert(sc.list.map(i => i.id + ':' + i.dur).join() === 'example_8:15,example_9:15,rangga_2:15', 'shared list ' + JSON.stringify(sc.list));
