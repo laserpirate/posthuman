@@ -1524,5 +1524,152 @@
    ],
    "pan": 65
   }
+ },
+ "pk34": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   },
+   {
+    "name": "rain",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-r=\"auto\"]"
+     },
+     {
+      "label": "light",
+      "sel": "[data-r=\"0.3\"]"
+     },
+     {
+      "label": "heavy",
+      "sel": "[data-r=\"1\"]"
+     }
+    ]
+   }
+  ],
+  "cam": {
+   "ka": 0.005,
+   "ky": 0.1,
+   "y": [
+    12,
+    14.2
+   ],
+   "kr": 0.02,
+   "r": [
+    6,
+    10.5
+   ],
+   "pan": 3
+  }
+ },
+ "pk35": {
+  "turntable": {
+   "method": "camA",
+   "spinVar": "turntable",
+   "rate": 0.0007
+  },
+  "groups": [
+   {
+    "name": "time",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-t=\"auto\"]"
+     },
+     {
+      "label": "dawn",
+      "sel": "[data-t=\"0\"]"
+     },
+     {
+      "label": "day",
+      "sel": "[data-t=\"0.25\"]"
+     },
+     {
+      "label": "dusk",
+      "sel": "[data-t=\"0.5\"]"
+     },
+     {
+      "label": "night",
+      "sel": "[data-t=\"0.75\"]"
+     }
+    ]
+   },
+   {
+    "name": "flood",
+    "items": [
+     {
+      "label": "cycle",
+      "sel": "[data-f=\"auto\"]"
+     },
+     {
+      "label": "low",
+      "sel": "[data-f=\"0\"]"
+     },
+     {
+      "label": "high",
+      "sel": "[data-f=\"1\"]"
+     }
+    ]
+   }
+  ],
+  "cam": {
+   "ka": 0.005,
+   "ky": 0.4,
+   "y": [
+    10,
+    80
+   ],
+   "kr": 0.05,
+   "r": [
+    120,
+    230
+   ],
+   "pan": 60
+  }
  }
 }

@@ -108,3 +108,13 @@ One line per judgment call. Newest at the bottom.
 - Leak check before every push: `tools/leak-check.mjs` scans every tracked file for the password, each scene's title, seed and a line of its code, and JPEG data in kodamas/ (it catches a planted title).
 - e2e-kodama: `KODAMA_PASS=none` runs the live test with no password (locked pack).
 - Pushes that change only docs or test tools after a green gate are not re-gated; any change to app code, the rig or the pack is.
+
+## v0.4.1 · Gund Hall kodamas (handoff-7)
+
+- Started after the `posthuman-v0.4.0` tag. The two builders researched and wrote first, then ran browser tests only after a marker file appeared, once the v0.4.0 gate was done, so their GPU use could not disturb the soak timings.
+- References: public descriptions, photos and sections of Gund Hall (John Andrews, 1972), for massing and proportions only. Nothing downloaded, saved or committed. Both scenes are stylized, not survey-accurate; the HUD credit line says so (hidden in output).
+- Trays: the handoff asks for five. The pk34 builder found that GSD's own history page and Architectural Record describe four terraced trays. Both scenes keep five, as asked; this is noted as a difference from the real building.
+- pk34 gund trays (interior): the orbit stays inside the studio volume. camR 6 to 10.5, camY 12 to 14.2 (a full orbit and the pan were swept for clearance against the floor, parapets, truss chords and glass walls). Drag rates are pk27's interior values (vertical .1, wheel .02), not the standard .4/.05, because the height range is only 2.2 units. Rain comes only through the missing panes. Rain has its own small group (follows TIME by default, plus light and heavy), which the registry mirrors as a third control group.
+- pk35 gund ruin (exterior): the long side elevation by default, so the stepped roof reads. camY 10 to 80, camR 120 to 230, pan 60. Rain follows TIME. The ruin damage (caved bays, dangling trusses, trees through the holes) is invented.
+- No Harvard shield, wordmark, signage or text in either canvas. No people or creatures; pk35 has small abstract kodama motes around the trees.
+- Both are drafts pending approval, out of the default playlist. Contact sheet now 10-up (pk26 to pk35).
