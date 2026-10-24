@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>kodama preflight harness</title>
+<meta name="robots" content="noindex, nofollow, noai, noimageai">
+<link rel="icon" href="data:,">
+<style>html,body{margin:0;background:#000}#box{position:relative;width:1280px;height:720px;overflow:hidden}iframe{position:absolute;left:0;top:0;border:0;background:#000}</style>
+</head><body>
+<div id="box"></div>
+<script>window.PHKODA_BASE = '../';</script>
+<script src="../kodama.js"></script>
+<script>
+// Driven by tools/kodama-preflight.mjs and the kodama e2e tests: one scene at a time, stepped from
+// this page's rAF exactly as the app steps a deck.
+(() => {
+  const box = document.getElementById('box');
+  const probe = document.createElement('canvas'); probe.width = 160; probe.height = 90;
+  const pctx = probe.getContext('2d', { willReadFrequently: true });
+  let f = null;
+  function blank(c) {
+    pctx.drawImage(c, 0, 0, 160, 90);
+    const px = pctx.getImageData(0, 0, 160, 90).data;
+    let hi = 0, lo = 255;
+    for (let i = 0; i < px.length; i += 4) { const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]); if (mx > hi) hi = mx; if (mn < lo) lo = mn; }
+    return hi < 10 ? 'black' : lo > 245 ? 'white' : '';
+  }
+  window.KH = {
+    async open() { const P = await PHKODA.open(); return { mode: P.mode, why: P.why, scenes: P.scenes }; },
+    async load(id, w = 1280, h = 720) {
+      KH.unload();
+      const s = PHKODA.P.scenes.find(x => x.id === id);
+      box.style.width = w + 'px'; box.style.height = h + 'px';
+      f = document.createElement('iframe');
+      f.width = w; f.height = h; f.style.width = w + 'px'; f.style.height = h + 'px';
+      f.srcdoc = PHKODA.prep(s);
+      box.append(f);
+      const t0 = performance.now();
+      return new Promise(res => {
+        let last = 0;
+        const tick = now => {
+          const r = f && f.contentWindow && f.contentWindow.__rig;
+          if (r && r.err) return res({ ok: false, err: r.err });
+          if (r) r.step(last ? now - last : 16, 1, 1);
+          last = now;
+          if (r && r.ready) return res({ ok: true, ms: performance.now() - t0 });
+          if (performance.now() - t0 > 15000) return res({ ok: false, err: 'did not render within 15 s' });
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    },
+    // run for ms at a 30 fps cap; per displayed frame: the time the scene's steps took, blank checks
+    run(ms, speed = 1, tt = 1) {
+      const r = f.contentWindow.__rig;
+      return new Promise(res => {
+        const costs = [], bad = []; let last = 0, t0 = 0, err = '', lastP = 0, frames = 0;
+        const tick = now => {
+          if (!t0) t0 = now;
+          if (last && now - last < 1000 / 30 - 8) return requestAnimationFrame(tick);
+          const a = performance.now();
+          let n = 0;
+          try { n = r.step(last ? now - last : 33, speed, tt); } catch (e) { err = e.message || String(e); }
+          if (n) costs.push(performance.now() - a);
+          frames++;
+          if (r.err) err = r.err;
+          if (n && now - lastP > 1000) { lastP = now; try { bad.push(blank(r.canvas())); } catch (e) { bad.push('readback'); } }
+          last = now;
+          if (err || now - t0 > ms) {
+            costs.sort((x, y) => x - y);
+            return res({ err, frames, fps: frames * 1000 / (now - t0), p50: costs[costs.length >> 1] || 0, p95: costs[Math.floor(costs.length * 0.95)] || 0, bad, steps: r.steps, virt: r.virt, angle: r.angle(), spin: r.spin });
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    },
+    thumb(w = 320, h = 180) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const r = f.contentWindow.__rig;
+      r.step(1000 / 60 + 0.5, 1, 1); // render now: scenes without preserveDrawingBuffer clear after the frame
+      c.getContext('2d').drawImage(r.canvas(), 0, 0, w, h);
+      return c.toDataURL('image/jpeg', 0.82);
+    },
+    // every element that would be visible in the scene document: only canvases may be
+    visibleNonCanvas() {
+      const d = f.contentDocument, out = [];
+      for (const el of d.body.querySelectorAll('*')) {
+        if (el.tagName === 'CANVAS' || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+        const cs = f.contentWindow.getComputedStyle(el), r = el.getBoundingClientRect();
+        if (cs.visibility !== 'hidden' && cs.display !== 'none' && r.width > 0 && r.height > 0 && el.childElementCount === 0) out.push(el.tagName + '#' + el.id + ' ' + (el.textContent || '').trim().slice(0, 30));
+      }
+      return out;
+    },
+    rig: () => f.contentWindow.__rig,
+    win: () => f.contentWindow,
+    unload() {
+      if (!f) return;
+      try { f.contentWindow.__rig.destroy(); } catch (e) { /* gone */ }
+      f.remove(); f = null;
+    },
+  };
+})();
+</script>
+</body></html>
