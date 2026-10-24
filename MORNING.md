@@ -2,7 +2,7 @@
 
 ## Live
 
-- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`; safety tag `posthuman-v0.2.2-pre-kodama`)
+- **URL:** https://laserpirate.github.io/posthuman/ (tags `posthuman-v0.1.0`, `posthuman-v0.2.0`, `posthuman-v0.2.1`, `posthuman-v0.3.0`, `posthuman-v0.3.1`, `posthuman-v0.4.0`; safety tag `posthuman-v0.2.2-pre-kodama`)
 - **Repo:** https://github.com/laserpirate/posthuman (public, `main`, Pages from `/`)
 - **Local:** `Z:\_F26_Fall-2026\9_post-human\posthuman-vj\`
 
@@ -43,6 +43,18 @@
   - Unplugged: the Live tab says so in red, the visuals keep running without audio, and it reconnects by itself when the device is back.
   - Hookup checklist in `SHOWNIGHT.md`: USB, mixer booth/record out to input 1 (or 1+2), INST/Air/direct monitor off, gain ring green (amber on peaks, never red), Focusrite Control on Windows if not listed, plug in before opening the app.
 - **Keys card:** adds S (star) and Ctrl+Enter (run).
+
+## v0.4.0 (handoff-6): approvals, palette fix, orbit/pan/zoom, four mashups
+
+- **Palette root cause:** not a rendering failure (every palette changed the real screen pixels in headed Chrome, controller and output, windowed and full screen); the "Kodama start" dropdown looked like the palette picker but did nothing live, and re-entering Kodama mode reset the live palette to it.
+- **Palette now:** first row of the Scene tab, a dropdown in the menu bar in Kodama mode, **P** cycles. "On start" applies at once and only sets the palette when the app opens. An item with its own palette (Pal) says so in the Scene tab and the controls edit it ("Use the mode palette" clears it). Applied inside each scene's own page (and on the hydra canvases), so B/W is exactly two values on screen.
+- **Orbit/pan/zoom (Kodamas):** drag on the stage = orbit, **shift-drag or right-drag** = pan, **wheel** = zoom. Same on the Scene tab's **pad**, or directly in the output window (the projector follows the controller and the other way round). Each scene keeps its own drag speed and height/zoom limits. The turntable rests while you steer and resumes 2 s later. **Reset view** = the scene's start. **View** on a playlist row saves the current view for that item.
+- **Approved:** pk26 airfield, pk27 under-city, pk28 drowned towers, pk29 cloud city are out of draft and in the default Kodamas playlist (added once to an existing one).
+- **Drafts awaiting approval:** pk30 cloud airfield, pk31 flooded under-city, pk32 storm runway, pk33 hanging city. Not in any default playlist.
+- **Contact sheet (8-up, pk26 to pk33):** `local\kodamas\contact-sheet.jpg`.
+- **Tests:** Hydra e2e 27/27 local, 26/26 live. Kodama e2e 14/14 local, live 2/2 locked and 13/13 unlocked. On-screen palette test (headed Chrome, OS screen copy) 4/4. Hydra soak 10 min pass (30 fps, heap 3.74 to 3.95 MB, 0 context lost, 0 console errors). Kodama soak 15 min over all 40 scenes, steering and palettes cycling: pass (29.5 to 30 fps, 0 context lost, 0 skips, 0 console errors, at most 2 iframes; heap 7.0 to 8.6 MB between the first and last third, inside the 2 MB rule but higher than the Hydra soak). Leak check 0.
+- **New scenes' fps:** in-app High 59 to 60 fps on the RTX 3080; SwiftShader at Low 27.5 to 30 fps (floor 22). Preflight: 40/40 ok, none quarantined.
+- **Not verified:** Luna, the M4, Stardust or a projector. The output window's full screen was checked on Polaris's own monitor only. Dragging was tested with a mouse; no touch or trackpad testing.
 
 ## v0.3.0 (handoff-5): Kodama mode
 

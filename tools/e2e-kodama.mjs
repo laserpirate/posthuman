@@ -12,7 +12,8 @@ const BASE = process.argv.slice(2).find(a => a.startsWith('http')) || 'http://lo
 const HEADED = process.argv.includes('--headed');
 const LOCAL = BASE.startsWith('http://localhost');
 const PASSFILE = path.join('local', 'kodama-pass.txt');
-const PASS = process.env.KODAMA_PASS || (fs.existsSync(PASSFILE) ? fs.readFileSync(PASSFILE, 'utf8').trim() : '');
+// KODAMA_PASS=none tests the locked pack (no password at all)
+const PASS = process.env.KODAMA_PASS === 'none' ? '' : process.env.KODAMA_PASS || (fs.existsSync(PASSFILE) ? fs.readFileSync(PASSFILE, 'utf8').trim() : '');
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const offsite = [], consoleProblems = [], results = [];
 const KSCENES = 40; // pk17-pk24, kv01-kv25 (no kv22), pk26-pk33

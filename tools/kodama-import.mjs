@@ -14,10 +14,10 @@ const OUT = path.join(ROOT, 'local', 'kodamas');
 const WANT = [
   ...['17', '18', '19', '20', '21', '22', '23', '24'].map(n => 'pk' + n),
   ...Array.from({ length: 25 }, (_, i) => 'kv' + String(i + 1).padStart(2, '0')).filter(k => k !== 'kv22'),
-  'pk26', 'pk27', 'pk28', 'pk29', 'pk30', 'pk31', 'pk32', 'pk33',
+  'pk26', 'pk27', 'pk28', 'pk29', 'pk30', 'pk31', 'pk32', 'pk33', 'pk34', 'pk35',
 ];
 // new scenes, plain working titles (Marko names them later). pk26-pk29 approved by Marko
-// (handoff-6); pk30-pk33 are drafts pending his approval, out of the default playlist.
+// (handoff-6); pk30-pk35 are drafts pending his approval, out of the default playlist.
 const NEW = {
   pk26: { file: 'phylla-kodama-topo-26-airfield.html', title: 'airfield', series: 'phylla-kodama-topo' },
   pk27: { file: 'phylla-kodama-topo-27-under-city.html', title: 'under-city', series: 'phylla-kodama-topo' },
@@ -27,6 +27,9 @@ const NEW = {
   pk31: { file: 'phylla-kodama-topo-31-flooded-under-city.html', title: 'flooded under-city', series: 'phylla-kodama-topo', draft: true },
   pk32: { file: 'phylla-kodama-topo-32-storm-runway.html', title: 'storm runway', series: 'phylla-kodama-topo', draft: true },
   pk33: { file: 'phylla-kodama-topo-33-hanging-city.html', title: 'hanging city', series: 'phylla-kodama-topo', draft: true },
+  // handoff-7: Gund Hall, stylized, drafts
+  pk34: { file: 'phylla-kodama-topo-34-gund-trays.html', title: 'gund trays', series: 'phylla-kodama-topo', draft: true },
+  pk35: { file: 'phylla-kodama-topo-35-gund-ruin.html', title: 'gund ruin', series: 'phylla-kodama-topo', draft: true },
 };
 
 function csv(text) {

@@ -103,3 +103,8 @@ One line per judgment call. Newest at the bottom.
 - A scene file missing from local/kodamas/ is now left out of the pack instead of failing the whole pack.
 - Mashups pk30 to pk33 built by four parallel agents from one brief: pk26 to pk29 as templates, the registry-parsable camera and button conventions, the perf budget, mood-only refs. Drafts, out of the default playlist.
 - `kodamas_manifest.csv` in ..\All_Kodamas gained rows for pk26 to pk33. pk26 to pk29 had not been added in handoff-5.
+- Addendum 7a (overnight rules) read mid-run: handoff-6 continued where it stood. "Palette transition" in 7a is read as handoff-6's palette fix; its setting is the Scene tab Palette row (and "On start").
+- On-screen palette test: Marko's Claude desktop window was in front of the test browser, and Windows does not let a background process take the foreground. `tools/front.ps1` makes the test window topmost by a unique title while it is measured.
+- Leak check before every push: `tools/leak-check.mjs` scans every tracked file for the password, each scene's title, seed and a line of its code, and JPEG data in kodamas/ (it catches a planted title).
+- e2e-kodama: `KODAMA_PASS=none` runs the live test with no password (locked pack).
+- Pushes that change only docs or test tools after a green gate are not re-gated; any change to app code, the rig or the pack is.
