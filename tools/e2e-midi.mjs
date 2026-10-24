@@ -17,7 +17,7 @@ async function test(name, fn) {
 }
 
 // the fake Web MIDI: __midi.plug(name), unplug(name), cc(num, val, ch), and what the app sent back (LEDs)
-const SHIM = ({ noMidi }) => {
+const SHIM = ({ noMidi, dev }) => {
   if (noMidi) { try { delete Navigator.prototype.requestMIDIAccess; } catch (e) { /* */ } navigator.requestMIDIAccess = undefined; return; }
   const M = window.__midi = { inputs: new Map(), outputs: new Map(), sent: [], access: null, calls: 0, sysex: false };
   const ev = port => { if (M.access && M.access.onstatechange) M.access.onstatechange({ port }); };
@@ -40,7 +40,7 @@ const SHIM = ({ noMidi }) => {
     M.access = { inputs: M.inputs, outputs: M.outputs, onstatechange: null, sysexEnabled: false };
     return M.access;
   };
-  M.plug('nanoKONTROL2');
+  M.plug(dev || 'nanoKONTROL2');
 };
 
 async function ctx(opts = {}) {
@@ -102,9 +102,12 @@ await test('enable: no sysex, device listed, monitor shows messages', async () =
   await c.close();
 });
 
-await test('every nanoKONTROL2 preset binding fires its action', async () => {
-  const c = await ctx(), p = await open(c);
+for (const [dev, want, n] of [['nanoKONTROL2', 'nanoKONTROL2', 37], ['nanoKONTROL', 'nanoKONTROL (scene 1)', 34]])
+await test('every ' + dev + ' preset binding fires its action (auto-picked by port name)', async () => {
+  const c = await ctx({ dev }), p = await open(c);
   await enable(p);
+  const name = await p.evaluate(() => PHVJ.midiUI.state().map.name);
+  assert(name.startsWith(want), 'auto preset for ' + dev + ': ' + name);
   // count calls instead of acting (the actions themselves are tested below)
   const binds = await p.evaluate(() => {
     window.__hits = {};
@@ -114,7 +117,7 @@ await test('every nanoKONTROL2 preset binding fires its action', async () => {
     }
     return PHVJ.midiUI.state().map.bindings;
   });
-  assert(binds.length >= 37, 'preset has ' + binds.length + ' bindings');
+  assert(binds.length === n, 'preset has ' + binds.length + ' bindings');
   for (const b of binds) {
     await cc(p, b.num, 127);
     if (b.mode === 'hold') await wait(b.holdMs + 150);
@@ -314,6 +317,30 @@ await test('Hydras: orbit is skipped with a note; Kodamas: zoom, orbit, reset vi
   assert((await st(p)).k.speed === 3, 'speed ' + (await st(p)).k.speed);
   await cc(p, 33, 127); await cc(p, 33, 0); // S2 reset speed + turntable
   assert((await st(p)).k.speed === 1, 'reset speed');
+  await c.close();
+});
+
+await test('original nanoKONTROL: REC panic needs a 1 s hold, knob 9 picks the palette, upper 9 fires, lower 9 menu', async () => {
+  const c = await ctx({ dev: 'nanoKONTROL' }), p = await open(c, '?i=midink1');
+  await enable(p);
+  await cc(p, 44, 127); await wait(400); await cc(p, 44, 0);
+  await wait(800);
+  assert((await st(p)).settings.black === false, 'short REC fired panic');
+  await cc(p, 44, 127); await wait(1150); await cc(p, 44, 0);
+  assert((await st(p)).settings.black === true, 'REC hold: no panic');
+  await cc(p, 22, 0); await cc(p, 22, 127); // knob 9 sweeps the palette list: original (0) -> last
+  const style = (await st(p)).pal.style;
+  assert(style === 'rg', 'palette pick ' + style);
+  await cc(p, 22, 60);
+  assert((await st(p)).pal.style === 'bw', 'palette pick middle ' + (await st(p)).pal.style);
+  const s0 = await st(p);
+  await cc(p, 31, 127); await cc(p, 31, 0); // upper 9 = fire
+  await p.waitForFunction(c0 => PHVJ.state.cur !== c0, s0.cur);
+  await cc(p, 41, 127); await cc(p, 41, 0); // lower 9 = menu
+  assert((await st(p)).settings.menuHidden !== s0.settings.menuHidden, 'menu');
+  await cc(p, 49, 127); await cc(p, 49, 0); // LOOP = clean
+  assert((await st(p)).settings.clean === true, 'LOOP clean');
+  assert(/SCENE LED on 1/.test(await p.textContent('#v-midi')), 'no SCENE note');
   await c.close();
 });
 

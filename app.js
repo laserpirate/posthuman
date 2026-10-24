@@ -2218,6 +2218,11 @@
       },
     },
     dim: { label: 'Master dim', get: () => 1 - RT.dim, set: x => setDim(1 - x) },
+    palPick: {
+      label: 'Palette pick',
+      get: () => PAL_STYLES.indexOf(effPal().style) / (PAL_STYLES.length - 1),
+      set: x => { const st = PAL_STYLES[Math.round(x * (PAL_STYLES.length - 1))]; if (st !== effPal().style) { setPal({ style: st }); saveSoon(); } },
+    },
     orbitA: {
       label: 'Orbit angle',
       get: () => camVal((v, c, v0) => (((v.a - v0.a) / TAU + 0.5) % 1 + 1) % 1),

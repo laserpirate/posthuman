@@ -10,7 +10,9 @@
   const ACTS = P.acts, LOG = P.log;
   const $ = s => document.querySelector(s);
   const KEY = 'phvj:' + P.inst + ':midi';
-  const PRESETS = { nanokontrol2: 'nanoKONTROL2 (factory CC mode)', nanokontrol: 'nanoKONTROL (scene 1)', generic: 'Generic' };
+  const PRESETS = { auto: 'Auto (by device name)', nanokontrol: 'nanoKONTROL (scene 1)', nanokontrol2: 'nanoKONTROL2 (factory CC mode)', generic: 'Generic' };
+  // Auto: nanoKONTROL2 when the port says so, else the original nanoKONTROL (Marko's controller)
+  const autoPreset = () => (M.inputs.some(i => /nanokontrol\s*2/i.test(i.name)) ? 'nanokontrol2' : 'nanokontrol');
   // UI controls that MIDI Learn can target by clicking them
   const TARGETS = {
     blackout: '#b-black', play: '#b-play', next: '#b-next', prev: '#b-prev', star: '#b-star', clean: '#b-clean', menu: '#b-hide',
@@ -28,11 +30,12 @@
     let s = null;
     try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* none */ }
     s = s && typeof s === 'object' ? s : {};
-    return { enabled: !!s.enabled, dev: typeof s.dev === 'string' ? s.dev : '', led: !!s.led, preset: PRESETS[s.preset] ? s.preset : 'nanokontrol2', map: s.map && Array.isArray(s.map.bindings) ? s.map : null };
+    return { enabled: !!s.enabled, dev: typeof s.dev === 'string' ? s.dev : '', led: !!s.led, preset: PRESETS[s.preset] ? s.preset : 'auto', map: s.map && Array.isArray(s.map.bindings) ? s.map : null };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(M.st)); } catch (e) { /* full or blocked */ } }
   const log = (t, w) => LOG('MIDI: ' + t, w);
-  const map = () => M.st.map || M.presets[M.st.preset] || { name: 'empty', bindings: [] };
+  const presetKey = () => (M.st.preset === 'auto' ? autoPreset() : M.st.preset);
+  const map = () => M.st.map || M.presets[presetKey()] || { name: 'empty', bindings: [] };
 
   function cleanMap(m) {
     if (!m || typeof m !== 'object' || !Array.isArray(m.bindings)) throw new Error('not a MIDI map (no bindings)');
@@ -47,7 +50,7 @@
     return { name: String(m.name || 'custom').slice(0, 60), device: m.device ? String(m.device).slice(0, 60) : '', layout: m.layout || null, bindings };
   }
   async function loadPresets() {
-    await Promise.all(Object.keys(PRESETS).map(async k => {
+    await Promise.all(Object.keys(PRESETS).filter(k => k !== 'auto').map(async k => {
       try { const r = await fetch('data/midi-maps/' + k + '.json', { cache: 'no-store' }); if (r.ok) M.presets[k] = cleanMap(await r.json()); } catch (e) { /* offline without the file */ }
     }));
     if (M.st.map) try { M.st.map = cleanMap(M.st.map); } catch (e) { M.st.map = null; }
@@ -272,14 +275,15 @@
         on ? sel : null),
       stEl,
       h('div', { class: 'row' }, h('span', { class: 'lbl', text: 'Map' }), preset,
-        h('span', { class: 'dim', text: M.st.map ? M.st.map.name : '' }),
+        h('span', { class: 'dim', text: M.st.map ? M.st.map.name : M.st.preset === 'auto' ? '→ ' + PRESETS[presetKey()] : '' }),
         h('button', { text: 'Reset to preset', onclick: () => { M.st.map = null; M.picks.clear(); save(); log('map reset to ' + PRESETS[M.st.preset]); render(); } })),
       h('div', { class: 'row' },
         h('button', { text: M.learn ? 'Stop learn' : 'MIDI Learn', 'aria-pressed': String(!!M.learn), id: 'midi-learn', onclick: () => setLearn(!M.learn) }),
         h('button', { text: 'Export map', onclick: exportMap }),
         h('button', { text: 'Import map', onclick: () => file.click() }), file),
       M.learn ? h('p', { class: 'pick', text: M.learn.act ? 'Now move a knob, fader or button for: ' + ACTS[M.learn.act].label : 'Click a control in the app (dashed outline) or a Learn button below, then move a knob, fader or button.' }) : null,
-      h('div', { class: 'row' }, h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: M.st.led || null, onchange: e => { M.st.led = e.target.checked; save(); M.ledLast.clear(); led(true); } }), ' LED feedback (set the nanoKONTROL2 LED mode to External in Korg Kontrol Editor)')),
+      h('p', { class: 'dim', text: 'nanoKONTROL: keep the SCENE LED on 1 (SCENE switches the device\'s own scenes; the app ignores it). If a button fires only every other press, set it to Momentary in Korg Kontrol Editor.' }),
+      h('div', { class: 'row' }, h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: M.st.led || null, onchange: e => { M.st.led = e.target.checked; save(); M.ledLast.clear(); led(true); } }), ' LED feedback (nanoKONTROL2 only: set its LED mode to External in Korg Kontrol Editor)')),
       pickEl,
       h('h3', { text: 'Monitor (last messages)' }), monEl,
       h('h3', { text: 'Layout' }), drawing(m),
@@ -299,7 +303,7 @@
   }
   // a drawing of the controller with the current bindings, from the map's layout
   function drawing(m) {
-    const NS = 'http://www.w3.org/2000/svg', L = m.layout || (M.presets.nanokontrol2 || {}).layout;
+    const NS = 'http://www.w3.org/2000/svg', L = m.layout || (M.presets[presetKey()] || {}).layout;
     const svg = document.createElementNS(NS, 'svg');
     const el = (tag, at, text) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (text) e.textContent = text; svg.append(e); return e; };
     const strips = L && L.strips ? L.strips : 8, tx = L && L.transport ? L.transport : [];
@@ -322,7 +326,7 @@
         ['s', 'm', 'r'].forEach((row, j) => {
           if (!L[row]) return;
           el('rect', { x, y: 34 + j * 20, width: 12, height: 10, rx: 2, fill: 'none', stroke: 'currentColor', 'stroke-opacity': 0.6 });
-          el('text', { x: x + 2, y: 42 + j * 20 }, row.toUpperCase());
+          el('text', { x: x + 2, y: 42 + j * 20 }, (L.rowNames && L.rowNames[row] ? L.rowNames[row][0] : row).toUpperCase());
           el('text', { x: x + 15, y: 42 + j * 20 }, lab('cc', L[row][s]));
         });
         el('rect', { x: x + 3, y: 98, width: 6, height: 52, fill: 'none', stroke: 'currentColor', 'stroke-opacity': 0.6 });

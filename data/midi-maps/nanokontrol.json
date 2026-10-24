@@ -1,7 +1,7 @@
 {
  "name": "nanoKONTROL (scene 1)",
  "device": "nanoKONTROL",
- "verified": "Sliders 1-5 (CC 2-6) and knobs (CC 14-22) match public setup guides; sliders 6-9, buttons and transport are from memory: confirm with the MIDI monitor.",
+ "verified": "Map confirmed by Marko (24 Oct). CC numbers are scene 1 factory defaults: sliders 1-5 (CC 2-6) and knobs (CC 14-22) match public setup guides; sliders 6-9, the buttons and transport are from memory, not confirmed: check them in the MIDI tab monitor on the real unit. Fader 9 is free for learn. SCENE is ignored (keep its LED on 1).",
  "layout": {
   "strips": 9,
   "knob": [
@@ -48,29 +48,33 @@
    40,
    41
   ],
+  "rowNames": {
+   "s": "upper",
+   "m": "lower"
+  },
   "transport": [
    {
-    "name": "rew",
+    "name": "REW",
     "cc": 47
    },
    {
-    "name": "play",
+    "name": "PLAY",
     "cc": 45
    },
    {
-    "name": "ff",
+    "name": "FF",
     "cc": 48
    },
    {
-    "name": "loop",
+    "name": "LOOP",
     "cc": 49
    },
    {
-    "name": "stop",
+    "name": "STOP",
     "cc": 46
    },
    {
-    "name": "rec",
+    "name": "REC",
     "cc": 44
    }
   ]
@@ -232,16 +236,28 @@
    "act": "mode",
    "type": "cc",
    "ch": 1,
+   "num": 40,
+   "mode": "toggle"
+  },
+  {
+   "act": "palPick",
+   "type": "cc",
+   "ch": 1,
+   "num": 22
+  },
+  {
+   "act": "fire",
+   "type": "cc",
+   "ch": 1,
    "num": 31,
    "mode": "toggle"
   },
   {
-   "act": "panic",
+   "act": "menu",
    "type": "cc",
    "ch": 1,
    "num": 41,
-   "mode": "hold",
-   "holdMs": 1000
+   "mode": "toggle"
   },
   {
    "act": "prev",
@@ -272,18 +288,19 @@
    "mode": "toggle"
   },
   {
-   "act": "fire",
-   "type": "cc",
-   "ch": 1,
-   "num": 44,
-   "mode": "toggle"
-  },
-  {
    "act": "clean",
    "type": "cc",
    "ch": 1,
    "num": 49,
    "mode": "toggle"
+  },
+  {
+   "act": "panic",
+   "type": "cc",
+   "ch": 1,
+   "num": 44,
+   "mode": "hold",
+   "holdMs": 1000
   }
  ]
 }
