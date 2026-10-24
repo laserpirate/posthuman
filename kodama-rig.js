@@ -9,7 +9,13 @@
 //    run per displayed frame (several per frame above 1x, one every few frames below it), and only
 //    the last step of a frame renders. Clock-based and per-frame animation scale together;
 //  - drives the turntable through the scene's own orbit angle (camA) and switches off its own spin;
-//  - pins devicePixelRatio to 1 (the iframe is sized to the quality level and scaled to the stage).
+//  - pins devicePixelRatio to 1 and, in the app, reports the quality level's size as innerWidth /
+//    innerHeight: the scene draws at that size and its canvas is stretched over the iframe, which the
+//    app sizes to the stage. Scaling happens here, before the palette filter, so B/W stays two values;
+//  - applies the palette inside the scene's own document, as a CSS filter on its WebGL canvas;
+//  - gives the controller the scene's camera: its own orbit globals (camA, camY, camR) plus a pan
+//    offset added to both the camera and its look point at render time. Pointer input is read by the
+//    app on the stage (controller and output window alike) and set here, so the scene's handlers stay off.
 (() => {
   'use strict';
   const W = window, cfg = W.__KCFG || {};
@@ -20,6 +26,19 @@
   performance.now = () => t0 + rig.virt;
   Date.now = () => d0 + Math.round(rig.virt);
   try { Object.defineProperty(W, 'devicePixelRatio', { get: () => 1, configurable: true }); } catch (e) { /* keep the real one */ }
+  const size = { w: cfg.w || 0, h: cfg.h || 0 };
+  if (size.w) {
+    try {
+      Object.defineProperty(W, 'innerWidth', { get: () => size.w, configurable: true });
+      Object.defineProperty(W, 'innerHeight', { get: () => size.h, configurable: true });
+    } catch (e) { size.w = 0; }
+  }
+  // a new quality level: the scene's own resize handler picks the new size up
+  rig.setSize = (w, h) => {
+    if (!size.w || (w === size.w && h === size.h)) return;
+    size.w = w; size.h = h;
+    W.dispatchEvent(new Event('resize'));
+  };
 
   let q = [], seq = 0;
   W.requestAnimationFrame = cb => { q.push([++seq, cb]); return seq; };
@@ -31,7 +50,8 @@
   const css = document.createElement('style');
   css.textContent = 'html,body{background:#000 !important;cursor:none !important;overflow:hidden !important}' +
     'body *{visibility:hidden !important;pointer-events:none !important;transition:none !important;animation:none !important}' +
-    'canvas{visibility:visible !important}';
+    'canvas{visibility:visible !important}' +
+    (size.w ? 'canvas{position:fixed !important;left:0 !important;top:0 !important;width:100% !important;height:100% !important}' : '');
   document.documentElement.appendChild(css);
 
   // after three.js loads: wrap the renderer so catch-up steps skip rendering and teardown is complete
@@ -46,7 +66,16 @@
         rig.scene = scene;
         if (rig.skip) return;
         if (rig.spin === 'root' && scene) scene.rotation.y = rig.rootAng;
-        render.call(this, scene, camera);
+        const pan = rig.pan, panned = camera && (pan.x || pan.y || pan.z);
+        if (panned) {
+          // the scene placed the camera around its target this step; shift both by the pan
+          const t = rig.lookTarget();
+          camera.position.x += pan.x; camera.position.y += pan.y; camera.position.z += pan.z;
+          if (t) camera.lookAt(t.x + pan.x, t.y + pan.y, t.z + pan.z);
+        }
+        try { render.call(this, scene, camera); } finally {
+          if (panned) { camera.position.x -= pan.x; camera.position.y -= pan.y; camera.position.z -= pan.z; }
+        }
         rig.renders++;
         rig.ready = true;
       };
@@ -62,6 +91,8 @@
   // else rotate the scene root
   let G = null;
   rig.rootAng = 0;
+  rig.holdUntil = 0; // real time; while someone steers the view the turntable rests
+  rig.hold = ms => { rig.holdUntil = realNow() + ms; };
   function spinStep(tt) {
     if (G === null) {
       try {
@@ -72,6 +103,7 @@
       } catch (e) { G = false; rig.spin = 'root'; }
     }
     const rate = cfg.rate || 0.0008;
+    if (realNow() < rig.holdUntil) tt = 0; // held: no turn, and a scene's own spin is cancelled
     if (G) G.set(G.get() + rate * (tt - (cfg.spinVar || !cfg.ownSpin ? 0 : 1)));
     else rig.rootAng -= rate * (tt - 1);
   }
@@ -80,6 +112,7 @@
   let acc = 0;
   rig.step = (dtMs, speed, tt) => {
     if (!q.length) return 0; // the scene has not started its loop yet
+    if (!rig.view0) rig.view0 = rig.view(); // the scene's own starting view, for Reset view
     acc += Math.max(0, speed) * Math.min(dtMs, 250) / STEP;
     let n = Math.floor(acc);
     if (n > 8) { n = 8; acc = 0; } else acc -= n;
@@ -98,6 +131,64 @@
   rig.canvas = () => {
     const r = rig.renderers[0];
     return (r && r.domElement) || document.querySelector('canvas');
+  };
+
+  // camera: the scene's orbit globals, its look target, and the pan offset
+  let C = null;
+  function cam() {
+    if (C === null) {
+      try {
+        C = (0, eval)('({get:()=>({a:camA,y:camY,r:camR}),set:v=>{if(isFinite(v.a))camA=v.a;if(isFinite(v.y))camY=v.y;if(isFinite(v.r))camR=v.r;}})');
+        C.get();
+      } catch (e) { C = false; }
+    }
+    return C;
+  }
+  let T = null;
+  rig.lookTarget = () => {
+    if (T === null) { try { T = (0, eval)('target'); if (!T || !T.isVector3) T = false; } catch (e) { T = false; } }
+    return T || null;
+  };
+  rig.pan = { x: 0, y: 0, z: 0 };
+  rig.view0 = null;
+  rig.view = () => {
+    const c = cam();
+    if (!c) return null;
+    const v = c.get();
+    return { a: v.a, y: v.y, r: v.r, px: rig.pan.x, py: rig.pan.y, pz: rig.pan.z };
+  };
+  rig.setView = v => {
+    const c = cam();
+    if (!c || !v) return false;
+    c.set(v);
+    for (const k of ['x', 'y', 'z']) if (isFinite(v['p' + k])) rig.pan[k] = v['p' + k];
+    return true;
+  };
+
+  // palette: an SVG filter defined in this document, on every canvas here
+  rig.setPal = markup => {
+    let f = document.getElementById('__phpal');
+    if (!f) {
+      const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('width', '0'); svg.setAttribute('height', '0'); svg.setAttribute('aria-hidden', 'true');
+      svg.style.cssText = 'position:absolute;width:0;height:0;left:0;top:0';
+      f = document.createElementNS(NS, 'filter');
+      f.id = '__phpal';
+      for (const [k, v] of [['x', '0'], ['y', '0'], ['width', '100%'], ['height', '100%'], ['color-interpolation-filters', 'sRGB']]) f.setAttribute(k, v);
+      svg.appendChild(f);
+      document.documentElement.appendChild(svg); // outside body: the overlay hiding never touches it
+    }
+    f.innerHTML = markup || '';
+    rig.palOn = !!markup;
+    rig.palCanvas();
+  };
+  rig.palOn = false;
+  rig.palCanvas = () => {
+    for (const c of document.querySelectorAll('canvas')) {
+      c.style.setProperty('filter', 'none', 'important');
+      void c.offsetWidth; // Chrome picks up new filter content only on a filter change
+      c.style.setProperty('filter', rig.palOn ? 'url(#__phpal)' : 'none', 'important');
+    }
   };
 
   // the scene's own buttons, mirrored by the controller

@@ -43,7 +43,9 @@
     try { idx = JSON.parse(await getText('local/kodamas/index.json')); } catch (e) { return false; }
     await common();
     const files = new Map();
-    await Promise.all(idx.scenes.map(async s => { files.set(s.file, await getText('local/kodamas/' + s.file)); }));
+    // a scene whose file is missing from the folder is left out rather than closing the whole pack
+    await Promise.all(idx.scenes.map(async s => { try { files.set(s.file, await getText('local/kodamas/' + s.file)); } catch (e) { /* missing */ } }));
+    idx.scenes = idx.scenes.filter(s => files.has(s.file));
     try { P.manifest = await getText('local/kodamas/phylla-kodama-manifest.js'); } catch (e) { P.manifest = ''; }
     P.thumbs = new Map(idx.scenes.filter(s => s.thumb).map(s => [s.id, BASE + 'local/kodamas/' + s.thumb]));
     P.files = files; P.scenes = idx.scenes; P.mode = 'local'; P.why = '';
@@ -110,11 +112,11 @@
   function forget() { try { localStorage.removeItem(KEYSTORE); } catch (e) { /* ignore */ } }
 
   // the scene, ready for a deck: local three.js, inline manifest, the rig first
-  function prep(scene) {
+  function prep(scene, size) {
     const html = P.files.get(scene.file);
     if (!html) return null;
     const r = (P.reg[scene.id] && P.reg[scene.id].turntable) || {};
-    const cfg = { id: scene.id, spinVar: r.spinVar || '', rate: r.rate || 0.0008, ownSpin: !!r.ownSpin };
+    const cfg = { id: scene.id, spinVar: r.spinVar || '', rate: r.rate || 0.0008, ownSpin: !!r.ownSpin, w: size ? size.w : 0, h: size ? size.h : 0 };
     const head = '<script>window.__KCFG=' + JSON.stringify(cfg) + ';</script><script>' + P.rig + '\n</script>';
     let out = html.replace(THREE_TAG, '<script src="' + abs('vendor/three.r128.min.js') + '"></script><script>window.__rig&&__rig.afterThree();</script>');
     out = out.replace(MANIFEST_TAG, () => '<script>' + P.manifest + '\n</script>');

@@ -37,6 +37,14 @@
         <option value="med">Med 1280×720</option>
         <option value="high">High 1920×1080</option>
       </select>
+      <select id="b-pal" title="Palette (P cycles)" hidden>
+        <option value="original">Original</option>
+        <option value="grayscale">Grayscale</option>
+        <option value="bw">Black / white</option>
+        <option value="mono">Mono</option>
+        <option value="duotone">Duotone</option>
+        <option value="rg">Red/green gradient map</option>
+      </select>
       <span id="fps" class="readout" title="Frames per second">-- fps</span>
       <button id="b-code" title="Code overlay (C)">Code</button>
       <button id="b-cred" title="Credits line">Credits</button>
@@ -171,15 +179,9 @@
       </div>
 
       <div id="v-scene" class="view" hidden>
-        <div id="k-scene">
-          <h3>Scene controls</h3>
-          <p id="k-cur" class="dim"></p>
-          <div id="k-ctrls"></div>
-          <div class="row sl"><span class="lbl">Speed</span><input id="k-speed" type="range" min="0.1" max="3" step="0.05" title="Playback speed"><span id="k-speed-v" class="readout"></span><button id="k-speed-1" title="Back to 1x">1×</button></div>
-          <div class="row sl"><span class="lbl">Turntable</span><input id="k-tt" type="range" min="0" max="3" step="0.05" title="Turntable speed"><span id="k-tt-v" class="readout"></span><label class="chk"><input id="k-rev" type="checkbox"> Reverse</label></div>
-          <p class="dim">Speed scales the whole scene clock (0.1× to 3×). Turntable 0 stops the orbit. Dragging inside the output is off.</p>
-        </div>
-        <h3>Palette <span id="p-for" class="dim"></span></h3>
+        <h3>Palette</h3>
+        <p id="p-for" class="dim"></p>
+        <div class="row" id="p-item" hidden><span id="p-item-t"></span><button id="p-item-x" title="Remove this item's own palette">Use the mode palette</button></div>
         <div class="row">
           <select id="p-style" title="Palette">
             <option value="original">Original</option>
@@ -204,8 +206,10 @@
         </div>
         <div class="row sl"><span class="lbl">Intensity</span><input id="p-int" type="range" min="0" max="1" step="0.01" title="Mix with the original"></div>
         <div class="row sl"><span class="lbl">Contrast</span><input id="p-con" type="range" min="0.5" max="2" step="0.01" title="Contrast"></div>
-        <div class="row"><span class="lbl">Kodama start</span>
-          <select id="p-kdef" title="Palette when entering Kodama mode">
+        <p class="dim">Applied on the output after the scene or sketch, on the controller and in the output window. Hydras and Kodamas each keep their own. P cycles styles. A playlist row's Pal button gives that item its own palette; while it is on screen, these controls edit it.</p>
+
+        <div class="row" id="p-kdef-row"><span class="lbl">On start</span>
+          <select id="p-kdef" title="Kodama palette when the app opens">
             <option value="original">Original</option>
             <option value="grayscale">Grayscale</option>
             <option value="duotone">Duotone</option>
@@ -213,9 +217,20 @@
             <option value="mono">Mono</option>
             <option value="rg">Red/green gradient map</option>
           </select>
-          <span class="dim">palette on entering Kodama mode</span>
+          <span class="dim">Kodama palette when the app opens (changing it applies it now)</span>
         </div>
-        <p class="dim">The palette is a filter on the output, after the scene or sketch. Hydras and Kodamas each keep their own. A playlist row's Pal button saves the current palette for that item.</p>
+
+        <div id="k-scene">
+          <h3>Scene controls</h3>
+          <p id="k-cur" class="dim"></p>
+          <div id="k-ctrls"></div>
+          <div class="row sl"><span class="lbl">Speed</span><input id="k-speed" type="range" min="0.1" max="3" step="0.05" title="Playback speed"><span id="k-speed-v" class="readout"></span><button id="k-speed-1" title="Back to 1x">1×</button></div>
+          <div class="row sl"><span class="lbl">Turntable</span><input id="k-tt" type="range" min="0" max="3" step="0.05" title="Turntable speed"><span id="k-tt-v" class="readout"></span><label class="chk"><input id="k-rev" type="checkbox"> Reverse</label></div>
+          <h3>View</h3>
+          <div class="row"><div id="k-pad" title="Drag: orbit. Shift-drag or right-drag: pan. Wheel: zoom."><span id="k-pad-dot"></span></div>
+            <div class="col"><button id="k-view-reset" title="The scene's own starting view">Reset view</button><span id="k-view-v" class="readout"></span></div></div>
+          <p class="dim">Speed scales the whole scene clock (0.1× to 3×). Turntable 0 stops the orbit. Orbit, pan and zoom: drag on the stage or on the pad (shift-drag or right-drag pans, wheel zooms), here or in the output window; the turntable rests while you steer and resumes 2 s later. A playlist row's View button saves the current view for that item.</p>
+        </div>
       </div>
 
       <div id="v-code" class="view" hidden>
@@ -263,6 +278,8 @@
       <dt>T</dt><dd>Tap tempo</dd>
       <dt>G</dt><dd>Hold current sketch</dd>
       <dt>X</dt><dd>Ban current sketch</dd>
+      <dt>P</dt><dd>Next palette</dd>
+      <dt>Drag</dt><dd>Orbit a kodama (shift or right-drag pans, wheel zooms)</dd>
       <dt>Esc</dt><dd>Leave full screen</dd>
       <dt>?</dt><dd>This card</dd>
     </dl>

@@ -140,7 +140,14 @@
     saveSettings();
   }
 
-  // a playlist is [{id, dur, pal?}], no duplicate ids, only known sketches
+  // a kodama camera view: the scene's orbit (a, y, r) and the pan offset
+  function cleanView(v) {
+    if (!v || typeof v !== 'object') return null;
+    const o = {};
+    for (const k of ['a', 'y', 'r', 'px', 'py', 'pz']) { const n = Number(v[k]); if (!Number.isFinite(n)) return null; o[k] = n; }
+    return o;
+  }
+  // a playlist is [{id, dur, pal?, view?}], no duplicate ids, only known sketches
   function cleanList(items, sk = SK, dur = defDur()) {
     const seen = new Set(), out = [];
     for (const it of Array.isArray(items) ? items : []) {
@@ -149,6 +156,8 @@
       seen.add(id);
       const o = { id, dur: clamp(it.dur, 1, 3600, dur) };
       if (it.pal && typeof it.pal === 'object') o.pal = cleanPal(it.pal);
+      const vw = cleanView(it.view);
+      if (vw) o.view = vw;
       out.push(o);
     }
     return out;
@@ -538,7 +547,7 @@
       RT.elapsed += dt;
       if (RT.elapsed >= durOf(RT.cur) * 1000) advance(1);
     }
-    if (now - lastUi > 250) { lastUi = now; renderClock(); if (MODE === 'kodama' && !OUT) kRenderOn(); }
+    if (now - lastUi > 250) { lastUi = now; renderClock(); if (MODE === 'kodama' && !OUT) { kRenderOn(); if (S.tab === 'scene') renderView(); } }
     if (now - lastSave > 2000) { lastSave = now; savePlay(); }
   }
 
@@ -688,6 +697,7 @@
         h('input', { type: 'number', min: 1, max: 3600, step: 1, value: it.dur, title: 'Seconds', 'data-act': 'dur' }),
         h('button', { 'data-act': 'cue', title: 'Play this next', text: 'Cue', 'aria-pressed': String(PLAY.cue === it.id) }),
         h('button', { 'data-act': 'pal', title: it.pal ? 'Own palette (' + it.pal.style + '); click to clear' : 'Save the current palette for this item', text: 'Pal', 'aria-pressed': String(!!it.pal) }),
+        MODE === 'kodama' ? h('button', { 'data-act': 'view', title: it.view ? 'Own view; click to clear' : 'Save the current view for this item (while it is on screen)', text: 'View', 'aria-pressed': String(!!it.view) }) : null,
         h('button', { 'data-act': 'ban', class: 'warn', title: 'Ban: never autoplay on this instance', text: 'Ban', 'aria-pressed': String(banned.has(it.id)) }),
         h('button', { 'data-act': 'up', title: 'Move up', text: '↑', disabled: i === 0 }),
         h('button', { 'data-act': 'down', title: 'Move down', text: '↓', disabled: i === L.length - 1 }),
@@ -696,6 +706,7 @@
     $('#pl-empty').hidden = L.length > 0;
     $('#pl-empty').textContent = MODE === 'kodama' ? 'Empty. Add scenes from the Kodamas tab or pull random ones.' : 'Empty. Add sketches from the Gallery or pull random ones.';
     $('#pl-share').hidden = MODE === 'kodama'; // kodamas are private; a link would not open them elsewhere
+    plList.classList.toggle('k', MODE === 'kodama');
     for (const c of $('#g-grid').children) markInList(c);
   }
   function changed() { saveLists(); renderPlaylist(); }
@@ -746,6 +757,7 @@
     else if (act === 'star') toggleStar(li.dataset.id);
     else if (act === 'cue') setCue(PLAY.cue === li.dataset.id ? null : li.dataset.id);
     else if (act === 'pal') setItemPal(li.dataset.id);
+    else if (act === 'view') setItemView(li.dataset.id);
     else if (act === 'ban') setBan(li.dataset.id, !banned.has(li.dataset.id));
   });
   plList.addEventListener('change', e => {
@@ -986,6 +998,7 @@
       if (m.t === 'kset' && m.k) S.k = { speed: clamp(m.k.speed, 0.1, 3, 1), tt: clamp(m.k.tt, 0, 3, 1), rev: !!m.k.rev };
       if (m.t === 'kclick' && m.id === RT.cur && typeof m.sel === 'string') kClick(m.sel);
       if (m.t === 'pal' && m.pal) applyPalette(cleanPal(m.pal));
+      if (m.t === 'view' && MODE === 'kodama') takeView(m.id, m.v);
       if ((m.t === 'show' || m.t === 'sync') && (m.mode || 'hydra') !== MODE) {
         if (!setMode(m.mode || 'hydra', { instant: true, noStart: true })) { pendingMsg = m; return; }
       }
@@ -1018,8 +1031,11 @@
         post({ t: 'kset', k: S.k });
         post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level, mode: MODE });
         post({ t: 'pal', pal: effPal() });
+        { const r = MODE === 'kodama' ? kCurRig() : null, v = r && r.view ? r.view() : null; if (v) post({ t: 'view', id: RT.cur, v }); }
         if (ED.liveCode) post({ t: 'run', id: RT.cur, code: ED.liveCode, slot: ED.active ? ED.slot : 0, vals: PHK[ED.slot] });
       }
+    } else if (m.t === 'view' && m.from === 'out' && MODE === 'kodama') {
+      takeView(m.id, m.v); // steered in the output window
     } else if (m.t === 'failed' && SK.has(m.id) && !RT.failed.has(m.id)) {
       RT.failed.add(m.id);
       RT.skips++;
@@ -1530,17 +1546,23 @@
     kind: 'k', canvas: el, frame: null, id: null, badSince: 0, tickErr: '', ready: false, rendered: false, t0: 0,
   }));
   const CTX = { hydra: null, kodama: null };
+  const APPROVED = ['pk26', 'pk27', 'pk28', 'pk29']; // handoff-6: out of draft, into the default playlist
 
-  // each iframe is the quality level's size, scaled to fit the stage
+  // each iframe covers the letterboxed stage; inside it the scene draws at the quality level's size
+  // and its canvas is stretched to fit (kodama-rig.js)
   function kLayout() {
     const st = $('#stage').getBoundingClientRect(), c = LEVEL[RT.level];
     const s = Math.min(st.width / c.w, st.height / c.h) || 1;
+    RT.kScale = s;
     const x = (st.width - c.w * s) / 2, y = (st.height - c.h * s) / 2;
     for (const d of KDECKS) {
       const f = d.frame;
       if (!f) continue;
-      if (f.style.width !== c.w + 'px') { f.style.width = c.w + 'px'; f.style.height = c.h + 'px'; }
-      f.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + s.toFixed(5) + ')';
+      const w = Math.round(c.w * s) + 'px', hh = Math.round(c.h * s) + 'px';
+      if (f.style.width !== w || f.style.height !== hh) { f.style.width = w; f.style.height = hh; }
+      f.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+      const r = kRig(d);
+      if (r && r.setSize) r.setSize(c.w, c.h);
     }
   }
   if ('ResizeObserver' in window) new ResizeObserver(kLayout).observe($('#stage'));
@@ -1548,7 +1570,7 @@
   function kRig(d) { try { return d.frame && d.frame.contentWindow && d.frame.contentWindow.__rig; } catch (e) { return null; } }
   function kLoad(d, sk) {
     kUnload(d);
-    const html = PHKODA.prep(sk.scene);
+    const html = PHKODA.prep(sk.scene, LEVEL[RT.level]);
     if (!html) return new Error('scene file missing from the pack');
     const f = document.createElement('iframe');
     f.title = 'kodama'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
@@ -1568,6 +1590,11 @@
       d.rendered = r.renders > before;
       if (r.ready && !d.ready) {
         d.ready = true;
+        kPalTo(d);
+        const it = list().find(x => x.id === d.id);
+        if (it && it.view && r.setView) r.setView(it.view);
+        if (pendView && pendView.id === d.id && r.setView) { r.setView(pendView.v); pendView = null; }
+        if (!OUT && it && it.view) post({ t: 'view', id: d.id, v: it.view });
         const f = d.frame, c = r.canvas();
         if (c) c.addEventListener('webglcontextlost', () => { if (d.frame === f && d.id) { RT.ctxLost++; failDeck(d, 'WebGL context lost'); } });
       }
@@ -1613,6 +1640,17 @@
       PLAY: cleanPlay(kload('play', {}), ksk),
       failed: new Set(),
     };
+    // scenes Marko approved after this instance made its Kodamas playlist join it once (never again
+    // if removed by hand later)
+    const L = CTX.kodama.LISTS, had = new Set(kload('approved', []) || []), add = [];
+    for (const id of APPROVED) {
+      if (had.has(id) || !ksk.has(id)) continue;
+      had.add(id);
+      const k = L.lists.Kodamas;
+      if (k && !k.some(it => it.id === id)) { k.push({ id, dur: S.kDur }); add.push(id); }
+    }
+    save('k:approved', [...had]);
+    if (add.length) { save('k:lists', L); log('Added to the Kodamas playlist (approved): ' + add.join(', ')); }
   }
   let kPackErr = '';
   function renderPack() {
@@ -1684,7 +1722,9 @@
       PLAY.playing = playing && !OUT;
       if (!OUT) {
         S.mode = m;
-        if (m === 'kodama' && !opts.keepPal) S.pal.kodama = cleanPal(Object.assign({}, S.pal.kodama, { style: S.kPalDef }));
+        // the start palette applies once, when the app opens; coming back later keeps what was set
+        if (m === 'kodama' && !opts.keepPal && !RT.kPalStarted) S.pal.kodama = cleanPal(Object.assign({}, S.pal.kodama, { style: S.kPalDef }));
+        if (m === 'kodama') RT.kPalStarted = true;
         saveSettings();
         edLoad(null);
         if (m === 'kodama') $('#ed-title').textContent = 'Live edit works on Hydra sketches';
@@ -1706,6 +1746,7 @@
     return true;
   }
   function renderModeUi() {
+    body.classList.toggle('kmode', MODE === 'kodama');
     press(btn('mh'), MODE === 'hydra');
     press(btn('mk'), MODE === 'kodama');
     $('#tab-gal').textContent = MODE === 'kodama' ? 'Kodamas' : 'Gallery';
@@ -1757,8 +1798,10 @@
   $('#k-speed-1').addEventListener('click', () => { S.k.speed = 1; saveSettings(); kSet(); });
   $('#k-rev').addEventListener('change', e => { S.k.rev = e.target.checked; saveSettings(); kSet(); });
 
-  // palettes: an SVG filter on the deck wrapper. Contrast first, then luminance, then a color map,
-  // mixed back with the (contrast-adjusted) original by the intensity
+  // palettes: an SVG filter. Contrast first, then luminance, then a color map, mixed back with the
+  // (contrast-adjusted) original by the intensity. Kodamas get it inside their own iframe, on the
+  // scene's WebGL canvas (kodama-rig.js setPal); hydras on their two canvases. Nothing sits on a
+  // wrapper around the decks.
   const hex3 = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255);
   const f4 = n => (Math.round(n * 10000) / 10000).toString();
   const RGB = ['R', 'G', 'B'];
@@ -1779,31 +1822,56 @@
     if (p.int < 1) x += '<feComposite in="' + (tables ? 'm' : 'g') + '" in2="' + src + '" operator="arithmetic" k1="0" k2="' + f4(p.int) + '" k3="' + f4(1 - p.int) + '" k4="0"/>';
     return x;
   }
-  const effPal = () => { const it = list().find(x => x.id === RT.cur); return (it && it.pal) || S.pal[MODE]; };
+  // the item on screen may have its own palette; the controls then edit that one
+  const curItem = () => list().find(x => x.id === RT.cur);
+  const effPal = () => { const it = curItem(); return (it && it.pal) || S.pal[MODE]; };
   let palShown = null;
+  function kPalTo(d) { const r = kRig(d); if (r && r.setPal) try { r.setPal(palShown || ''); } catch (e) { /* scene gone */ } }
   function applyPalette(p = effPal()) {
     const m = palMarkup(p);
     RT.pal = p;
     if (m !== palShown) {
       palShown = m;
       $('#phpal').innerHTML = m;
-      const el = $('#pal');
-      el.style.filter = 'none';
-      void el.offsetWidth; // make Chrome pick up the new filter content
-      el.style.filter = m ? 'url(#phpal)' : '';
+      for (const d of HDECKS) {
+        d.canvas.style.filter = 'none';
+        void d.canvas.offsetWidth; // make Chrome pick up the new filter content
+        d.canvas.style.filter = m ? 'url(#phpal)' : '';
+      }
     }
+    for (const d of KDECKS) if (d.frame) kPalTo(d);
     if (!OUT) post({ t: 'pal', pal: p });
   }
   function renderPal() {
-    const p = S.pal[MODE], it = list().find(x => x.id === RT.cur);
+    const it = curItem(), own = !!(it && it.pal), p = effPal();
     $('#p-style').value = p.style; $('#p-thr').value = String(p.thr); $('#p-mono-c').value = p.mono;
     $('#p-duo-pre').value = p.pre; $('#p-duo-a').value = p.a; $('#p-duo-b').value = p.b;
     $('#p-int').value = String(p.int); $('#p-con').value = String(p.con); $('#p-kdef').value = S.kPalDef;
     $('#p-bw').hidden = p.style !== 'bw'; $('#p-mono').hidden = p.style !== 'mono'; $('#p-duo').hidden = p.style !== 'duotone';
-    $('#p-for').textContent = '(' + (MODE === 'kodama' ? 'Kodamas' : 'Hydras') + (it && it.pal ? '; this item has its own palette' : '') + ')';
+    $('#p-for').textContent = own ? '' : 'For all ' + (MODE === 'kodama' ? 'Kodamas' : 'Hydras') + ' without their own palette.';
+    $('#p-item').hidden = !own;
+    $('#p-item-t').textContent = own ? 'Editing the own palette of ' + SK.get(it.id).title : '';
+    $('#p-kdef-row').hidden = MODE !== 'kodama';
+    const bp = $('#b-pal');
+    bp.hidden = OUT || MODE !== 'kodama';
+    bp.value = p.style;
+    bp.title = 'Palette (P cycles)' + (own ? '; this item has its own palette' : '');
+    bp.classList.toggle('own', own);
   }
-  function setPal(ch) { S.pal[MODE] = cleanPal(Object.assign({}, S.pal[MODE], ch)); renderPal(); applyPalette(); }
+  function setPal(ch) {
+    const it = curItem();
+    if (it && it.pal) { it.pal = cleanPal(Object.assign({}, it.pal, ch)); saveLists(); }
+    else S.pal[MODE] = cleanPal(Object.assign({}, S.pal[MODE], ch));
+    renderPal(); applyPalette();
+  }
+  function cyclePal() {
+    const i = PAL_STYLES.indexOf(effPal().style);
+    setPal({ style: PAL_STYLES[(i + 1) % PAL_STYLES.length] }); saveSettings();
+    log('Palette: ' + $('#p-style').selectedOptions[0].textContent);
+  }
   $('#p-style').addEventListener('change', e => { setPal({ style: e.target.value }); saveSettings(); e.target.blur(); });
+  $('#b-pal').addEventListener('change', e => { setPal({ style: e.target.value }); saveSettings(); e.target.blur(); });
+  $('#p-item-x').addEventListener('click', () => { if (RT.cur) setItemPal(RT.cur); });
   $('#p-thr').addEventListener('input', e => setPal({ thr: Number(e.target.value) }));
   $('#p-mono-c').addEventListener('input', e => setPal({ mono: e.target.value }));
   $('#p-duo-pre').addEventListener('change', e => {
@@ -1816,7 +1884,11 @@
   $('#p-int').addEventListener('input', e => setPal({ int: Number(e.target.value) }));
   $('#p-con').addEventListener('input', e => setPal({ con: Number(e.target.value) }));
   for (const id of ['#p-thr', '#p-mono-c', '#p-duo-a', '#p-duo-b', '#p-int', '#p-con']) $(id).addEventListener('change', e => { saveSettings(); e.target.blur(); });
-  $('#p-kdef').addEventListener('change', e => { S.kPalDef = PAL_STYLES.includes(e.target.value) ? e.target.value : 'original'; saveSettings(); e.target.blur(); });
+  $('#p-kdef').addEventListener('change', e => {
+    S.kPalDef = PAL_STYLES.includes(e.target.value) ? e.target.value : 'original';
+    if (MODE === 'kodama') setPal({ style: S.kPalDef }); // it reads as a palette picker, so it applies now too
+    saveSettings(); e.target.blur();
+  });
   // a playlist item can keep its own palette
   function setItemPal(id) {
     const it = list().find(x => x.id === id);
@@ -1825,6 +1897,117 @@
     else { it.pal = cleanPal(S.pal[MODE]); log('Palette saved for ' + SK.get(id).title + ': ' + it.pal.style); }
     changed();
     if (id === RT.cur) { applyPalette(); renderPal(); }
+  }
+
+  // ---- kodama view: orbit, pan and zoom ------------------------------------------------------------
+  // The scene's own orbit (camA, camY, camR) at its own drag rates and inside its own limits (from
+  // data/kodama-controls.json), plus a pan that moves the camera and its look point together. Drag on
+  // the stage (controller or output window) or on the Scene tab's pad: drag orbits, shift-drag or
+  // right-drag pans, the wheel zooms. The turntable rests while someone steers and resumes 2 s later
+  // from the new angle. Each change goes to the other window as an absolute view.
+  const CAM_DEF = { ka: 0.005, ky: 0.4, kr: 0.05, y: null, r: null, pan: 0 };
+  const camCfg = id => Object.assign({}, CAM_DEF, ((PHKODA.P.reg || {})[id] || {}).cam || {});
+  const kCurRig = () => { const d = curDeck(); return d && d.kind === 'k' && d.id ? kRig(d) : null; };
+  // dx, dy in scene pixels (stage pixels divided by the iframe's scale), as the scene's handlers saw them
+  function steer(kind, dx, dy) {
+    const r = kCurRig(), v = r && r.view ? r.view() : null;
+    if (!v) return false;
+    const c = camCfg(RT.cur);
+    if (kind === 'orbit') {
+      v.a -= dx * c.ka;
+      if (c.y) v.y = clamp(v.y - dy * c.ky, c.y[0], c.y[1], v.y);
+    } else if (kind === 'zoom') {
+      if (!c.r) return false;
+      v.r = clamp(v.r + dy * c.kr, c.r[0], c.r[1], v.r);
+    } else {
+      if (!c.pan) return false;
+      // the camera sits at (cos a, sin a) * r around its target; screen right is (sin a, 0, -cos a)
+      const k = v.r * 0.0016, sa = Math.sin(v.a), ca = Math.cos(v.a);
+      v.px -= dx * k * sa; v.pz += dx * k * ca; v.py += dy * k;
+      const hz = Math.hypot(v.px, v.pz);
+      if (hz > c.pan) { v.px *= c.pan / hz; v.pz *= c.pan / hz; }
+      // the camera's height stays inside the scene's own camY limits
+      const lo = Math.max(-c.pan / 2, c.y ? c.y[0] - v.y : -c.pan / 2), hi = Math.min(c.pan / 2, c.y ? c.y[1] - v.y : c.pan / 2);
+      v.py = Math.min(Math.max(v.py, lo), Math.max(lo, hi));
+    }
+    setViewNow(v, true);
+    return true;
+  }
+  let viewSent = 0, viewT = 0;
+  function sendView(v) {
+    viewSent = performance.now();
+    const m = { t: 'view', id: RT.cur, v };
+    if (!OUT) post(m);
+    else if (chan) try { chan.postMessage(Object.assign(m, { from: 'out' })); } catch (e) { /* closed */ }
+  }
+  function setViewNow(v, mine) {
+    const r = kCurRig();
+    if (!r || !r.setView || !v) return false;
+    r.setView(v);
+    if (r.hold) r.hold(2000);
+    if (mine) { clearTimeout(viewT); if (performance.now() - viewSent > 30) sendView(v); else viewT = setTimeout(() => sendView(v), 30); }
+    renderView();
+    return true;
+  }
+  // a view for a scene that has not drawn its first frame yet (output window)
+  let pendView = null;
+  function takeView(id, v) {
+    v = cleanView(v);
+    if (!v || id !== RT.cur) return;
+    const d = curDeck();
+    if (d && d.kind === 'k' && d.ready) setViewNow(v, false);
+    else pendView = { id, v };
+  }
+  function resetView() {
+    const r = kCurRig();
+    if (!r || !r.view0) return false;
+    return setViewNow(Object.assign({}, r.view0, { px: 0, py: 0, pz: 0 }), true);
+  }
+  function renderView() {
+    if (OUT) return;
+    const r = MODE === 'kodama' ? kCurRig() : null, v = r && r.view ? r.view() : null, c = camCfg(RT.cur);
+    const dot = $('#k-pad-dot');
+    if (!v) { $('#k-view-v').textContent = ''; dot.style.left = dot.style.top = '50%'; return; }
+    const tau = Math.PI * 2, a = ((v.a % tau) + tau) % tau;
+    dot.style.left = (a / tau * 100).toFixed(1) + '%';
+    dot.style.top = (c.y ? (1 - (v.y - c.y[0]) / (c.y[1] - c.y[0] || 1)) * 100 : 50).toFixed(1) + '%';
+    $('#k-view-v').textContent = 'zoom ' + v.r.toFixed(0) + (v.px || v.py || v.pz ? ' · panned' : '') + (c.pan ? '' : ' · no pan');
+  }
+  function steerInput(el, scale) {
+    let drag = null;
+    el.addEventListener('pointerdown', e => {
+      if (MODE !== 'kodama' || (e.button !== 0 && e.button !== 2)) return;
+      drag = { x: e.clientX, y: e.clientY, pan: e.button === 2, id: e.pointerId };
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* no capture */ }
+      el.classList.add('steer');
+    });
+    el.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const k = scale(), dx = (e.clientX - drag.x) / k, dy = (e.clientY - drag.y) / k;
+      drag.x = e.clientX; drag.y = e.clientY;
+      if (dx || dy) steer(drag.pan || e.shiftKey ? 'pan' : 'orbit', dx, dy);
+    });
+    const end = e => { if (drag && e.pointerId === drag.id) { drag = null; el.classList.remove('steer'); } };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('wheel', e => { if (MODE !== 'kodama') return; e.preventDefault(); steer('zoom', 0, e.deltaY); }, { passive: false });
+    el.addEventListener('contextmenu', e => { if (MODE === 'kodama') e.preventDefault(); });
+  }
+  steerInput($('#stage'), () => RT.kScale || 1);
+  steerInput($('#k-pad'), () => 0.5); // the pad is small: one pad pixel is two scene pixels
+  $('#k-view-reset').addEventListener('click', e => { resetView(); e.target.blur(); });
+  // a playlist item can keep its own view, saved from the scene on screen
+  function setItemView(id) {
+    const it = list().find(x => x.id === id);
+    if (!it) return;
+    if (it.view) { delete it.view; log('View cleared for ' + SK.get(id).title); }
+    else {
+      const r = id === RT.cur ? kCurRig() : null, v = r && r.view ? cleanView(r.view()) : null;
+      if (!v) { log('Play ' + SK.get(id).title + ' first, then save its view', true); return; }
+      it.view = v;
+      log('View saved for ' + SK.get(id).title);
+    }
+    changed();
   }
 
   // ---- bar controls and keys ----------------------------------------------------------------------
@@ -1879,6 +2062,7 @@
       c: () => setCode(!RT.code),
       b: () => setBlack(!S.black),
       r: toggleRandom,
+      p: cyclePal,
       '?': () => { $('#help').hidden = !$('#help').hidden; },
       Escape: () => {
         if (!$('#help').hidden) $('#help').hidden = true;
@@ -1918,7 +2102,7 @@
   if (!OUT) { listInputs(); if (S.au.on) audioStart(); }
   loadKodamas().then(ok => {
     if (OUT || S.mode !== 'kodama' || MODE === 'kodama') return;
-    if (ok) setMode('kodama', { instant: true, keepPal: true });
+    if (ok) { RT.kPalStarted = true; setMode('kodama', { instant: true, keepPal: true }); }
     else { log('Kodama pack not available; starting in Hydras', true); S.mode = 'hydra'; saveSettings(); stageMsg(''); startMode(); renderBar(); }
   });
 
@@ -1946,7 +2130,11 @@
       SK.set(id, { id, title: 'Test ' + id, author: 'test', link: '', href: '', code, hydraCode: '', thumb: '', quarantine: '' });
     },
     addToList, pull, edRun, saveVariant, parseKnobs,
-    setMode, loadKodamas, kClick, setPal, setItemPal, applyPalette,
+    setMode, loadKodamas, kClick, setPal, setItemPal, applyPalette, cyclePal, steer, resetView, setItemView,
+    view: () => { const r = kCurRig(); return r && r.view ? r.view() : null; },
+    view0: () => { const r = kCurRig(); return r ? r.view0 : null; },
+    angle: () => { const r = kCurRig(); return r && r.angle ? r.angle() : null; },
+    camCfg: () => camCfg(RT.cur),
     poolIds: () => POOL.filter(x => !x.quarantine).map(x => x.id),
     // a scene that is not in the pack (kodama mode only), to test the skip rules
     addTestKodama(id, html) {

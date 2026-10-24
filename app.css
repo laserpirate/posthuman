@@ -200,3 +200,16 @@ body.out #black, body.out #mfade { position: fixed; }
   body.fs #stage, body.clean #stage, body.out #stage { aspect-ratio: auto; height: 100vh; }
 }
 @media (max-width: 1400px) { :root { --panel: 400px; } #g-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }
+
+/* kodama view: orbit pad, stage dragging, the view button on playlist rows */
+#pl-list.k li { grid-template-columns: 18px 22px auto minmax(0, 1fr) auto auto auto auto auto auto auto auto; }
+body.kmode #stage { cursor: grab; touch-action: none; }
+body.kmode #stage.steer { cursor: grabbing; }
+#k-pad { position: relative; width: 168px; height: 96px; background: var(--bg2); border: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; flex: 0 0 auto; }
+#k-pad.steer { cursor: grabbing; border-color: var(--on); }
+#k-pad::before, #k-pad::after { content: ''; position: absolute; background: var(--line); }
+#k-pad::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+#k-pad::after { top: 50%; left: 0; right: 0; height: 1px; }
+#k-pad-dot { position: absolute; width: 7px; height: 7px; margin: -3px 0 0 -3px; background: var(--on); left: 50%; top: 50%; z-index: 1; }
+.col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+#p-item { color: var(--on); }
