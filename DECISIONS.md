@@ -189,3 +189,9 @@ One line per judgment call. Newest at the bottom.
 - e2e-kodama: the encrypted-pack tests became "the public copy opens with no password and plays" (`?kpack=pub` locally; on Pages by default), with no unlock box, password field or locked message; the password steps before each test are gone.
 - Root baseline moved to `posthuman-v0.4.5` (171 files).
 - Gates (16:48 to 16:53, RTX 3080, headless, no password anywhere): kodama e2e 14/14 on `/` and `/next/` (local folder and the public copy), Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, leak check 0, root byte-identical to `posthuman-v0.4.5`.
+
+## v0.4.6 · early Kodamas click (handoff-13 follow-up)
+
+- The live check after v0.4.5 (fresh profile, click Kodamas as soon as the app is ready) found that a click in the first second, before the public pack has opened, logged "Kodama pack not loaded" and stayed in Hydras; a second click worked. With the password gone, that click is now the first thing a visitor does. The Kodamas button now waits for the pack if it is still opening, then switches (setMode itself is unchanged, so the output window's queue still works). Same on `feat/midi` (de419d9); `/next/` rebuilt. v0.4.5 stays as pushed; this is a new tag.
+- e2e-kodama's public-pack test now clicks Kodamas straight after load, before the pack opens.
+- Gates (16:56 to 17:00): kodama e2e 14/14 on `/` and `/next/`, Hydra e2e 27/27 on `/`, MIDI e2e 15/15 on `/next/`, leak check 0, root byte-identical to `posthuman-v0.4.6`.
