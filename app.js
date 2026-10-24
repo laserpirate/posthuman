@@ -1,4 +1,5 @@
-// POST/HUMAN · VJ: gallery, playlists and autoplay for Hydra gallery sketches.
+// POST/HUMAN · VJ: gallery, playlists and autoplay for Hydra gallery sketches, and a Kodama mode for
+// Marko's kodama scenes (kodama.js, kodama-rig.js).
 // © 2026 Marko Manriquez. All rights reserved. Sketches CC BY-NC-SA 4.0 by their authors; hydra-synth AGPL-3.0.
 //
 // Provenance: the hydra runner (with(h) eval, autoLoop:false, one rAF loop, hush + time reset before
@@ -12,7 +13,9 @@
   'use strict';
 
   const D = window.PH_DATA;
-  const SK = new Map(D.sketches.map(s => [s.id, s]));
+  // the current mode's pool; Kodama mode swaps these (see setMode)
+  let SK = new Map(D.sketches.map(s => [s.id, s]));
+  let POOL = D.sketches;
   const LICENSE = 'CC BY-NC-SA 4.0';
   const $ = sel => document.querySelector(sel);
   const body = document.body;
@@ -62,11 +65,26 @@
     custom: [['highpass', lo], ['lowpass', hi]],
   })[b];
   const bandDef = () => ({ sens: 8, smooth: 0.85, thr: 0.05 });
+  // palettes: a filter on the output, after the sketch or scene
+  const PAL_STYLES = ['original', 'grayscale', 'bw', 'mono', 'duotone', 'rg'];
+  const DUO = { rg: ['#c41e3a', '#3ddc84'], cm: ['#00b7c7', '#e0309e'], ai: ['#2a1b6e', '#ffb000'] };
+  const HEX = /^#[0-9a-f]{6}$/i;
+  function cleanPal(p) {
+    p = p && typeof p === 'object' ? p : {};
+    return {
+      style: PAL_STYLES.includes(p.style) ? p.style : 'original',
+      thr: clamp(p.thr, 0.05, 0.95, 0.5), mono: HEX.test(p.mono) ? p.mono : '#c4f53c',
+      pre: ['rg', 'cm', 'ai', 'custom'].includes(p.pre) ? p.pre : 'cm',
+      a: HEX.test(p.a) ? p.a : DUO.cm[0], b: HEX.test(p.b) ? p.b : DUO.cm[1],
+      int: clamp(p.int, 0, 1, 1), con: clamp(p.con, 0.5, 2, 1),
+    };
+  }
   const DEF = {
     defaultDur: 30, transition: 'xfade', xfadeSec: 2, random: false, scope: 'playlist',
     quality: 'med', autoDrop: true, credits: true, clean: false, menuHidden: false, black: false,
     tab: 'playlist', pullN: 5, pullFrom: 'pool',
     bpm: 120, bars: 0, outPreview: false,
+    mode: 'hydra', kDur: 90, k: { speed: 1, tt: 1, rev: false }, pal: null, kPalDef: 'original',
     au: {
       on: false, dev: '', lo: 40, hi: 120,
       bands: { full: bandDef(), low: bandDef(), mid: bandDef(), high: bandDef(), custom: bandDef() },
@@ -82,7 +100,7 @@
     if (!['playlist', 'pool'].includes(v.scope)) v.scope = DEF.scope;
     if (!['low', 'med', 'high'].includes(v.quality)) v.quality = DEF.quality;
     if (!['pool', 'starred'].includes(v.pullFrom)) v.pullFrom = DEF.pullFrom;
-    if (!['playlist', 'gallery', 'live', 'code', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
+    if (!['playlist', 'gallery', 'live', 'scene', 'code', 'credits', 'log'].includes(v.tab)) v.tab = DEF.tab;
     for (const k of ['random', 'autoDrop', 'credits', 'clean', 'menuHidden', 'black', 'outPreview']) v[k] = !!v[k];
     v.bpm = clamp(v.bpm, 40, 240, DEF.bpm);
     v.bars = [0, 4, 8, 16, 32].includes(Number(v.bars)) ? Number(v.bars) : 0;
@@ -102,27 +120,45 @@
     au.flash = clamp(au.flash, 0, 1.5, DEF.au.flash);
     for (const k of ['band', 'sens', 'smooth']) delete au[k]; // v0.1 single-band settings
     v.au = au;
+    v.mode = v.mode === 'kodama' ? 'kodama' : 'hydra';
+    v.kDur = clamp(v.kDur, 1, 3600, DEF.kDur);
+    const k = v.k && typeof v.k === 'object' ? v.k : {};
+    v.k = { speed: clamp(k.speed, 0.1, 3, 1), tt: clamp(k.tt, 0, 3, 1), rev: !!k.rev };
+    v.pal = { hydra: cleanPal(v.pal && v.pal.hydra), kodama: cleanPal(v.pal && v.pal.kodama) };
+    if (!PAL_STYLES.includes(v.kPalDef)) v.kPalDef = DEF.kPalDef;
     return v;
   })();
   const saveSettings = () => save('settings', S);
 
-  // a playlist is [{id, dur}], no duplicate ids, only known sketches
-  function cleanList(items) {
+  // one mode plays at a time; playlists, stars, bans and position are stored per mode
+  let MODE = 'hydra';
+  const MK = k => (MODE === 'kodama' ? 'k:' : '') + k;
+  const defDur = () => (MODE === 'kodama' ? S.kDur : S.defaultDur);
+  function setDefDur(v) {
+    if (MODE === 'kodama') S.kDur = clamp(v, 1, 3600, S.kDur);
+    else S.defaultDur = clamp(v, 1, 3600, S.defaultDur);
+    saveSettings();
+  }
+
+  // a playlist is [{id, dur, pal?}], no duplicate ids, only known sketches
+  function cleanList(items, sk = SK, dur = defDur()) {
     const seen = new Set(), out = [];
     for (const it of Array.isArray(items) ? items : []) {
       const id = it && typeof it.id === 'string' ? it.id : null;
-      if (!id || !SK.has(id) || seen.has(id)) continue;
+      if (!id || !sk.has(id) || seen.has(id)) continue;
       seen.add(id);
-      out.push({ id, dur: clamp(it.dur, 1, 3600, S.defaultDur) });
+      const o = { id, dur: clamp(it.dur, 1, 3600, dur) };
+      if (it.pal && typeof it.pal === 'object') o.pal = cleanPal(it.pal);
+      out.push(o);
     }
     return out;
   }
-  function cleanLists(v) {
+  function cleanLists(v, sk = SK, dur = defDur()) {
     if (!v || typeof v !== 'object' || !v.lists || typeof v.lists !== 'object') return null;
     const lists = {};
     for (const [name, items] of Object.entries(v.lists)) {
       const n = String(name).trim().slice(0, 40);
-      if (n) lists[n] = cleanList(items);
+      if (n) lists[n] = cleanList(items, sk, dur);
     }
     const names = Object.keys(lists);
     if (!names.length) return null;
@@ -130,28 +166,29 @@
   }
   let LISTS = cleanLists(load('lists', null)) ||
     { active: 'Favorites', lists: { Favorites: D.favorites.map(id => ({ id, dur: S.defaultDur })) } };
-  const saveLists = () => save('lists', LISTS);
-  const stars = new Set((load('stars', null) || D.favorites).filter(id => SK.has(id)));
-  const saveStars = () => save('stars', [...stars]);
-  const banned = new Set((load('banned', null) || []).filter(id => SK.has(id)));
-  const saveBanned = () => save('banned', [...banned]);
+  const saveLists = () => save(MK('lists'), LISTS);
+  let stars = new Set((load('stars', null) || D.favorites).filter(id => SK.has(id)));
+  const saveStars = () => save(MK('stars'), [...stars]);
+  let banned = new Set((load('banned', null) || []).filter(id => SK.has(id)));
+  const saveBanned = () => save(MK('banned'), [...banned]);
 
-  const PLAY = (() => {
-    const v = Object.assign({ id: null, pos: 0, elapsed: 0, playing: false, hold: false, cue: null, bag: [], hist: [] }, load('play', {}));
-    if (!SK.has(v.id)) v.id = null;
-    if (!SK.has(v.cue)) v.cue = null;
+  function cleanPlay(saved, sk) {
+    const v = Object.assign({ id: null, pos: 0, elapsed: 0, playing: false, hold: false, cue: null, bag: [], hist: [] }, saved);
+    if (!sk.has(v.id)) v.id = null;
+    if (!sk.has(v.cue)) v.cue = null;
     v.pos = clamp(v.pos, 0, 999, 0);
     v.elapsed = clamp(v.elapsed, 0, 3600e3, 0);
     v.playing = !!v.playing && !OUT; // the output window never runs its own clock
     v.hold = !!v.hold;
-    v.bag = Array.isArray(v.bag) ? v.bag.filter(id => SK.has(id)) : [];
-    v.hist = Array.isArray(v.hist) ? v.hist.filter(id => SK.has(id)).slice(-100) : [];
+    v.bag = Array.isArray(v.bag) ? v.bag.filter(id => sk.has(id)) : [];
+    v.hist = Array.isArray(v.hist) ? v.hist.filter(id => sk.has(id)).slice(-100) : [];
     return v;
-  })();
+  }
+  let PLAY = cleanPlay(load('play', {}), SK);
   function savePlay() {
     PLAY.id = RT.cur;
     PLAY.elapsed = Math.round(RT.elapsed);
-    save('play', PLAY);
+    save(MK('play'), PLAY);
   }
 
   const list = () => LISTS.lists[LISTS.active];
@@ -214,7 +251,8 @@
   });
   function applyQuality() {
     const c = LEVEL[RT.level];
-    for (const d of RT.decks) if (d.canvas.width !== c.w || d.canvas.height !== c.h) d.hy.setResolution(c.w, c.h);
+    for (const d of HDECKS) if (d.canvas.width !== c.w || d.canvas.height !== c.h) d.hy.setResolution(c.w, c.h);
+    kLayout();
     guard.idle();
     renderBar();
   }
@@ -260,6 +298,7 @@
 
   // hush, clear the feedback buffers, reset time, then eval. Returns the error, or null.
   function loadInto(d, sk) {
+    if (d.kind === 'k') return kLoad(d, sk);
     const hy = d.hy, s = hy.synth, c = LEVEL[RT.level];
     try {
       if (d.canvas.width !== c.w || d.canvas.height !== c.h) hy.setResolution(c.w, c.h);
@@ -297,6 +336,7 @@
     warn(...args);
   };
   function tickSafe(d, dt) {
+    if (d.kind === 'k') { kStep(d, dt); return; }
     tickDeck = d;
     try { d.hy.tick(dt); } finally { tickDeck = null; }
     if (d.tickErr) throw new Error(d.tickErr);
@@ -311,6 +351,7 @@
     RT.decks[f.from].canvas.style.opacity = '0';
     RT.live = f.to;
     RT.fade = null;
+    if (RT.decks[f.from].kind === 'k') kUnload(RT.decks[f.from]); // tear the outgoing scene down fully
   }
 
   // put a sketch on the idle deck and transition to it
@@ -332,19 +373,21 @@
     if (PLAY.cue === id) PLAY.cue = null;
     const old = RT.live >= 0 ? RT.decks[RT.live] : null;
     const cut = !!(opts.cut || S.transition === 'cut' || !old);
-    post({ t: 'show', id, cut, xfadeSec: S.xfadeSec });
+    post({ t: 'show', id, cut, xfadeSec: S.xfadeSec, mode: MODE });
     d.canvas.style.zIndex = '2';
     if (old) old.canvas.style.zIndex = '1';
-    if (cut) {
+    // a kodama scene takes a moment to start: even a cut waits for its first frame, so no gap shows
+    if (cut && !(d.kind === 'k' && old)) {
       d.canvas.style.opacity = '1';
       if (old) old.canvas.style.opacity = '0';
       RT.live = idle;
     } else {
       d.canvas.style.opacity = '0';
-      RT.fade = { from: RT.live, to: idle, t0: performance.now(), ms: S.xfadeSec * 1000 };
+      RT.fade = { from: RT.live, to: idle, t0: performance.now(), ms: cut ? 1 : S.xfadeSec * 1000 };
     }
     const idx = list().findIndex(it => it.id === id);
     if (idx >= 0) PLAY.pos = idx;
+    applyPalette();
     savePlay();
     renderNow();
     return true;
@@ -354,6 +397,7 @@
   function failDeck(d, reason) {
     const id = d.id, sk = SK.get(id);
     d.id = null;
+    if (d.kind === 'k') kUnload(d);
     RT.failed.add(id);
     RT.skips++;
     log('Skipped "' + (sk ? sk.title : id) + '" (' + id + '): ' + reason, true);
@@ -374,9 +418,9 @@
   const durOf = id => {
     if (S.bars) return S.bars * 4 * 60 / S.bpm;
     const it = list().find(x => x.id === id);
-    return it ? it.dur : S.defaultDur;
+    return it ? it.dur : defDur();
   };
-  const universe = () => (S.scope === 'pool' ? D.sketches.map(s => s.id) : list().map(it => it.id)).filter(playable);
+  const universe = () => (S.scope === 'pool' ? POOL.map(s => s.id) : list().map(it => it.id)).filter(playable);
 
   function pickNext(dir, from) {
     if (dir > 0 && PLAY.cue) {
@@ -461,6 +505,8 @@
 
     const f = RT.fade;
     if (f) {
+      const to = RT.decks[f.to];
+      if (to.kind === 'k' && !to.ready) f.t0 = now; // the fade starts with the scene's first frame
       const k = (now - f.t0) / f.ms;
       if (k >= 1) finishFade();
       else RT.decks[f.to].canvas.style.opacity = k.toFixed(3);
@@ -477,12 +523,13 @@
         return;
       }
     }
-    if (!OUT) { audioFrame(); knobFrame(now); }
+    if (!OUT) { audioFrame(); if (MODE === 'hydra') knobFrame(now); }
     const d = curDeck();
-    if (!rest && d && d.id && !d.edited && now - lastProbe > 1000) {
+    // a kodama scene is read only on a frame it rendered (some clear their buffer after the frame)
+    if (!rest && d && d.id && !d.edited && (d.kind !== 'k' || (d.ready && d.rendered)) && now - lastProbe > 1000) {
       lastProbe = now;
       let bad = '';
-      try { bad = blankness(d.canvas); } catch (e) { /* readback unavailable */ }
+      try { bad = blankness(d.kind === 'k' ? kRig(d).canvas() : d.canvas); } catch (e) { /* readback unavailable */ }
       if (!bad) d.badSince = 0;
       else if (!d.badSince) d.badSince = now;
       else if (now - d.badSince > 3000) { failDeck(d, 'rendered ' + bad + ' for 3 s'); return; }
@@ -491,7 +538,7 @@
       RT.elapsed += dt;
       if (RT.elapsed >= durOf(RT.cur) * 1000) advance(1);
     }
-    if (now - lastUi > 250) { lastUi = now; renderClock(); }
+    if (now - lastUi > 250) { lastUi = now; renderClock(); if (MODE === 'kodama' && !OUT) kRenderOn(); }
     if (now - lastSave > 2000) { lastSave = now; savePlay(); }
   }
 
@@ -549,17 +596,22 @@
     $('#au-lo').value = String(S.au.lo); $('#au-hi').value = String(S.au.hi);
     const cue = SK.get(PLAY.cue);
     $('#cue-st').textContent = cue ? 'Cued next: ' + cue.title : '';
+    if (!OUT) { renderModeUi(); renderK(); renderPal(); }
     renderClock();
   }
 
   function renderNow() {
     const sk = SK.get(RT.cur);
     $('#now').textContent = sk ? sk.title + ' · ' + sk.author : '';
-    $('#credit').textContent = sk ? sk.title + ' · ' + sk.author + ' · ' + LICENSE : '';
+    $('#credit').textContent = sk ? sk.title + ' · ' + sk.author + ' · ' + (sk.license || LICENSE) : '';
     $('#code-ov').textContent = sk ? sk.code : '';
     for (const li of $('#pl-list').children) li.classList.toggle('cur', li.dataset.id === RT.cur);
     for (const c of $('#g-grid').children) c.classList.toggle('cur', c.dataset.id === RT.cur);
-    if (!OUT) { renderStar(); if (ED.id !== RT.cur) edLoad(RT.cur); }
+    if (!OUT) {
+      renderStar();
+      if (MODE === 'hydra' && ED.id !== RT.cur) edLoad(RT.cur);
+      if (MODE === 'kodama') kRenderScene();
+    }
     renderClock();
   }
 
@@ -608,7 +660,7 @@
   function setTab(t) {
     S.tab = t; saveSettings();
     for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
-    for (const v of ['playlist', 'gallery', 'live', 'code', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
+    for (const v of ['playlist', 'gallery', 'live', 'scene', 'code', 'credits', 'log']) $('#v-' + v).hidden = v !== t;
     if (t === 'log') { unseen = 0; logN.hidden = true; }
     if (t === 'gallery' && !$('#g-grid').children.length) renderGallery();
   }
@@ -620,7 +672,7 @@
     const sel = $('#pl-sel');
     sel.replaceChildren(...Object.keys(LISTS.lists).map(n => h('option', { value: n, text: n + ' (' + LISTS.lists[n].length + ')' })));
     sel.value = LISTS.active;
-    $('#def-dur').value = String(S.defaultDur);
+    $('#def-dur').value = String(defDur());
     $('#pull-n').value = String(S.pullN);
     $('#pull-from').value = S.pullFrom;
     const L = list();
@@ -635,12 +687,15 @@
         h('span', { class: 't', title: 'Play now' + q, 'data-act': 'play' }, sk.title, h('small', { text: sk.author })),
         h('input', { type: 'number', min: 1, max: 3600, step: 1, value: it.dur, title: 'Seconds', 'data-act': 'dur' }),
         h('button', { 'data-act': 'cue', title: 'Play this next', text: 'Cue', 'aria-pressed': String(PLAY.cue === it.id) }),
+        h('button', { 'data-act': 'pal', title: it.pal ? 'Own palette (' + it.pal.style + '); click to clear' : 'Save the current palette for this item', text: 'Pal', 'aria-pressed': String(!!it.pal) }),
         h('button', { 'data-act': 'ban', class: 'warn', title: 'Ban: never autoplay on this instance', text: 'Ban', 'aria-pressed': String(banned.has(it.id)) }),
         h('button', { 'data-act': 'up', title: 'Move up', text: '↑', disabled: i === 0 }),
         h('button', { 'data-act': 'down', title: 'Move down', text: '↓', disabled: i === L.length - 1 }),
         h('button', { 'data-act': 'rm', title: 'Remove', text: '✕' }));
     }));
     $('#pl-empty').hidden = L.length > 0;
+    $('#pl-empty').textContent = MODE === 'kodama' ? 'Empty. Add scenes from the Kodamas tab or pull random ones.' : 'Empty. Add sketches from the Gallery or pull random ones.';
+    $('#pl-share').hidden = MODE === 'kodama'; // kodamas are private; a link would not open them elsewhere
     for (const c of $('#g-grid').children) markInList(c);
   }
   function changed() { saveLists(); renderPlaylist(); }
@@ -655,15 +710,15 @@
   function addToList(id) {
     const L = list();
     if (L.some(it => it.id === id)) { log('Already in "' + LISTS.active + '": ' + SK.get(id).title); return false; }
-    L.push({ id, dur: S.defaultDur });
+    L.push({ id, dur: defDur() });
     changed();
     return true;
   }
   function pull(n, from) {
     const L = list(), have = new Set(L.map(it => it.id));
-    const src = D.sketches.filter(s => !s.quarantine && !have.has(s.id) && (from !== 'starred' || stars.has(s.id)));
+    const src = POOL.filter(s => !s.quarantine && !have.has(s.id) && (from !== 'starred' || stars.has(s.id)));
     const got = shuffle(src.map(s => s.id)).slice(0, n);
-    for (const id of got) L.push({ id, dur: S.defaultDur });
+    for (const id of got) L.push({ id, dur: defDur() });
     log('Pulled ' + got.length + ' random from ' + from + (got.length < n ? ' (only ' + got.length + ' left)' : ''));
     changed();
     return got;
@@ -690,6 +745,7 @@
     else if (act === 'rm') { list().splice(i, 1); changed(); }
     else if (act === 'star') toggleStar(li.dataset.id);
     else if (act === 'cue') setCue(PLAY.cue === li.dataset.id ? null : li.dataset.id);
+    else if (act === 'pal') setItemPal(li.dataset.id);
     else if (act === 'ban') setBan(li.dataset.id, !banned.has(li.dataset.id));
   });
   plList.addEventListener('change', e => {
@@ -769,16 +825,16 @@
     list().length = 0;
     changed();
   });
-  $('#def-dur').addEventListener('change', e => { S.defaultDur = clamp(e.target.value, 1, 3600, S.defaultDur); e.target.value = String(S.defaultDur); saveSettings(); });
+  $('#def-dur').addEventListener('change', e => { setDefDur(e.target.value); e.target.value = String(defDur()); });
   $('#pl-apply').addEventListener('click', () => {
-    S.defaultDur = clamp($('#def-dur').value, 1, 3600, S.defaultDur); saveSettings();
-    for (const it of list()) it.dur = S.defaultDur;
+    setDefDur($('#def-dur').value);
+    for (const it of list()) it.dur = defDur();
     changed();
   });
 
   // export / import: every playlist of this instance
   function exportData() {
-    return { format: 'posthuman-vj-playlists', version: 1, instance: INST, active: LISTS.active, lists: LISTS.lists };
+    return { format: 'posthuman-vj-playlists', version: 1, instance: INST, mode: MODE, active: LISTS.active, lists: LISTS.lists };
   }
   function importData(v) {
     if (!v || v.format !== 'posthuman-vj-playlists') throw new Error('not a POST/HUMAN · VJ playlist file');
@@ -812,6 +868,7 @@
   function openShared(hash) {
     const m = /^#pl=([A-Za-z0-9_-]+)$/.exec(hash || '');
     if (!m) return false;
+    if (MODE !== 'hydra') { log('Switch to Hydras to open a shared playlist', true); return false; }
     try {
       const p = JSON.parse(unb64u(m[1]));
       const items = cleanList((p.items || []).map(([id, dur]) => ({ id, dur })));
@@ -843,7 +900,7 @@
   function editLink(sk) { return 'https://hydra.ojack.xyz/?code=' + encodeURIComponent(sk.hydraCode); }
   function renderGallery() {
     const q = $('#g-q').value.trim().toLowerCase(), onlyStar = $('#g-star').checked;
-    const shown = D.sketches.filter(s => (!onlyStar || stars.has(s.id)) &&
+    const shown = POOL.filter(s => (!onlyStar || stars.has(s.id)) &&
       (!q || s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)));
     grid.replaceChildren(...shown.map(s => {
       const img = h('img', { src: s.thumb, alt: s.title, loading: 'lazy', width: 320, height: 180 });
@@ -853,15 +910,16 @@
         h('div', { class: 'meta' }, h('b', { text: s.title }), h('span', { text: s.author })),
         s.quarantine ? h('div', { class: 'qb', text: 'Quarantined: ' + s.quarantine }) : null,
         banned.has(s.id) ? h('div', { class: 'qb ban', text: 'Banned on this instance' }) : null,
+        s.draft ? h('div', { class: 'qb draft', text: 'Draft, pending approval' }) : null,
         h('div', { class: 'acts' },
           h('button', { class: 'star', 'data-act': 'star', title: 'Star', 'aria-pressed': String(stars.has(s.id)), text: stars.has(s.id) ? '★' : '☆' }),
           h('button', { 'data-act': 'add', text: 'Add' }),
           h('button', { 'data-act': 'play', text: 'Play' }),
-          h('a', { href: editLink(s), target: '_blank', rel: 'noopener', text: 'Edit in Hydra' })));
+          s.kodama ? null : h('a', { href: editLink(s), target: '_blank', rel: 'noopener', text: 'Edit in Hydra' })));
       markInList(card);
       return card;
     }));
-    $('#g-n').textContent = shown.length + ' / ' + D.sketches.length;
+    $('#g-n').textContent = shown.length + ' / ' + POOL.length;
   }
   grid.addEventListener('click', e => {
     const el = e.target.closest('[data-act]'), card = e.target.closest('.cardg');
@@ -887,9 +945,9 @@
   }
   btn('star').addEventListener('click', () => RT.cur && toggleStar(RT.cur));
   $('#pl-fromstar').addEventListener('click', () => {
-    const ids = D.sketches.filter(s => stars.has(s.id) && !s.quarantine).map(s => s.id);
+    const ids = POOL.filter(s => stars.has(s.id) && !s.quarantine).map(s => s.id);
     if (!ids.length) { log('No starred sketches yet', true); return; }
-    LISTS.lists.Starred = ids.map(id => ({ id, dur: S.defaultDur }));
+    LISTS.lists.Starred = ids.map(id => ({ id, dur: defDur() }));
     switchList('Starred');
     log('Playlist "Starred" made from ' + ids.length + ' starred sketches');
   });
@@ -913,9 +971,24 @@
   function postState() { post({ t: 'state', black: S.black, code: RT.code, level: RT.level }); }
   const outLive = () => !OUT && performance.now() - RT.outSeen < 3000;
   const previewResting = () => outLive() && !S.outPreview;
-  if (chan) chan.onmessage = ({ data: m }) => {
+  let pendingMsg = null, outFadeT = 0; // output window: a show that waits for the kodama pack to open
+  if (chan) chan.onmessage = ({ data: m }) => onMsg(m);
+  function onMsg(m) {
     if (!m || typeof m !== 'object') return;
     if (OUT) {
+      if (m.t === 'mode') {
+        const fe = $('#mfade');
+        fe.style.opacity = '1';
+        clearTimeout(outFadeT);
+        outFadeT = setTimeout(() => { fe.style.opacity = '0'; }, 900);
+      }
+      if (m.t === 'kkey' && typeof m.key === 'string' && !CTX.kodama) loadKodamas(m.key);
+      if (m.t === 'kset' && m.k) S.k = { speed: clamp(m.k.speed, 0.1, 3, 1), tt: clamp(m.k.tt, 0, 3, 1), rev: !!m.k.rev };
+      if (m.t === 'kclick' && m.id === RT.cur && typeof m.sel === 'string') kClick(m.sel);
+      if (m.t === 'pal' && m.pal) applyPalette(cleanPal(m.pal));
+      if ((m.t === 'show' || m.t === 'sync') && (m.mode || 'hydra') !== MODE) {
+        if (!setMode(m.mode || 'hydra', { instant: true, noStart: true })) { pendingMsg = m; return; }
+      }
       if (m.t === 'show' || m.t === 'sync') {
         if (m.t === 'show' || m.id !== RT.cur) {
           if (m.t === 'show') { S.transition = m.cut ? 'cut' : 'xfade'; S.xfadeSec = clamp(m.xfadeSec, 0.2, 10, 2); }
@@ -929,7 +1002,7 @@
       }
       if (m.t === 'fx') applyFx(m.A, m.fx || S.au);
       if (m.t === 'knobs' && m.slot) PHK[m.slot] = m.vals;
-      if (m.t === 'run' && m.id === RT.cur && typeof m.code === 'string') {
+      if (m.t === 'run' && MODE === 'hydra' && m.id === RT.cur && typeof m.code === 'string') {
         if (m.slot) PHK[m.slot] = m.vals;
         const err = evalLive(m.code);
         if (err) restoreGood(); else ED.goodEval = m.code;
@@ -941,7 +1014,10 @@
       RT.outSeen = performance.now();
       if (fresh) {
         log('Output window connected');
-        post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level });
+        if (PHKODA.P.raw) post({ t: 'kkey', key: PHKODA.P.raw });
+        post({ t: 'kset', k: S.k });
+        post({ t: 'sync', id: RT.cur, black: S.black, code: RT.code, level: RT.level, mode: MODE });
+        post({ t: 'pal', pal: effPal() });
         if (ED.liveCode) post({ t: 'run', id: RT.cur, code: ED.liveCode, slot: ED.active ? ED.slot : 0, vals: PHK[ED.slot] });
       }
     } else if (m.t === 'failed' && SK.has(m.id) && !RT.failed.has(m.id)) {
@@ -950,7 +1026,7 @@
       log('Output window skipped "' + SK.get(m.id).title + '" (' + m.id + '): ' + m.reason, true);
       if (RT.cur === m.id) advance(1, { cut: true });
     }
-  };
+  }
   if (OUT) {
     body.classList.add('out');
     document.title = 'POST/HUMAN · VJ output · ' + INST;
@@ -1203,7 +1279,7 @@
 
   // numeric literals that are whole float arguments of a hydra function call
   function parseKnobs(code) {
-    const T = RT.decks[0].hy.generator.glslTransforms;
+    const T = HDECKS[0].hy.generator.glslTransforms;
     const out = [], stack = [];
     const n = code.length;
     let i = 0, prev = '', prevIdent = '', prevIdentDotted = false, prevIdentEnd = -1;
@@ -1301,6 +1377,7 @@
 
   // eval on the deck that is on screen: no hush, no time reset
   function evalLive(code) {
+    if (MODE !== 'hydra') return new Error('live edit works on Hydra sketches');
     finishFade();
     const d = curDeck();
     if (!d || !d.id) return new Error('nothing on screen');
@@ -1314,6 +1391,7 @@
     } catch (e) { return e; }
   }
   function restoreGood() {
+    if (MODE !== 'hydra') return;
     const d = curDeck();
     if (d) d.tickErr = '';
     const e = evalLive(ED.goodEval);
@@ -1325,6 +1403,7 @@
     restoreGood();
   }
   function edRun(text, opts = {}) {
+    if (MODE !== 'hydra') { edError('Live edit works on Hydra sketches. Switch to Hydras.'); return false; }
     if (!RT.cur) return false;
     const err = evalLive(text);
     if (err) {
@@ -1441,6 +1520,313 @@
     window.open('https://hydra.ojack.xyz/?code=' + encodeURIComponent(btoa(encodeURIComponent(edText.value))), '_blank', 'noopener');
   });
 
+  // ---- Kodama mode: Marko's kodama scenes on two iframe decks ----------------------------------------
+  // One mode plays at a time. Each mode keeps its own pool, playlists, stars, bans, position and
+  // failures; switching swaps them and fades through black. A kodama scene plays in a same-origin
+  // iframe driven by kodama-rig.js: this loop steps it, so the fps cap, the resting preview, the
+  // skip rules and the output window work as they do for the hydra decks.
+
+  const KDECKS = [...document.querySelectorAll('#kdecks .kd')].map(el => ({
+    kind: 'k', canvas: el, frame: null, id: null, badSince: 0, tickErr: '', ready: false, rendered: false, t0: 0,
+  }));
+  const CTX = { hydra: null, kodama: null };
+
+  // each iframe is the quality level's size, scaled to fit the stage
+  function kLayout() {
+    const st = $('#stage').getBoundingClientRect(), c = LEVEL[RT.level];
+    const s = Math.min(st.width / c.w, st.height / c.h) || 1;
+    const x = (st.width - c.w * s) / 2, y = (st.height - c.h * s) / 2;
+    for (const d of KDECKS) {
+      const f = d.frame;
+      if (!f) continue;
+      if (f.style.width !== c.w + 'px') { f.style.width = c.w + 'px'; f.style.height = c.h + 'px'; }
+      f.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + s.toFixed(5) + ')';
+    }
+  }
+  if ('ResizeObserver' in window) new ResizeObserver(kLayout).observe($('#stage'));
+
+  function kRig(d) { try { return d.frame && d.frame.contentWindow && d.frame.contentWindow.__rig; } catch (e) { return null; } }
+  function kLoad(d, sk) {
+    kUnload(d);
+    const html = PHKODA.prep(sk.scene);
+    if (!html) return new Error('scene file missing from the pack');
+    const f = document.createElement('iframe');
+    f.title = 'kodama'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+    f.srcdoc = html;
+    Object.assign(d, { frame: f, ready: false, rendered: false, t0: performance.now(), tickErr: '' });
+    d.canvas.append(f);
+    kLayout();
+    return null;
+  }
+  function kStep(d, dt) {
+    const r = kRig(d);
+    d.rendered = false;
+    if (r && r.err) throw new Error(r.err);
+    if (r && r.step) {
+      const before = r.renders;
+      r.step(dt, S.k.speed, S.k.tt * (S.k.rev ? -1 : 1));
+      d.rendered = r.renders > before;
+      if (r.ready && !d.ready) {
+        d.ready = true;
+        const f = d.frame, c = r.canvas();
+        if (c) c.addEventListener('webglcontextlost', () => { if (d.frame === f && d.id) { RT.ctxLost++; failDeck(d, 'WebGL context lost'); } });
+      }
+    }
+    if (!d.ready && performance.now() - d.t0 > 15000) throw new Error('did not start within 15 s');
+  }
+  function kUnload(d) {
+    const r = kRig(d);
+    if (r && r.destroy) try { r.destroy(); } catch (e) { /* gone */ }
+    if (d.frame) d.frame.remove();
+    Object.assign(d, { frame: null, ready: false, rendered: false });
+  }
+
+  // the pack: plain local folder or the encrypted copy; every scene is in memory once it opens
+  let kOpening = null;
+  function loadKodamas(rawKey) {
+    if (CTX.kodama) return Promise.resolve(true);
+    if (kOpening && !rawKey) return kOpening;
+    kOpening = PHKODA.open(rawKey).then(P => {
+      const ok = (P.mode === 'local' || P.mode === 'encrypted') && P.scenes.length > 0;
+      if (ok) { buildKodamaCtx(P); log('Kodama pack open (' + (P.mode === 'local' ? 'local folder' : 'encrypted pack') + '): ' + P.scenes.length + ' scenes, ' + P.scenes.filter(s => s.quarantine).length + ' quarantined'); }
+      else if (!OUT) log(P.why || 'Kodama pack not loaded');
+      if (!OUT) { renderPack(); renderBar(); }
+      if (ok && OUT && pendingMsg) { const m = pendingMsg; pendingMsg = null; onMsg(m); }
+      return ok;
+    }, e => { log('Kodama pack could not open: ' + (e.message || e), true); if (!OUT) renderPack(); return false; });
+    return kOpening;
+  }
+  function buildKodamaCtx(P) {
+    const pool = P.scenes.map(s => ({
+      id: s.id, title: s.title, author: 'Marko Manriquez', license: 'all rights reserved', code: '',
+      thumb: P.thumbs.get(s.id) || '', quarantine: s.quarantine || '', draft: !!s.draft, kodama: true, scene: s,
+    }));
+    const ksk = new Map(pool.map(s => [s.id, s]));
+    const kload = (k, fb) => load('k:' + k, fb);
+    // drafts stay out of the default playlist until Marko approves them
+    const first = { active: 'Kodamas', lists: { Kodamas: pool.filter(s => !s.quarantine && !s.draft).map(s => ({ id: s.id, dur: S.kDur })) } };
+    CTX.kodama = {
+      SK: ksk, POOL: pool,
+      LISTS: cleanLists(kload('lists', null), ksk, S.kDur) || first,
+      stars: new Set((kload('stars', []) || []).filter(id => ksk.has(id))),
+      banned: new Set((kload('banned', []) || []).filter(id => ksk.has(id))),
+      PLAY: cleanPlay(kload('play', {}), ksk),
+      failed: new Set(),
+    };
+  }
+  let kPackErr = '';
+  function renderPack() {
+    const P = PHKODA.P, open = !!CTX.kodama;
+    $('#k-pack').hidden = open && MODE !== 'kodama';
+    $('#k-pack-st').textContent = open
+      ? 'Kodama pack: ' + P.scenes.length + ' scenes, from the ' + (P.mode === 'local' ? 'local folder' : 'encrypted pack') + '. Drafts are marked.'
+      : kPackErr || (P.why || 'Kodama pack not loaded') + '.';
+    $('#k-unlock').hidden = open || P.mode !== 'locked';
+    $('#k-forget').hidden = !(open && P.mode === 'encrypted');
+  }
+  $('#k-unlock').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pass = $('#k-pass').value;
+    if (!pass) return;
+    $('#k-go').disabled = true;
+    try {
+      const P = await PHKODA.unlock(pass, $('#k-remember').checked);
+      buildKodamaCtx(P);
+      kPackErr = '';
+      $('#k-pass').value = '';
+      log('Kodama pack unlocked: ' + P.scenes.length + ' scenes');
+      post({ t: 'kkey', key: P.raw });
+    } catch (err) { log('Kodama pack: ' + (err.message || err), true); kPackErr = 'Wrong password, or the pack could not be read.'; }
+    $('#k-go').disabled = false;
+    renderPack(); renderBar();
+    if (MODE === 'kodama' || CTX.kodama) $('#k-pass').blur();
+  });
+  $('#k-forget').addEventListener('click', () => { PHKODA.forget(); log('Saved kodama key removed from this laptop (it still works until reload)'); });
+
+  // switching modes: stop this mode's decks, swap the pools, start the other mode
+  function stopDecks() {
+    finishFade();
+    for (const d of RT.decks) {
+      if (d.kind === 'k') kUnload(d);
+      else {
+        try { for (const src of d.hy.s || []) { try { if (src.tex) src.tex.destroy(); } catch (e) { /* gone */ } } d.hy.hush(); } catch (e) { /* ignore */ }
+        d.edited = false;
+      }
+      d.id = null; d.badSince = 0; d.canvas.style.opacity = '0';
+    }
+    RT.live = -1; RT.fade = null;
+  }
+  function startMode() {
+    const id = PLAY.id;
+    if (id && SK.has(id) && !SK.get(id).quarantine && !banned.has(id) && show(id, { cut: true, elapsed: PLAY.elapsed })) return;
+    advance(1, { cut: true, from: null });
+  }
+  let modeT = 0;
+  function setMode(m, opts = {}) {
+    m = m === 'kodama' ? 'kodama' : 'hydra';
+    if (m === MODE) return true;
+    if (m === 'kodama' && !CTX.kodama) {
+      log((PHKODA.P.why || 'Kodama pack not loaded') + '. See the Gallery tab.', true);
+      if (!OUT) { renderPack(); setTab('gallery'); }
+      return false;
+    }
+    const swap = () => {
+      const playing = PLAY.playing;
+      savePlay();
+      stopDecks();
+      CTX[MODE] = { SK, POOL, LISTS, stars, banned, PLAY, failed: RT.failed };
+      MODE = m;
+      const c = CTX[m];
+      ({ SK, POOL, LISTS, stars, banned, PLAY } = c);
+      RT.failed = c.failed;
+      RT.decks = m === 'kodama' ? KDECKS : HDECKS;
+      RT.cur = null; RT.elapsed = 0;
+      PLAY.playing = playing && !OUT;
+      if (!OUT) {
+        S.mode = m;
+        if (m === 'kodama' && !opts.keepPal) S.pal.kodama = cleanPal(Object.assign({}, S.pal.kodama, { style: S.kPalDef }));
+        saveSettings();
+        edLoad(null);
+        if (m === 'kodama') $('#ed-title').textContent = 'Live edit works on Hydra sketches';
+      }
+      stageMsg('');
+      if (!opts.noStart) startMode();
+      applyPalette();
+      if (!OUT) { renderPlaylist(); if ($('#g-grid').children.length || S.tab === 'gallery') renderGallery(); renderPack(); }
+      renderNow(); renderBar();
+      log('Mode: ' + (m === 'kodama' ? 'Kodamas' : 'Hydras'));
+    };
+    if (opts.instant) { swap(); return true; }
+    // fade through black: the output window gets the same fade, then the show message
+    post({ t: 'mode', mode: m });
+    const fe = $('#mfade');
+    fe.style.opacity = '1';
+    clearTimeout(modeT);
+    modeT = setTimeout(() => { swap(); requestAnimationFrame(() => { fe.style.opacity = '0'; }); }, 470);
+    return true;
+  }
+  function renderModeUi() {
+    press(btn('mh'), MODE === 'hydra');
+    press(btn('mk'), MODE === 'kodama');
+    $('#tab-gal').textContent = MODE === 'kodama' ? 'Kodamas' : 'Gallery';
+    $('#k-scene').hidden = MODE !== 'kodama';
+    $('#g-q').placeholder = MODE === 'kodama' ? 'Search title' : 'Search title or author';
+  }
+  btn('mh').addEventListener('click', () => setMode('hydra'));
+  btn('mk').addEventListener('click', () => setMode('kodama'));
+
+  // the scene's own controls, mirrored from data/kodama-controls.json; clicks go to the scene's buttons
+  function kRenderScene() {
+    const sk = MODE === 'kodama' ? SK.get(RT.cur) : null, box = $('#k-ctrls');
+    $('#k-cur').textContent = sk ? sk.title + (sk.draft ? ' (draft)' : '') : 'Nothing on screen';
+    const reg = sk ? (PHKODA.P.reg || {})[sk.id] : null;
+    box.dataset.id = sk ? sk.id : '';
+    if (!reg || !reg.groups.length) {
+      box.replaceChildren(h('p', { class: 'dim', text: sk ? 'No buttons of its own. Speed and turntable still work.' : '' }));
+      return;
+    }
+    box.replaceChildren(...reg.groups.map(g => h('div', { class: 'kg' }, h('b', { text: g.name }),
+      ...g.items.map(it => h('button', { 'data-sel': it.sel, 'aria-pressed': 'false', text: it.label })))));
+    kRenderOn();
+  }
+  function kClick(sel) {
+    const d = curDeck(), r = d && d.kind === 'k' ? kRig(d) : null;
+    const ok = !!(r && r.click && r.click(sel));
+    if (!OUT) { post({ t: 'kclick', id: RT.cur, sel }); kRenderOn(); }
+    return ok;
+  }
+  function kRenderOn() {
+    const box = $('#k-ctrls'), d = curDeck(), r = d && d.kind === 'k' ? kRig(d) : null;
+    if (!r || !r.on || box.dataset.id !== RT.cur) return;
+    const btns = [...box.querySelectorAll('[data-sel]')];
+    const on = new Set(r.on(btns.map(b => b.dataset.sel)));
+    for (const b of btns) press(b, on.has(b.dataset.sel));
+  }
+  $('#k-ctrls').addEventListener('click', e => { const b = e.target.closest('[data-sel]'); if (b) { kClick(b.dataset.sel); b.blur(); } });
+
+  // playback speed and turntable, for every kodama scene
+  function renderK() {
+    $('#k-speed').value = String(S.k.speed); $('#k-speed-v').textContent = S.k.speed.toFixed(2) + '×';
+    $('#k-tt').value = String(S.k.tt); $('#k-tt-v').textContent = S.k.tt.toFixed(2) + '×';
+    $('#k-rev').checked = S.k.rev;
+  }
+  const kSet = () => { renderK(); post({ t: 'kset', k: S.k }); };
+  $('#k-speed').addEventListener('input', e => { S.k.speed = clamp(e.target.value, 0.1, 3, 1); kSet(); });
+  $('#k-tt').addEventListener('input', e => { S.k.tt = clamp(e.target.value, 0, 3, 1); kSet(); });
+  for (const id of ['#k-speed', '#k-tt']) $(id).addEventListener('change', e => { saveSettings(); e.target.blur(); });
+  $('#k-speed-1').addEventListener('click', () => { S.k.speed = 1; saveSettings(); kSet(); });
+  $('#k-rev').addEventListener('change', e => { S.k.rev = e.target.checked; saveSettings(); kSet(); });
+
+  // palettes: an SVG filter on the deck wrapper. Contrast first, then luminance, then a color map,
+  // mixed back with the (contrast-adjusted) original by the intensity
+  const hex3 = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255);
+  const f4 = n => (Math.round(n * 10000) / 10000).toString();
+  const RGB = ['R', 'G', 'B'];
+  function palMarkup(p) {
+    const con = p.con !== 1
+      ? '<feComponentTransfer in="SourceGraphic" result="c">' + RGB.map(ch => '<feFunc' + ch + ' type="linear" slope="' + f4(p.con) + '" intercept="' + f4(0.5 - 0.5 * p.con) + '"/>').join('') + '</feComponentTransfer>'
+      : '';
+    const src = con ? 'c' : 'SourceGraphic';
+    if (p.style === 'original') return con;
+    const L = '0.2126 0.7152 0.0722 0 0';
+    let x = con + '<feColorMatrix in="' + src + '" type="matrix" values="' + L + ' ' + L + ' ' + L + ' 0 0 0 1 0" result="g"/>';
+    let tables = null, type = 'table';
+    if (p.style === 'bw') { type = 'discrete'; const v = Array.from({ length: 100 }, (_, k) => (k / 100 >= p.thr ? 1 : 0)).join(' '); tables = [v, v, v]; }
+    else if (p.style === 'mono') tables = hex3(p.mono).map(v => '0 ' + f4(v));
+    else if (p.style === 'duotone') { const a = hex3(p.a), b = hex3(p.b); tables = a.map((v, i) => f4(v) + ' ' + f4(b[i])); }
+    else if (p.style === 'rg') tables = ['0 1 0', '0 0 1', '0 0 0']; // dark to red, light to green
+    if (tables) x += '<feComponentTransfer in="g" result="m">' + RGB.map((ch, i) => '<feFunc' + ch + ' type="' + type + '" tableValues="' + tables[i] + '"/>').join('') + '</feComponentTransfer>';
+    if (p.int < 1) x += '<feComposite in="' + (tables ? 'm' : 'g') + '" in2="' + src + '" operator="arithmetic" k1="0" k2="' + f4(p.int) + '" k3="' + f4(1 - p.int) + '" k4="0"/>';
+    return x;
+  }
+  const effPal = () => { const it = list().find(x => x.id === RT.cur); return (it && it.pal) || S.pal[MODE]; };
+  let palShown = null;
+  function applyPalette(p = effPal()) {
+    const m = palMarkup(p);
+    RT.pal = p;
+    if (m !== palShown) {
+      palShown = m;
+      $('#phpal').innerHTML = m;
+      const el = $('#pal');
+      el.style.filter = 'none';
+      void el.offsetWidth; // make Chrome pick up the new filter content
+      el.style.filter = m ? 'url(#phpal)' : '';
+    }
+    if (!OUT) post({ t: 'pal', pal: p });
+  }
+  function renderPal() {
+    const p = S.pal[MODE], it = list().find(x => x.id === RT.cur);
+    $('#p-style').value = p.style; $('#p-thr').value = String(p.thr); $('#p-mono-c').value = p.mono;
+    $('#p-duo-pre').value = p.pre; $('#p-duo-a').value = p.a; $('#p-duo-b').value = p.b;
+    $('#p-int').value = String(p.int); $('#p-con').value = String(p.con); $('#p-kdef').value = S.kPalDef;
+    $('#p-bw').hidden = p.style !== 'bw'; $('#p-mono').hidden = p.style !== 'mono'; $('#p-duo').hidden = p.style !== 'duotone';
+    $('#p-for').textContent = '(' + (MODE === 'kodama' ? 'Kodamas' : 'Hydras') + (it && it.pal ? '; this item has its own palette' : '') + ')';
+  }
+  function setPal(ch) { S.pal[MODE] = cleanPal(Object.assign({}, S.pal[MODE], ch)); renderPal(); applyPalette(); }
+  $('#p-style').addEventListener('change', e => { setPal({ style: e.target.value }); saveSettings(); e.target.blur(); });
+  $('#p-thr').addEventListener('input', e => setPal({ thr: Number(e.target.value) }));
+  $('#p-mono-c').addEventListener('input', e => setPal({ mono: e.target.value }));
+  $('#p-duo-pre').addEventListener('change', e => {
+    const pre = e.target.value;
+    setPal(DUO[pre] ? { pre, a: DUO[pre][0], b: DUO[pre][1] } : { pre });
+    saveSettings(); e.target.blur();
+  });
+  $('#p-duo-a').addEventListener('input', e => setPal({ a: e.target.value, pre: 'custom' }));
+  $('#p-duo-b').addEventListener('input', e => setPal({ b: e.target.value, pre: 'custom' }));
+  $('#p-int').addEventListener('input', e => setPal({ int: Number(e.target.value) }));
+  $('#p-con').addEventListener('input', e => setPal({ con: Number(e.target.value) }));
+  for (const id of ['#p-thr', '#p-mono-c', '#p-duo-a', '#p-duo-b', '#p-int', '#p-con']) $(id).addEventListener('change', e => { saveSettings(); e.target.blur(); });
+  $('#p-kdef').addEventListener('change', e => { S.kPalDef = PAL_STYLES.includes(e.target.value) ? e.target.value : 'original'; saveSettings(); e.target.blur(); });
+  // a playlist item can keep its own palette
+  function setItemPal(id) {
+    const it = list().find(x => x.id === id);
+    if (!it) return;
+    if (it.pal) { delete it.pal; log('Palette cleared for ' + SK.get(id).title); }
+    else { it.pal = cleanPal(S.pal[MODE]); log('Palette saved for ' + SK.get(id).title + ': ' + it.pal.style); }
+    changed();
+    if (id === RT.cur) { applyPalette(); renderPal(); }
+  }
+
   // ---- bar controls and keys ----------------------------------------------------------------------
 
   btn('play').addEventListener('click', () => setPlaying(!PLAY.playing));
@@ -1513,7 +1899,8 @@
 
   const gpu = gpuName();
   $('#gpu').textContent = 'GPU: ' + gpu;
-  RT.decks = [mkDeck($('#deck-a')), mkDeck($('#deck-b'))];
+  const HDECKS = [mkDeck($('#deck-a')), mkDeck($('#deck-b'))];
+  RT.decks = HDECKS;
   openShared(location.hash);
   window.addEventListener('hashchange', () => { if (openShared(location.hash)) renderPlaylist(); });
   renderPlaylist();
@@ -1522,13 +1909,18 @@
   renderBar();
   log('Ready. Instance "' + INST + '", ' + D.sketches.length + ' sketches, ' + D.sketches.filter(s => s.quarantine).length + ' quarantined. GPU: ' + gpu);
 
-  // restore the sketch that was on, where it was; else the first playable item
-  const restoreId = PLAY.id;
-  if (restoreId && SK.has(restoreId) && !SK.get(restoreId).quarantine && !banned.has(restoreId) && show(restoreId, { cut: true, elapsed: PLAY.elapsed })) { /* restored */ }
-  else advance(1, { cut: true, from: null });
+  // restore the sketch that was on, where it was; else the first playable item. A Kodama-mode
+  // instance waits for the pack instead (the output window waits for the controller).
+  if (S.mode === 'kodama') stageMsg('Opening the kodama pack');
+  else startMode();
   renderBar();
   requestAnimationFrame(frame);
   if (!OUT) { listInputs(); if (S.au.on) audioStart(); }
+  loadKodamas().then(ok => {
+    if (OUT || S.mode !== 'kodama' || MODE === 'kodama') return;
+    if (ok) setMode('kodama', { instant: true, keepPal: true });
+    else { log('Kodama pack not available; starting in Hydras', true); S.mode = 'hydra'; saveSettings(); stageMsg(''); startMode(); renderBar(); }
+  });
 
   // test and debug handle
   window.PHVJ = {
@@ -1541,7 +1933,9 @@
         fs: RT.fs, code: RT.code, settings: { ...S }, active: LISTS.active,
         list: list().map(it => ({ ...it })), lists: Object.keys(LISTS.lists), stars: [...stars],
         out: OUT, outLive: outLive(), resting: previewResting(), hold: PLAY.hold, cue: PLAY.cue, banned: [...banned],
-        time: curDeck() ? curDeck().hy.synth.time : 0, evals: RT.evals, edited: !!(curDeck() && curDeck().edited),
+        time: curDeck() && curDeck().hy ? curDeck().hy.synth.time : 0, evals: RT.evals,
+        mode: MODE, kpack: PHKODA.P.mode, kscenes: PHKODA.P.scenes.length, kready: !!(curDeck() && curDeck().ready),
+        kframes: document.querySelectorAll('#kdecks iframe').length, k: { ...S.k }, pal: RT.pal ? { ...RT.pal } : null, edited: !!(curDeck() && curDeck().edited),
         knobs: ED.knobs.map((kn, k) => kn.fn + '.' + kn.name + '=' + ED.links[k].v), knobVals: (PHK[ED.slot] || []).slice(), edActive: ED.active,
         edErr: edErr.textContent, variants: VARIANTS.map(v => v.id),
         fx: RT.fx, audio: !!AU.ctx, auLabel: AU.label, auLost: !!AU.lost, auStatus: $('#au-status').textContent, A: { ...A }, dur: RT.cur ? durOf(RT.cur) : 0,
@@ -1552,6 +1946,15 @@
       SK.set(id, { id, title: 'Test ' + id, author: 'test', link: '', href: '', code, hydraCode: '', thumb: '', quarantine: '' });
     },
     addToList, pull, edRun, saveVariant, parseKnobs,
+    setMode, loadKodamas, kClick, setPal, setItemPal, applyPalette,
+    poolIds: () => POOL.filter(x => !x.quarantine).map(x => x.id),
+    // a scene that is not in the pack (kodama mode only), to test the skip rules
+    addTestKodama(id, html) {
+      const file = 'test-' + id + '.html', scene = { id, file, title: 'Test ' + id };
+      PHKODA.P.files.set(file, html);
+      SK.set(id, { id, title: scene.title, author: 'test', code: '', thumb: '', quarantine: '', kodama: true, scene });
+    },
+    kRig: () => { const d = curDeck(); return d && d.kind === 'k' ? kRig(d) : null; },
     testEndInput: () => { if (AU.stream) AU.stream.getAudioTracks()[0].dispatchEvent(new Event('ended')); },
   };
 })();

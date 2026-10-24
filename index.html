@@ -11,7 +11,8 @@
 <body>
 <div id="app">
   <header id="bar">
-    <div class="grp brand"><b>POST/HUMAN · VJ</b><span id="inst" class="tag" title="Instance name (?i=)"></span></div>
+    <div class="grp brand"><b>POST/HUMAN · VJ</b><span id="inst" class="tag" title="Instance name (?i=)"></span>
+      <span class="seg" role="group" aria-label="Mode"><button id="b-mh" title="Hydra sketches">Hydras</button><button id="b-mk" title="Kodama scenes">Kodamas</button></span></div>
     <div class="grp transport">
       <button id="b-prev" title="Previous (Left)">Prev</button>
       <button id="b-play" class="wide" title="Play / pause (Space)">Play</button>
@@ -50,21 +51,27 @@
 
   <main id="main">
     <section id="stage" aria-label="Output">
-      <div id="decks">
-        <canvas id="deck-a"></canvas>
-        <canvas id="deck-b"></canvas>
+      <div id="pal">
+        <div id="decks">
+          <canvas id="deck-a"></canvas>
+          <canvas id="deck-b"></canvas>
+          <div id="kdecks"><div class="kd"></div><div class="kd"></div></div>
+        </div>
       </div>
       <pre id="code-ov" hidden></pre>
       <div id="credit"></div>
       <div id="stage-msg" hidden></div>
+      <div id="mfade"></div>
       <div id="black" hidden></div>
+      <svg id="pal-svg" width="0" height="0" aria-hidden="true"><filter id="phpal" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"></filter></svg>
     </section>
 
     <aside id="panel">
       <nav id="tabs" role="tablist">
         <button data-tab="playlist" role="tab">Playlist</button>
-        <button data-tab="gallery" role="tab">Gallery</button>
+        <button data-tab="gallery" role="tab" id="tab-gal">Gallery</button>
         <button data-tab="live" role="tab">Live</button>
+        <button data-tab="scene" role="tab">Scene</button>
         <button data-tab="code" role="tab">Code</button>
         <button data-tab="credits" role="tab">Credits</button>
         <button data-tab="log" role="tab">Log <span id="log-n" class="badge" hidden></span></button>
@@ -104,6 +111,15 @@
       </div>
 
       <div id="v-gallery" class="view" hidden>
+        <div id="k-pack" hidden>
+          <p id="k-pack-st" class="dim"></p>
+          <form id="k-unlock" class="row" hidden>
+            <input id="k-pass" type="password" autocomplete="current-password" placeholder="Kodama pack password" aria-label="Kodama pack password">
+            <label class="chk"><input id="k-remember" type="checkbox" checked> Remember on this laptop</label>
+            <button id="k-go" type="submit">Unlock</button>
+          </form>
+          <div class="row"><button id="k-forget" hidden>Forget the saved key</button></div>
+        </div>
         <div class="row">
           <input id="g-q" type="search" placeholder="Search title or author">
           <label class="chk"><input id="g-star" type="checkbox"> Starred</label>
@@ -154,6 +170,54 @@
         <p class="dim">Zoom and flash sit on top of the sketch; sketch code is untouched. Browser voice processing is off. In edited code, A.full, A.low, A.mid, A.high and A.custom give the levels (0 to 1).</p>
       </div>
 
+      <div id="v-scene" class="view" hidden>
+        <div id="k-scene">
+          <h3>Scene controls</h3>
+          <p id="k-cur" class="dim"></p>
+          <div id="k-ctrls"></div>
+          <div class="row sl"><span class="lbl">Speed</span><input id="k-speed" type="range" min="0.1" max="3" step="0.05" title="Playback speed"><span id="k-speed-v" class="readout"></span><button id="k-speed-1" title="Back to 1x">1×</button></div>
+          <div class="row sl"><span class="lbl">Turntable</span><input id="k-tt" type="range" min="0" max="3" step="0.05" title="Turntable speed"><span id="k-tt-v" class="readout"></span><label class="chk"><input id="k-rev" type="checkbox"> Reverse</label></div>
+          <p class="dim">Speed scales the whole scene clock (0.1× to 3×). Turntable 0 stops the orbit. Dragging inside the output is off.</p>
+        </div>
+        <h3>Palette <span id="p-for" class="dim"></span></h3>
+        <div class="row">
+          <select id="p-style" title="Palette">
+            <option value="original">Original</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="bw">Black / white</option>
+            <option value="mono">Mono</option>
+            <option value="duotone">Duotone</option>
+            <option value="rg">Red/green gradient map</option>
+          </select>
+          <span id="p-extra"></span>
+        </div>
+        <div class="row" id="p-bw"><span class="lbl">Threshold</span><input id="p-thr" type="range" min="0.05" max="0.95" step="0.01"></div>
+        <div class="row" id="p-mono"><span class="lbl">Hue</span><input id="p-mono-c" type="color" title="Mono color"></div>
+        <div class="row" id="p-duo"><span class="lbl">Duotone</span>
+          <select id="p-duo-pre" title="Duotone preset">
+            <option value="rg">Red / green</option>
+            <option value="cm">Cyan / magenta</option>
+            <option value="ai">Amber / indigo</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input id="p-duo-a" type="color" title="Shadows"><input id="p-duo-b" type="color" title="Highlights">
+        </div>
+        <div class="row sl"><span class="lbl">Intensity</span><input id="p-int" type="range" min="0" max="1" step="0.01" title="Mix with the original"></div>
+        <div class="row sl"><span class="lbl">Contrast</span><input id="p-con" type="range" min="0.5" max="2" step="0.01" title="Contrast"></div>
+        <div class="row"><span class="lbl">Kodama start</span>
+          <select id="p-kdef" title="Palette when entering Kodama mode">
+            <option value="original">Original</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="duotone">Duotone</option>
+            <option value="bw">Black / white</option>
+            <option value="mono">Mono</option>
+            <option value="rg">Red/green gradient map</option>
+          </select>
+          <span class="dim">palette on entering Kodama mode</span>
+        </div>
+        <p class="dim">The palette is a filter on the output, after the scene or sketch. Hydras and Kodamas each keep their own. A playlist row's Pal button saves the current palette for that item.</p>
+      </div>
+
       <div id="v-code" class="view" hidden>
         <div class="row"><b id="ed-title"></b></div>
         <div class="ed"><pre id="ed-gutter" aria-hidden="true"></pre><textarea id="ed-text" spellcheck="false" autocomplete="off" wrap="off" aria-label="Sketch code"></textarea></div>
@@ -173,6 +237,7 @@
         <p class="dim">Sketches from the Hydra gallery, each by the artist named, licensed CC BY-NC-SA 4.0. Code runs unmodified.
           Engine: hydra-synth by Olivia Jack and contributors, AGPL-3.0. Fonts: Chakra Petch and Martian Mono, SIL OFL 1.1.
           App code © 2026 Marko Manriquez, all rights reserved.</p>
+        <p class="dim">Kodama scenes © Marko Manriquez, all rights reserved; not part of the public site (local pack or password). three.js r128, MIT.</p>
         <table id="cr-table"><thead><tr><th>Title</th><th>Author</th><th>License</th></tr></thead><tbody></tbody></table>
       </div>
 
@@ -206,6 +271,7 @@
 </div>
 <script src="vendor/hydra-synth/hydra-synth.js"></script>
 <script src="data/sketches.js"></script>
+<script src="kodama.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
